@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Post-Incident Report | Tactical Command</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container": "#e3f0f8",
+                    "secondary-container": "#d7e4ec",
+                    "on-primary-fixed": "#410003",
+                    "surface-variant": "#d7e4ec",
+                    "on-tertiary-fixed-variant": "#723600",
+                    "tertiary-fixed": "#ffdcc6",
+                    "outline-variant": "#e4beba",
+                    "surface-bright": "#f4faff",
+                    "on-primary": "#ffffff",
+                    "on-secondary-fixed-variant": "#3c494f",
+                    "primary-fixed-dim": "#ffb3ac",
+                    "primary-container": "#d32f2f",
+                    "secondary-fixed": "#d7e4ec",
+                    "secondary-fixed-dim": "#bbc8d0",
+                    "on-error": "#ffffff",
+                    "on-primary-container": "#fff2f0",
+                    "inverse-primary": "#ffb3ac",
+                    "on-surface-variant": "#5b403d",
+                    "surface-container-high": "#ddeaf2",
+                    "tertiary-container": "#b05700",
+                    "surface-dim": "#cfdce4",
+                    "inverse-surface": "#263238",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-on-surface": "#e6f3fb",
+                    "surface-tint": "#ba1a20",
+                    "surface-container-low": "#e9f6fd",
+                    "on-primary-fixed-variant": "#930010",
+                    "background": "#f4faff",
+                    "error": "#ba1a1a",
+                    "primary-fixed": "#ffdad6",
+                    "outline": "#8f6f6c",
+                    "on-secondary-fixed": "#111d23",
+                    "on-tertiary-fixed": "#311300",
+                    "tertiary": "#8b4400",
+                    "surface-container-highest": "#d7e4ec",
+                    "tertiary-fixed-dim": "#ffb786",
+                    "surface": "#f4faff",
+                    "on-tertiary": "#ffffff",
+                    "secondary": "#546067",
+                    "on-background": "#111d23",
+                    "on-tertiary-container": "#fff2eb",
+                    "on-secondary-container": "#5a666d",
+                    "on-secondary": "#ffffff",
+                    "on-surface": "#111d23",
+                    "error-container": "#ffdad6",
+                    "on-error-container": "#93000a",
+                    "primary": "#af101a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift { background-color: #e9f6fd; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md flex justify-between items-center px-4 h-16 w-full">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a firefighter in uniform with a determined expression, studio lighting, neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLDd51Cwe-GSITYDNOTMNLUV7T5UCqYLVCYeLkjYg35zs7ivKr0iKYq6erGVq-61Q4CWtmOWcoJZTWN6VEt_3K14Z87s6X2JXUC-aza1olYcl5KZd7SlU-0Rkt7WG-JwgZzE0Mgl3M3IFIS27diDt-lOGMigpSs_qLuKcEsvi4vKO-g5_0vo2zpw0eL2S2DAJ6Pw6y_YM6yM0k11LBtEg4_S0zJQIL_AdPW79cOQ7fTDrEDXvQOKgO2ANKGWaqKJvZWNmDc4os32pt"/>
+</div>
+<h1 class="font-inter tracking-tighter font-bold uppercase text-xl text-slate-900 dark:text-slate-50">TACTICAL COMMAND</h1>
+</div>
+<button class="text-red-700 dark:text-red-500 active:scale-95 transition-transform p-2">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+</button>
+</header>
+<main class="pt-24 px-4 max-w-5xl mx-auto space-y-6">
+<!-- Dashboard Header -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<span class="label-md uppercase tracking-widest text-primary font-bold">Post-Incident Review</span>
+<h2 class="text-4xl font-black tracking-tighter leading-none mt-1">INCIDENT #4409-B</h2>
+<p class="text-secondary mt-2 font-medium">Structural Fire Response - Downtown Sector</p>
+</div>
+<button class="bg-gradient-to-v from-primary to-primary-container text-on-primary px-8 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="picture_as_pdf">picture_as_pdf</span>
+                Generate Legal Report (PDF)
+            </button>
+</section>
+<!-- Bento Grid Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<!-- Call Time -->
+<div class="bg-surface-container-low p-6 rounded-xl space-y-2 border-l-4 border-primary">
+<p class="text-xs font-bold uppercase tracking-widest text-secondary">Call Received</p>
+<p class="text-3xl font-black tracking-tight">02:14</p>
+<p class="text-xs text-on-surface-variant font-medium">12 Oct 2023</p>
+</div>
+<!-- Dispatch Time -->
+<div class="bg-surface-container-low p-6 rounded-xl space-y-2">
+<p class="text-xs font-bold uppercase tracking-widest text-secondary">Dispatch</p>
+<p class="text-3xl font-black tracking-tight">02:16</p>
+<p class="text-xs text-secondary-container bg-primary px-2 py-0.5 rounded inline-block">+2m 14s</p>
+</div>
+<!-- Arrival Time -->
+<div class="bg-surface-container-low p-6 rounded-xl space-y-2">
+<p class="text-xs font-bold uppercase tracking-widest text-secondary">On Scene</p>
+<p class="text-3xl font-black tracking-tight">02:22</p>
+<p class="text-xs text-on-tertiary-fixed-variant bg-tertiary-fixed px-2 py-0.5 rounded inline-block">8m Total</p>
+</div>
+<!-- Completion -->
+<div class="bg-surface-container-low p-6 rounded-xl space-y-2">
+<p class="text-xs font-bold uppercase tracking-widest text-secondary">Cleared</p>
+<p class="text-3xl font-black tracking-tight">04:45</p>
+<p class="text-xs text-on-surface-variant font-medium">Operation Closed</p>
+</div>
+</div>
+<!-- Two Column Detailed Section -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Incident Notes (Main Canvas) -->
+<div class="lg:col-span-2 space-y-4">
+<div class="bg-surface-container-highest p-8 rounded-xl min-h-[400px]">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-xl font-bold tracking-tight flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="description">description</span>
+                            Incident Notes
+                        </h3>
+<span class="text-xs font-bold bg-secondary/10 text-secondary px-3 py-1 rounded-full uppercase">Officer Verified</span>
+</div>
+<div class="prose prose-slate max-w-none text-on-surface/80 leading-relaxed space-y-4">
+<p>Upon arrival at 02:22, heavy smoke was visible from the second-story windows of the commercial structure. Engine 4 deployed two 1.75" lines for interior attack.</p>
+<p>Primary search completed at 02:35 with negative results for occupants. Fire was brought under control at 03:10. Overhaul operations focused on the western roof quadrant where structural compromise was detected.</p>
+<div class="bg-surface-container p-4 rounded-lg italic border-l-2 border-primary-container">
+                            "Structure 4409-B showed significant thermal damage to primary load-bearing beams. Recommend immediate structural engineering assessment before re-entry."
+                        </div>
+<p>All personnel accounted for. No injuries reported during the suppression or overhaul phases.</p>
+</div>
+</div>
+</div>
+<!-- Side Sidebar: Equipment & Status -->
+<div class="space-y-6">
+<!-- Equipment Checklist -->
+<div class="bg-inverse-surface text-inverse-on-surface p-6 rounded-xl shadow-xl">
+<h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary-fixed" data-icon="inventory">inventory</span>
+                        Camión Inventory
+                    </h3>
+<ul class="space-y-3">
+<li class="flex items-center justify-between p-2 rounded bg-white/5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-400 text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-medium">SCBA Units (6)</span>
+</div>
+<span class="text-[10px] uppercase font-bold text-white/40">Returned</span>
+</li>
+<li class="flex items-center justify-between p-2 rounded bg-white/5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-400 text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-medium">Hydraulic Tools</span>
+</div>
+<span class="text-[10px] uppercase font-bold text-white/40">Secured</span>
+</li>
+<li class="flex items-center justify-between p-2 rounded bg-white/5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+<span class="text-sm font-medium">LDR 50' Hose</span>
+</div>
+<span class="text-[10px] uppercase font-bold text-primary">Damaged</span>
+</li>
+<li class="flex items-center justify-between p-2 rounded bg-white/5">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-400 text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-medium">Thermal Camera</span>
+</div>
+<span class="text-[10px] uppercase font-bold text-white/40">Returned</span>
+</li>
+</ul>
+</div>
+<!-- Digital Signatures -->
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
+<h3 class="text-sm font-bold uppercase tracking-widest text-secondary mb-4">Command Validation</h3>
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary" data-icon="draw">draw</span>
+</div>
+<div>
+<p class="text-sm font-bold">Capt. Marcus Thorne</p>
+<p class="text-[10px] text-on-surface-variant">Electronically Signed @ 05:02</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Tactical Image Section (Visual Record) -->
+<div class="relative w-full h-64 rounded-2xl overflow-hidden shadow-inner bg-slate-200">
+<img class="w-full h-full object-cover opacity-80 mix-blend-multiply" data-alt="dramatic night shot of a fire truck at a scene with flashing red lights reflecting on wet asphalt, smoke rising from a building in the background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtf-GKs5Tfe9CZcC0gwZUFKG6FDevZ6bJsEWFKZO32DeoIsGRJ7vH0sScp7epn3RMQ40tuVHgVpM4egtvClHAE6Vn_AlnAyWUpMLbX-txLRoU8UT083BH1Oz2yWIftcbMYX3z95HGSZujH457V1aUgn0kyDTNYWsnrk1DzzF0kYscE2wz0DlKA-nmmXIueLSlRbUjNYWAv3p6xSpbcdeeT8xF-YyHNduyTB-nO1XA7F9jZKQU6g67KA7uS2sGJ4EtVzJK-blrbcPBL"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
+<div class="text-white">
+<p class="text-xs font-bold uppercase tracking-widest opacity-80">Visual Evidence Log</p>
+<p class="text-xl font-bold">Primary Scene Assessment Photo</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-end px-4 pb-6 pt-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-50 rounded-t-3xl shadow-[0px_-12px_32px_rgba(17,29,35,0.08)]">
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Alerts</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">SOS</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Resources</span>
+</a>
+<!-- Active Tab: Reports -->
+<a class="flex flex-col items-center justify-center bg-red-700 dark:bg-red-600 text-white rounded-2xl p-3 shadow-lg shadow-red-500/20 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest">Reports</span>
+</a>
+</nav>
+</body></html>

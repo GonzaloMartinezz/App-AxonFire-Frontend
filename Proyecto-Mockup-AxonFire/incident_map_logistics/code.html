@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "surface-container": "#e3f0f8",
+                "secondary-container": "#d7e4ec",
+                "on-primary-fixed": "#410003",
+                "surface-variant": "#d7e4ec",
+                "on-tertiary-fixed-variant": "#723600",
+                "tertiary-fixed": "#ffdcc6",
+                "outline-variant": "#e4beba",
+                "surface-bright": "#f4faff",
+                "on-primary": "#ffffff",
+                "on-secondary-fixed-variant": "#3c494f",
+                "primary-fixed-dim": "#ffb3ac",
+                "primary-container": "#d32f2f",
+                "secondary-fixed": "#d7e4ec",
+                "secondary-fixed-dim": "#bbc8d0",
+                "on-error": "#ffffff",
+                "on-primary-container": "#fff2f0",
+                "inverse-primary": "#ffb3ac",
+                "on-surface-variant": "#5b403d",
+                "surface-container-high": "#ddeaf2",
+                "tertiary-container": "#b05700",
+                "surface-dim": "#cfdce4",
+                "inverse-surface": "#263238",
+                "surface-container-lowest": "#ffffff",
+                "inverse-on-surface": "#e6f3fb",
+                "surface-tint": "#ba1a20",
+                "surface-container-low": "#e9f6fd",
+                "on-primary-fixed-variant": "#930010",
+                "background": "#f4faff",
+                "error": "#ba1a1a",
+                "primary-fixed": "#ffdad6",
+                "outline": "#8f6f6c",
+                "on-secondary-fixed": "#111d23",
+                "on-tertiary-fixed": "#311300",
+                "tertiary": "#8b4400",
+                "surface-container-highest": "#d7e4ec",
+                "tertiary-fixed-dim": "#ffb786",
+                "surface": "#f4faff",
+                "on-tertiary": "#ffffff",
+                "secondary": "#546067",
+                "on-background": "#111d23",
+                "on-tertiary-container": "#fff2eb",
+                "on-secondary-container": "#5a666d",
+                "on-secondary": "#ffffff",
+                "on-surface": "#111d23",
+                "error-container": "#ffdad6",
+                "on-error-container": "#93000a",
+                "primary": "#af101a"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+            },
+            "fontFamily": {
+                "headline": ["Inter"],
+                "body": ["Inter"],
+                "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift {
+            background-image: linear-gradient(to bottom, rgba(255,255,255,0.05), rgba(0,0,0,0.05));
+        }
+        .glass-panel {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface overflow-hidden h-screen w-screen">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-16 w-full bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-primary/20">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a professional firefighter in dark uniform looking determined against a neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiCTgmA3xAtMb93xZknMnqrgXALq9c-UwedRoieXc-7DN_QBlN3wobI0SMcx4mSyqTflXVc3-gJYgUMlscJYJyItzaO7ABgmCd-LZAQis2AK-LoX-qsRYl7gd_vu0UBdmsFUqceQ50plmzpRdgN-kFZ64Ee_VqcwZdJumBhpAT9ZL8xgGlWfFNEfCyHL9At-LhfIQ4GOZKoQaBVzqutdT00ryPWEbeqFSTYzXo6FYA-JRuYivlXCPPZjKtPEn1WRpy6bDlRHodicmc"/>
+</div>
+<span class="text-xl font-black tracking-tighter text-slate-900 dark:text-slate-50 uppercase">TACTICAL COMMAND</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-red-700 dark:text-red-500">emergency</span>
+</button>
+</div>
+</header>
+<!-- Main Map Canvas -->
+<main class="relative h-screen w-full pt-16 pb-24">
+<!-- Map Background Simulation -->
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover grayscale-[20%] contrast-[1.1]" data-alt="High-resolution topographic satellite map view of a dense forest region with subtle elevation contours and road networks" data-location="San Francisco Forest Park" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChLjoMy6Np1d9y3dbTeksWyUtlGPqPFnTO2M58YaflSZghK91ZlEtHx-CXLDjd6dyIeoIhrIRnbo6U7BTyrec0OcUyn3IkvKkA97uR1277ulIy0-NrNplvM2oh_-3MWhxCwSsa3aWLay4yNgGAnzcod26I0Yo_QZ8YKGGHCxGTfSNvfKsFhKGvWcRlJA06yQxHq5A645MAvaQ2OP_9Yd2AdvJ6XH14H14CnS8Zx7rlqYCYWBW2bV8rworsjFbBdaEL8zjLqGBfFArt"/>
+<!-- Trail Overlay (KML Simulation) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-60" preserveaspectratio="none" viewbox="0 0 1000 1000">
+<path d="M100,200 Q300,150 500,400 T800,350" fill="none" stroke="#d32f2f" stroke-dasharray="8 4" stroke-width="4"></path>
+<path d="M200,800 L400,600 L600,700 L850,500" fill="none" stroke="#ffb786" stroke-width="3"></path>
+</svg>
+</div>
+<!-- Floating Status Bar -->
+<div class="absolute top-20 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-xl">
+<div class="glass-panel bg-inverse-surface/90 text-white rounded-2xl p-4 flex items-center justify-between shadow-2xl border border-white/10">
+<div class="flex items-center gap-3">
+<div class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+</div>
+<div>
+<p class="font-black tracking-tighter uppercase text-xs opacity-70">Mission Status</p>
+<p class="font-bold text-sm tracking-tight">INCIDENT IN PROGRESS</p>
+</div>
+</div>
+<div class="h-10 w-[1px] bg-white/10 mx-2"></div>
+<div class="flex items-center gap-3">
+<div class="text-right">
+<p class="font-black tracking-tighter uppercase text-xs opacity-70">Responders</p>
+<p class="font-bold text-sm">12 UNITS ACTIVE</p>
+</div>
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border-2 border-inverse-surface bg-slate-400 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Profile photo of responder in gear" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0j0hGwSDSKnY5S-BaoanmD9Vo0NBxnkqg142XgQsDw5G2RPoaww0uwfWpuLg7HE72Gpe6L275huOAUE494cem3_tcCicYAxZU0F_N_bDEO1pjHQplA56u-GprGb2k82986IGghjQVkpQhm6fywV5TktL83rQhDa_nQRE7YONu4AmkM1IV_WrbocUCWK6ywnAkSZ8RYSJ2WGlBTONLr3ZBaBuFdsnxZO9eGoEbKC3lOuMkv5asbnpCwDfa03KuoaWqC8Vr2k1iraxc"/>
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-inverse-surface bg-slate-500 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Profile photo of responder" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCB91Y3Uu8bCmc16wJi1lzlG8TjY7KR_LMVYAosaeX31KjpcX4e5yUCWRuyD-QCvVkc83KCIkV7XcpvGHdcP-lgdlhNtZyfpdh58W34ehlvo8QAfTD3CN0YYZHpPWGX62ea-RFSdWIK4xOwXoKhVB4bFXpfmqVh6heel608sMl0VNI1_9C6HhyIYpZIbpfEaKtPyr8WoHcqsLmUaTk3zOmHdg7WONQBzux1lePAZK_VkbSO0Tmy1e2i7U_5RJqm_n8kyxg_A0ouIHZl"/>
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-inverse-surface bg-primary flex items-center justify-center text-[10px] font-bold">+10</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Map Controls / Legend -->
+<div class="absolute right-4 bottom-32 z-40 flex flex-col gap-2">
+<button class="w-12 h-12 glass-panel bg-white/90 dark:bg-slate-900/90 rounded-xl shadow-lg flex items-center justify-center text-on-surface active:scale-90 transition-all">
+<span class="material-symbols-outlined">layers</span>
+</button>
+<button class="w-12 h-12 glass-panel bg-white/90 dark:bg-slate-900/90 rounded-xl shadow-lg flex items-center justify-center text-on-surface active:scale-90 transition-all">
+<span class="material-symbols-outlined">my_location</span>
+</button>
+<div class="mt-2 flex flex-col gap-2 p-2 glass-panel bg-white/90 dark:bg-slate-900/90 rounded-xl shadow-lg">
+<button class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg"><span class="material-symbols-outlined">add</span></button>
+<div class="h-[1px] bg-slate-200"></div>
+<button class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg"><span class="material-symbols-outlined">remove</span></button>
+</div>
+</div>
+<!-- Map Markers -->
+<!-- Incident Pin -->
+<div class="absolute top-[40%] left-[45%] -translate-x-1/2 -translate-y-full z-30 group cursor-pointer">
+<div class="relative flex flex-col items-center">
+<div class="bg-primary text-white p-2 rounded-xl shadow-2xl shadow-primary/40 border-2 border-white flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">local_fire_department</span>
+<span class="font-black text-xs uppercase tracking-widest pr-1">Fire Front</span>
+</div>
+<div class="w-4 h-4 bg-primary border-2 border-white rounded-full shadow-lg"></div>
+</div>
+</div>
+<!-- Hydrant Markers -->
+<div class="absolute top-[60%] left-[30%] z-20">
+<div class="bg-blue-600 text-white w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">water_drop</span>
+</div>
+</div>
+<div class="absolute top-[55%] left-[70%] z-20">
+<div class="bg-blue-600 text-white w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">water_drop</span>
+</div>
+</div>
+<!-- Hazmat Markers -->
+<div class="absolute top-[35%] left-[65%] z-20 group">
+<div class="bg-tertiary text-white w-8 h-8 rounded-full shadow-lg border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">biotech</span>
+</div>
+<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-inverse-surface text-white text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap">Propane Storage</div>
+</div>
+<!-- Map Legend Floating Panel -->
+<div class="absolute left-4 bottom-32 z-40 hidden md:block">
+<div class="glass-panel bg-white/90 dark:bg-slate-900/90 p-4 rounded-2xl shadow-xl w-48 border border-white/20">
+<h3 class="font-black text-[10px] uppercase tracking-widest text-slate-500 mb-3">Map Legend</h3>
+<div class="space-y-3">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="text-xs font-bold uppercase tracking-tighter">Active Fire</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-blue-600"></div>
+<span class="text-xs font-bold uppercase tracking-tighter">Hydrants</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 rounded-full bg-tertiary"></div>
+<span class="text-xs font-bold uppercase tracking-tighter">Hazmat Sites</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-8 h-[2px] bg-primary/40 border-t border-dashed border-primary"></div>
+<span class="text-xs font-bold uppercase tracking-tighter">Planned Route</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-end px-4 pb-6 pt-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-50 rounded-t-3xl border-t border-slate-200/20 shadow-[0px_-12px_32px_rgba(17,29,35,0.08)]">
+<!-- Map - ACTIVE -->
+<a class="flex flex-col items-center justify-center bg-red-700 dark:bg-red-600 text-white rounded-2xl p-3 shadow-lg shadow-red-500/20 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">map</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Map</span>
+</a>
+<!-- Alerts -->
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Alerts</span>
+</a>
+<!-- SOS - Center Highlighted -->
+<button class="flex flex-col items-center justify-center -translate-y-4 bg-primary w-16 h-16 rounded-full shadow-2xl shadow-primary/40 text-white active:scale-95 transition-all">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">emergency</span>
+</button>
+<!-- Resources -->
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Resources</span>
+</a>
+<!-- Reports -->
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Reports</span>
+</a>
+</nav>
+</body></html>

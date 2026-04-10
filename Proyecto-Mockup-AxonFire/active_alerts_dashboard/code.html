@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tactical Command - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container": "#e3f0f8",
+                      "secondary-container": "#d7e4ec",
+                      "on-primary-fixed": "#410003",
+                      "surface-variant": "#d7e4ec",
+                      "on-tertiary-fixed-variant": "#723600",
+                      "tertiary-fixed": "#ffdcc6",
+                      "outline-variant": "#e4beba",
+                      "surface-bright": "#f4faff",
+                      "on-primary": "#ffffff",
+                      "on-secondary-fixed-variant": "#3c494f",
+                      "primary-fixed-dim": "#ffb3ac",
+                      "primary-container": "#d32f2f",
+                      "secondary-fixed": "#d7e4ec",
+                      "secondary-fixed-dim": "#bbc8d0",
+                      "on-error": "#ffffff",
+                      "on-primary-container": "#fff2f0",
+                      "inverse-primary": "#ffb3ac",
+                      "on-surface-variant": "#5b403d",
+                      "surface-container-high": "#ddeaf2",
+                      "tertiary-container": "#b05700",
+                      "surface-dim": "#cfdce4",
+                      "inverse-surface": "#263238",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-on-surface": "#e6f3fb",
+                      "surface-tint": "#ba1a20",
+                      "surface-container-low": "#e9f6fd",
+                      "on-primary-fixed-variant": "#930010",
+                      "background": "#f4faff",
+                      "error": "#ba1a1a",
+                      "primary-fixed": "#ffdad6",
+                      "outline": "#8f6f6c",
+                      "on-secondary-fixed": "#111d23",
+                      "on-tertiary-fixed": "#311300",
+                      "tertiary": "#8b4400",
+                      "surface-container-highest": "#d7e4ec",
+                      "tertiary-fixed-dim": "#ffb786",
+                      "surface": "#f4faff",
+                      "on-tertiary": "#ffffff",
+                      "secondary": "#546067",
+                      "on-background": "#111d23",
+                      "on-tertiary-container": "#fff2eb",
+                      "on-secondary-container": "#5a666d",
+                      "on-secondary": "#ffffff",
+                      "on-surface": "#111d23",
+                      "error-container": "#ffdad6",
+                      "on-error-container": "#93000a",
+                      "primary": "#af101a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "fontFamily": {
+                      "headline": ["Inter"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift {
+            transition: background-color 0.3s ease;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4faff;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased min-h-screen pb-32">
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md flex justify-between items-center px-4 h-16 w-full">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/20">
+<img class="w-full h-full object-cover" data-alt="close-up portrait of a determined male firefighter in front of a modern fire station with soft morning light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-mWSATqI3HiE6wAnRUIqtPLThxHdCOF-_NSq6Ch8V8UeUrwkCU5ohfoLq7HglqblQpwLDCV_MZYSuv_vp3Q7S49TsQ67Ayre6ZOKC85O9gAMQN6pRVS_MWGvQfOdH6I0dhveZeD-kWRf3gI1jYFS44sMF7EdX3GTHEq0kdkfLomb2zMt91jmQsXevZraH4Co7gxXcpeng4r8mODNcviYyFnYV0TfQuUeirlgFRFP0FgqY64wUVFkQ_L2qRkSTG_i1qJOfSNHwOWHl"/>
+</div>
+<h1 class="text-xl font-black tracking-tighter text-slate-900 dark:text-slate-50 font-inter tracking-tighter uppercase">TACTICAL COMMAND</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-red-700 dark:text-red-500 active:scale-95 transition-transform hover:bg-slate-200/50">
+<span class="material-symbols-outlined" data-icon="emergency">emergency</span>
+</button>
+</header>
+<main class="pt-20 px-4 max-w-2xl mx-auto">
+<section class="mb-8">
+<div class="flex justify-between items-end mb-6">
+<div>
+<span class="label-md uppercase tracking-widest text-on-surface-variant font-bold text-[10px]">Operational Overview</span>
+<h2 class="text-4xl font-black tracking-tight text-on-surface leading-none">ALERTS</h2>
+</div>
+<div class="flex items-center gap-2 p-1 bg-surface-container-low rounded-full">
+<button class="px-5 py-2 rounded-full text-xs font-bold bg-inverse-surface text-white">Active</button>
+<button class="px-5 py-2 rounded-full text-xs font-bold text-on-secondary-container hover:bg-surface-container-high transition-colors">All</button>
+<button class="px-5 py-2 rounded-full text-xs font-bold text-on-secondary-container hover:bg-surface-container-high transition-colors">Resolved</button>
+</div>
+</div>
+<div class="space-y-4">
+<div class="bg-surface-container-lowest rounded-[1.5rem] p-5 shadow-[0px_4px_20px_rgba(17,29,35,0.04)] relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-full bg-gradient-to-l from-primary/5 to-transparent"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex flex-col">
+<span class="bg-primary text-on-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-2">CRÍTICA</span>
+<h3 class="text-xl font-extrabold text-on-surface tracking-tight uppercase">Structural Fire</h3>
+</div>
+<span class="text-on-surface-variant font-bold text-xs">02m ago</span>
+</div>
+<div class="flex items-start gap-4 mb-6">
+<div class="w-20 h-20 rounded-xl overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="dramatic wide shot of a burning historic building at night with orange flames and thick dark smoke against a navy sky" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKeSlCJNYpIgziSebDZoHBFsSvTEj-05YDNDqCM84Qq8nzgDr5wavcUMiJ-AIKwbTk-5QIlzjAF56K70YXhZNmmZaQvFrFmEmJIXzOAy1zj0WqpnB-SIy2fpAW9Tk1Uo4XTHRslb-ovPo65ijaWxGid2m16drvwu2CLnwG0PJU8XUUBbpcRE7PU6aFSu9sj8ToeITBOHY4KF3f3k9OrK_WxA6l6laDL0YGoC7xyDEQBv2HWk1uIDDWgQ-277OBy5kSfy9OfbXeuAhW"/>
+</div>
+<div class="flex flex-col justify-center">
+<div class="flex items-center gap-2 text-on-surface-variant mb-1">
+<span class="material-symbols-outlined text-sm" data-icon="location_on">location_on</span>
+<p class="text-sm font-semibold">124 Industrial Pkwy, Sector 4</p>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm" data-icon="groups">groups</span>
+<p class="text-sm font-semibold">Units E-12, L-04 En Route</p>
+</div>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-inverse-surface text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all">Respond</button>
+<button class="w-12 bg-surface-container-high text-on-surface-variant flex items-center justify-center rounded-xl hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</button>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-[1.5rem] p-5 shadow-[0px_4px_20px_rgba(17,29,35,0.04)] relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<div class="flex flex-col">
+<span class="bg-tertiary text-on-tertiary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest self-start mb-2">High</span>
+<h3 class="text-xl font-extrabold text-on-surface tracking-tight uppercase">Vehicle Rescue</h3>
+</div>
+<span class="text-on-surface-variant font-bold text-xs">17m ago</span>
+</div>
+<div class="flex items-center gap-4 mb-4 p-3 bg-surface-container-low rounded-xl">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="minor_crash">minor_crash</span>
+<div>
+<p class="text-sm font-bold text-on-surface">Highway 401 - Mile 212</p>
+<p class="text-[11px] text-on-surface-variant uppercase font-bold tracking-wider">Multi-vehicle collision / Entrapment</p>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-low/50 border-2 border-dashed border-surface-container-highest rounded-[1.5rem] p-8 flex flex-col items-center justify-center text-center opacity-70">
+<span class="material-symbols-outlined text-surface-variant text-4xl mb-2" data-icon="history">history</span>
+<p class="text-on-surface-variant font-bold text-xs uppercase tracking-widest">No additional active alerts</p>
+</div>
+</div>
+</section>
+<section class="mb-8">
+<h4 class="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] mb-4">Nearby Units</h4>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container-high p-4 rounded-2xl flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+<div>
+<p class="text-xs font-black text-on-surface">ENGINE 104</p>
+<p class="text-[10px] text-on-secondary-container font-bold uppercase">Ready</p>
+</div>
+</div>
+<div class="bg-surface-container-high p-4 rounded-2xl flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<div>
+<p class="text-xs font-black text-on-surface">TRUCK 22</p>
+<p class="text-[10px] text-on-secondary-container font-bold uppercase">Active</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60]">
+<button class="bg-primary hover:bg-primary-container text-white h-20 w-20 rounded-full shadow-[0px_12px_32px_rgba(175,16,26,0.3)] flex items-center justify-center group active:scale-90 transition-all duration-300 relative">
+<div class="absolute inset-0 bg-primary rounded-full animate-ping opacity-10"></div>
+<span class="material-symbols-outlined text-4xl" data-icon="emergency_share" style="font-variation-settings: 'FILL' 1;">emergency_share</span>
+</button>
+</div>
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-end px-4 pb-6 pt-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-50 rounded-t-3xl shadow-[0px_-12px_32px_rgba(17,29,35,0.08)] border-t border-slate-200/20">
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Map</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-red-700 dark:bg-red-600 text-white rounded-2xl p-3 shadow-lg shadow-red-500/20 transition-all active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="notifications" style="font-variation-settings: 'FILL' 1;">notifications</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Alerts</span>
+</a>
+<div class="w-20"></div>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Resources</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-inter text-[10px] font-bold uppercase tracking-widest mt-1">Reports</span>
+</a>
+</nav>
+</body></html>

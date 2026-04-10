@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container": "#f1f5f9",
+                    "secondary-container": "#e2e8f0",
+                    "on-primary-fixed": "#410003",
+                    "surface-variant": "#cbd5e1",
+                    "on-tertiary-fixed-variant": "#723600",
+                    "tertiary-fixed": "#ffdcc6",
+                    "outline-variant": "#e2e8f0",
+                    "surface-bright": "#f8fafc",
+                    "on-primary": "#ffffff",
+                    "on-secondary-fixed-variant": "#3c494f",
+                    "primary-fixed-dim": "#ffb3ac",
+                    "primary-container": "#af101a",
+                    "secondary-fixed": "#e2e8f0",
+                    "secondary-fixed-dim": "#94a3b8",
+                    "on-error": "#ffffff",
+                    "on-primary-container": "#fff2f0",
+                    "inverse-primary": "#ffb3ac",
+                    "on-surface-variant": "#475569",
+                    "surface-container-high": "#e2e8f0",
+                    "tertiary-container": "#b05700",
+                    "surface-dim": "#cbd5e1",
+                    "inverse-surface": "#0f172a",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-on-surface": "#f8fafc",
+                    "surface-tint": "#af101a",
+                    "surface-container-low": "#f1f5f9",
+                    "on-primary-fixed-variant": "#930010",
+                    "background": "#f1f5f9",
+                    "error": "#ba1a1a",
+                    "primary-fixed": "#ffdad6",
+                    "outline": "#64748b",
+                    "on-secondary-fixed": "#0f172a",
+                    "on-tertiary-fixed": "#311300",
+                    "tertiary": "#8b4400",
+                    "surface-container-highest": "#cbd5e1",
+                    "tertiary-fixed-dim": "#ffb786",
+                    "surface": "#f1f5f9",
+                    "on-tertiary": "#ffffff",
+                    "secondary": "#475569",
+                    "on-background": "#0f172a",
+                    "on-tertiary-container": "#fff2eb",
+                    "on-secondary-container": "#1e293b",
+                    "on-secondary": "#ffffff",
+                    "on-surface": "#0f172a",
+                    "error-container": "#ffdad6",
+                    "on-error-container": "#93000a",
+                    "primary": "#af101a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift {
+            background-color: #f1f5f9;
+        }
+        .glass-panel {
+            background: rgba(241, 245, 249, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed">
+<!-- TopAppBar from COMPONENTS_15 -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl flex justify-between items-center px-6 py-3 w-full border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-700">
+<img alt="Mission Command Personnel Profile" class="w-full h-full object-cover" data-alt="Close-up portrait of a determined firefighter in uniform with a subtle grit texture and warm dramatic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8EyVObTdzczrZsziPMTOil0S8e8gHy1lPoHdks_7gIPz5u1gVKm1vWo9nVdOZ2a7CdI5ErZc9juOLZg6hsntjQdXmhM7WY0rni1mR1dTAJC9JmRzE8FSpJ8iRJEUympj21KTXsiaC4_HB_70eYz2ILUVl_gnvpt6f7TNvKLDSMHKIhbuA2_u-Uy06MMaB0vkosDRYsvqwqOG3grd09G-GJ3VIEi083SBzboRzZOp5G_uqXLd-3KlBTexp_5nK6fiEdhrqaRYEt3QH"/>
+</div>
+<h1 class="text-lg font-black tracking-widest text-slate-900 dark:text-slate-100 uppercase">TACTICAL OPS</h1>
+</div>
+<button class="text-red-700 dark:text-red-600 active:scale-95 duration-100 hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined" data-icon="emergency_home">emergency_home</span>
+</button>
+</header>
+<main class="pt-20 pb-32 px-4 space-y-6">
+<section class="space-y-4">
+<div class="flex items-center gap-2">
+<span class="bg-primary text-on-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">CRÍTICA</span>
+<span class="text-secondary font-bold text-xs uppercase tracking-widest">ALERTA #442-B</span>
+</div>
+<div class="relative overflow-hidden rounded-3xl aspect-[16/9] shadow-lg border border-slate-300 dark:border-slate-700">
+<img alt="Satellite View" class="w-full h-full object-cover grayscale-[0.2]" data-alt="Aerial satellite view of an industrial urban intersection with high contrast and tactical data overlays" data-location="Industrial Zone" src="https://lh3.googleusercontent.com/aida-public/AB6AXCbsHhevQ5dBVY-m_OC3Xg9qewO3E9OHCmI_ynAwjAzjyCEmouv_eA8qpgG9Zw_v72ZZYaASGOI8uLGRClN_Qk5wKXHfGvhyGjb5PhzOxCXdDNr5EblgoW8ZSGQV5jiI5InNF88gJELdHEkEMekc5KI_JTmQKbriMeGKVeqvV2rNXnK5hCuv5BEjHW3GX_xTDepde6qe_uZULI0NCqA3Irzhd3iVPoBl9kZXoQ7FQecJh61wZKmCVN_ieXQJ_USkLC2X9uMVfKLFX9H"/>
+<div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+<div class="text-white">
+<p class="text-[10px] font-bold uppercase tracking-widest opacity-70">Ubicación</p>
+<p class="text-lg font-black tracking-tight">Av. Central &amp; Calle 12, Bodega Sur</p>
+</div>
+<div class="bg-primary p-2 rounded-xl text-white shadow-lg">
+<span class="material-symbols-outlined" data-icon="my_location">my_location</span>
+</div>
+</div>
+</div>
+</section>
+<section class="grid grid-cols-2 gap-4">
+<div class="bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm p-5 rounded-[2rem] space-y-2 border border-slate-200 dark:border-slate-700">
+<div class="flex items-center gap-2 text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="schedule">schedule</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Tiempo transcurrido</span>
+</div>
+<p class="text-2xl font-black tracking-tighter text-on-surface">04:22</p>
+</div>
+<div class="bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm p-5 rounded-[2rem] space-y-2 border border-slate-200 dark:border-slate-700">
+<div class="flex items-center gap-2 text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="group">group</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Respondiendo</span>
+</div>
+<p class="text-2xl font-black tracking-tighter text-on-surface">12</p>
+</div>
+</section>
+<section class="space-y-4">
+<div class="flex flex-col gap-3">
+<button class="group relative flex items-center justify-between bg-gradient-to-b from-[#af101a] to-[#d32f2f] text-on-primary py-6 px-8 rounded-[2rem] shadow-[0px_12px_32px_rgba(175,16,26,0.25)] active:scale-95 transition-all">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-3xl" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-black text-lg tracking-tight uppercase">Confirm Assistance</span>
+</div>
+<span class="material-symbols-outlined opacity-50" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<button class="flex items-center justify-center gap-3 bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 py-5 px-8 rounded-[2rem] active:scale-95 transition-all border border-slate-400/20">
+<span class="material-symbols-outlined" data-icon="cancel">cancel</span>
+<span class="font-bold tracking-tight uppercase">Cannot Attend</span>
+</button>
+</div>
+</section>
+<section class="space-y-4">
+<h3 class="text-[10px] font-bold uppercase tracking-widest text-secondary px-2">DETALLES TÁCTICOS</h3>
+<div class="bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm rounded-[2rem] divide-y divide-slate-200 dark:divide-slate-700 border border-slate-200 dark:border-slate-700">
+<div class="p-5 flex items-start gap-4">
+<div class="bg-amber-500/10 p-3 rounded-xl">
+<span class="material-symbols-outlined text-amber-600" data-icon="local_fire_department">local_fire_department</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Fuego Estructural</p>
+<p class="text-sm text-secondary">Bodega de materiales inflamables. Reportan personas en el ala norte.</p>
+</div>
+</div>
+<div class="p-5 flex items-start gap-4">
+<div class="bg-blue-500/10 p-3 rounded-xl">
+<span class="material-symbols-outlined text-blue-600" data-icon="info">info</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Unidad Asignada</p>
+<p class="text-sm text-secondary">B-1, R-3, A-2</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar from COMPONENTS_15 -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-end pb-6 px-4 bg-slate-50/75 dark:bg-slate-900/75 backdrop-blur-md z-50 rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.06)]">
+<button class="flex flex-col items-center text-slate-500 dark:text-slate-400 p-2 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="text-[10px] font-bold tracking-tight uppercase Inter mt-1">Map</span>
+</button>
+<button class="flex flex-col items-center text-red-700 dark:text-red-500 font-black p-2">
+<span class="material-symbols-outlined" data-icon="notifications_active" style="font-variation-settings: 'FILL' 1;">notifications_active</span>
+<span class="text-[10px] font-bold tracking-tight uppercase Inter mt-1">Alerts</span>
+</button>
+<div class="relative -top-4">
+<button class="scale-110 bg-gradient-to-b from-[#af101a] to-[#d32f2f] rounded-full p-4 shadow-lg active:scale-95 transition-transform text-white">
+<span class="material-symbols-outlined text-2xl" data-icon="emergency_share">emergency_share</span>
+</button>
+</div>
+<button class="flex flex-col items-center text-slate-500 dark:text-slate-400 p-2 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="text-[10px] font-bold tracking-tight uppercase Inter mt-1">Resources</span>
+</button>
+<button class="flex flex-col items-center text-slate-500 dark:text-slate-400 p-2 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="text-[10px] font-bold tracking-tight uppercase Inter mt-1">Reports</span>
+</button>
+</nav>
+</body></html>
