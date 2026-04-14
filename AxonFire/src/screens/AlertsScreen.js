@@ -70,7 +70,7 @@ export default function AlertsScreen() {
           <Text style={styles.headerTitle}>AXON FIRE</Text>
         </View>
         <TouchableOpacity style={styles.emergencyBtn}>
-          <MaterialCommunityIcons name="asterisk" size={18} color={Colors.primary} />
+          <MaterialCommunityIcons name="alert-circle-outline" size={18} color={Colors.primary} />
         </TouchableOpacity>
       </View>
 

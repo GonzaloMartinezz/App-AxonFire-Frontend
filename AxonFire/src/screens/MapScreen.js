@@ -73,7 +73,7 @@ export default function MapScreen() {
             <Text style={styles.headerTitle}>AXON FIRE</Text>
           </View>
           <TouchableOpacity style={styles.emergencyIcon}>
-            <MaterialCommunityIcons name="asterisk" size={16} color={Colors.primary} />
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={Colors.primary} />
           </TouchableOpacity>
         </View>
 

@@ -45,7 +45,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
           colors={[Colors.primaryGradientStart, Colors.primaryGradientEnd]}
           style={styles.fab}
         >
-          <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+          <MaterialCommunityIcons name="alarm-light-outline" size={28} color="#fff" />
         </LinearGradient>
         <Text style={styles.fabLabel}>SOS</Text>
       </TouchableOpacity>
