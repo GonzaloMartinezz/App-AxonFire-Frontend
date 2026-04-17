@@ -243,6 +243,17 @@ Axon Fire implementa un design system propio denominado **"Tactical Monolith"**,
 
 ---
 
+## 🌿 Flujo de Trabajo (Git)
+
+Para mantener el orden en el desarrollo, seguimos una estrategia de ramas:
+
+1.  **`dev`**: Rama principal de desarrollo e integración.
+2.  **`main`**: Rama de producción estable.
+
+Para más detalles sobre cómo contribuir, configurar el proyecto y las reglas de las ramas, consulta nuestra **[Guía de Contribución](CONTRIBUTING.md)**.
+
+---
+
 ## 📋 Requisitos Previos
 
 Antes de ejecutar el proyecto, asegúrate de tener instalado:
