@@ -7,51 +7,84 @@ import {
   Image,
   TouchableOpacity,
   StatusBar,
+  Dimensions,
+  Platform
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Typography, Spacing, Radius } from '../theme';
-import StatusBadge from '../components/StatusBadge';
-import TacticalCard from '../components/TacticalCard';
 
-// Mock data
-const ACTIVE_ALERTS = [
+const { width } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
+
+// Mock data according to the screenshot
+const ALERTS = [
   {
     id: '1',
-    type: 'Incendio Estructural',
+    type: 'Incendio Estructural - Edificio ...',
     severity: 'critica',
+    status: 'activa',
     address: 'Av. Corrientes 1500, CABA',
-    units: 'Unidades E-12, L-04 En Ruta',
-    timeAgo: '02 min',
-    image: 'https://images.unsplash.com/photo-1486551937199-baf066858de7?w=200&h=200&fit=crop',
+    timeAgo: '17 hours ago',
+    icon: 'fire',
+    iconColor: '#dc2626',
+    iconBg: '#fee2e2',
   },
   {
     id: '2',
-    type: 'Rescate Vehicular',
+    type: 'Rescate Vehicular - Autopista',
     severity: 'alta',
+    status: 'despachada',
     address: 'Autopista 25 de Mayo, Km 3',
-    units: 'Colisión múltiple / Atrapamiento',
-    timeAgo: '17 min',
+    timeAgo: '17 hours ago',
     icon: 'car-wrench',
+    iconColor: '#d97706',
+    iconBg: '#fef3c7',
   },
   {
     id: '3',
-    type: 'Fuga de Gas',
+    type: 'Fuga de Gas - Zona Comercial',
     severity: 'alta',
     status: 'progreso',
-    address: 'Calle Juramento 2800',
-    timeAgo: '17 min',
-    icon: 'gas-cylinder',
+    address: 'Calle Juramento 2800, Belgrano',
+    timeAgo: '17 hours ago',
+    icon: 'biohazard',
+    iconColor: '#b91c1c',
+    iconBg: '#fff7ed',
   },
 ];
 
-const NEARBY_UNITS = [
-  { name: 'MOTOR 104', status: 'Listo', statusColor: Colors.success },
-  { name: 'CAMIÓN 22', status: 'Activo', statusColor: Colors.primary },
+const FILTERS = [
+  { label: 'Activas', count: 3 },
+  { label: 'Todas', count: null },
+  { label: 'Resueltas', count: null },
 ];
 
-const FILTERS = ['Activas', 'Todas', 'Resueltas'];
+const StatusBadge = ({ severity, type = 'severity' }) => {
+  const getBadgeStyle = () => {
+    switch (severity) {
+      case 'critica':
+        return { bg: '#af101a', text: '#fff', label: 'CRÍTICA' };
+      case 'alta':
+        return { bg: '#f97316', text: '#fff', label: 'ALTA' };
+      case 'activa':
+        return { bg: '#fce7f3', text: '#af101a', label: 'Activa' };
+      case 'despachada':
+        return { bg: '#fef3c7', text: '#92400e', label: 'Despachada' };
+      case 'progreso':
+        return { bg: '#dbeafe', text: '#1e40af', label: 'En Progreso' };
+      default:
+        return { bg: '#f3f4f6', text: '#4b5563', label: severity.toUpperCase() };
+    }
+  };
+
+  const config = getBadgeStyle();
+  return (
+    <View style={[styles.badge, { backgroundColor: config.bg, borderRadius: 8 }]}>
+      <Text style={[styles.badgeText, { color: config.text }]}>{config.label}</Text>
+    </View>
+  );
+};
 
 export default function AlertsScreen() {
   const [activeFilter, setActiveFilter] = useState('Activas');
@@ -59,138 +92,84 @@ export default function AlertsScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
-
-      {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatar}>
-            <MaterialCommunityIcons name="fire-extinguisher" size={18} color={Colors.primary} />
-          </View>
-          <Text style={styles.headerTitle}>AXON FIRE</Text>
-        </View>
-        <TouchableOpacity style={styles.emergencyBtn}>
-          <MaterialCommunityIcons name="asterisk" size={18} color={Colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+      <StatusBar barStyle="dark-content" />
+      
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent, 
+          { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 100 }
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Section Title ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.overline}>CENTRO DE EMERGENCIAS</Text>
-          <Text style={styles.sectionTitle}>Alertas</Text>
-        </View>
+        <View style={styles.responsiveWrapper}>
+          {/* Header Bar */}
+          <TouchableOpacity style={styles.menuButton}>
+            <MaterialCommunityIcons name="menu" size={24} color="#fff" />
+          </TouchableOpacity>
 
-        {/* ── Filter Pills ── */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          <View style={styles.filterRow}>
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.title}>Alertas</Text>
+            <Text style={styles.subtitle}>Centro de emergencias</Text>
+          </View>
+
+          {/* Filter Section */}
+          <View style={styles.filterSection}>
             {FILTERS.map((f) => (
               <TouchableOpacity
-                key={f}
-                onPress={() => setActiveFilter(f)}
-                style={[styles.filterPill, activeFilter === f && styles.filterPillActive]}
+                key={f.label}
+                onPress={() => setActiveFilter(f.label)}
+                style={[
+                  styles.filterChip,
+                  activeFilter === f.label ? styles.filterChipActive : styles.filterChipInactive
+                ]}
               >
-                <Text style={[styles.filterText, activeFilter === f && styles.filterTextActive]}>
-                  {f}
-                </Text>
-                {f === 'Activas' && (
-                  <View style={styles.filterBadge}>
-                    <Text style={styles.filterBadgeText}>3</Text>
-                  </View>
-                )}
+                <View style={styles.filterRow}>
+                  <Text style={[
+                    styles.filterText,
+                    activeFilter === f.label ? styles.filterTextActive : styles.filterTextInactive
+                  ]}>
+                    {f.label}
+                  </Text>
+                  {f.count && (
+                    <View style={styles.countBadge}>
+                      <Text style={styles.countText}>{f.count}</Text>
+                    </View>
+                  )}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
-        </ScrollView>
 
-        {/* ── Alert Cards ── */}
-        {ACTIVE_ALERTS.map((alert, idx) => (
-          <TacticalCard key={alert.id} elevated>
-            {idx === 0 && <View style={styles.ambientGlow} />}
+          {/* Alert List */}
+          <View style={styles.alertList}>
+            {ALERTS.map((alert) => (
+              <TouchableOpacity key={alert.id} style={styles.alertCard} activeOpacity={0.7}>
+                <View style={[styles.iconBox, { backgroundColor: alert.iconBg }]}>
+                  <MaterialCommunityIcons name={alert.icon} size={28} color={alert.iconColor} />
+                </View>
 
-            <View style={styles.cardTop}>
-              <View style={styles.badgeRow}>
-                <StatusBadge severity={alert.severity} />
-                {alert.status && <StatusBadge severity={alert.status} />}
-              </View>
-              <Text style={styles.timeAgo}>{alert.timeAgo}</Text>
-            </View>
-
-            <Text style={styles.alertTitle} numberOfLines={2}>{alert.type}</Text>
-
-            {alert.image ? (
-              <View style={styles.alertBody}>
-                <Image source={{ uri: alert.image }} style={styles.alertImage} />
-                <View style={styles.alertDetails}>
-                  <View style={styles.detailRow}>
-                    <MaterialIcons name="location-on" size={13} color={Colors.onSurfaceVariant} />
-                    <Text style={styles.detailText} numberOfLines={1}>{alert.address}</Text>
+                <View style={styles.cardContent}>
+                  <View style={styles.cardTopRow}>
+                    <View style={styles.tagRow}>
+                      <StatusBadge severity={alert.severity} />
+                      <StatusBadge severity={alert.status} type="status" />
+                    </View>
                   </View>
-                  <View style={styles.detailRow}>
-                    <MaterialCommunityIcons name="account-group" size={13} color={Colors.onSurfaceVariant} />
-                    <Text style={styles.detailText} numberOfLines={1}>{alert.units}</Text>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.alertBodyCompact}>
-                <View style={styles.iconContainer}>
-                  <MaterialCommunityIcons name={alert.icon || 'alert'} size={18} color={Colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.detailTextBold} numberOfLines={1}>{alert.address}</Text>
-                  <Text style={styles.detailTextSub} numberOfLines={1}>{alert.units}</Text>
-                </View>
-                <MaterialIcons name="chevron-right" size={20} color={Colors.onSurfaceVariant} />
-              </View>
-            )}
 
-            {idx === 0 && (
-              <View style={styles.actionRow}>
-                <TouchableOpacity style={{ flex: 1 }}>
-                  <LinearGradient
-                    colors={[Colors.primaryGradientStart, Colors.primaryGradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.respondBtn}
-                  >
-                    <Text style={styles.respondText}>RESPONDER</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.shareBtn}>
-                  <MaterialIcons name="share" size={18} color={Colors.onSurfaceVariant} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </TacticalCard>
-        ))}
+                  <Text style={styles.alertType} numberOfLines={1}>{alert.type}</Text>
+                  <Text style={styles.address} numberOfLines={1}>{alert.address}</Text>
+                  <Text style={styles.timeAgo}>{alert.timeAgo}</Text>
+                </View>
 
-        {/* ── Empty State ── */}
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="clock-outline" size={28} color={Colors.surfaceContainerHighest} />
-          <Text style={styles.emptyText}>SIN ALERTAS ADICIONALES</Text>
+                <MaterialIcons name="chevron-right" size={24} color="#cfd8dc" style={styles.chevron} />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-
-        {/* ── Nearby Units ── */}
-        <Text style={styles.sectionLabel}>UNIDADES CERCANAS</Text>
-        <View style={styles.unitsGrid}>
-          {NEARBY_UNITS.map((unit) => (
-            <View key={unit.name} style={styles.unitCard}>
-              <View style={[styles.statusDot, { backgroundColor: unit.statusColor }]} />
-              <View>
-                <Text style={styles.unitName}>{unit.name}</Text>
-                <Text style={styles.unitStatus}>{unit.status}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        <View style={{ height: 100 }} />
       </ScrollView>
+
     </View>
   );
 }
@@ -198,266 +177,174 @@ export default function AlertsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#f9f9f9',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
+  scrollView: {
+    flex: 1,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  scrollContent: {
+    paddingHorizontal: 20,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.primaryFixed,
+  responsiveWrapper: {
+    width: '100%',
+    maxWidth: 600, // For desktop responsiveness
+    alignSelf: 'center',
+  },
+  menuButton: {
+    backgroundColor: '#263238',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
+      }
+    })
   },
-  headerTitle: {
-    fontSize: 16,
+  titleSection: {
+    marginTop: 24,
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 32,
     fontWeight: '900',
+    color: '#000',
     letterSpacing: -0.5,
-    color: Colors.onSurface,
-    textTransform: 'uppercase',
   },
-  emergencyBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surfaceContainerLow,
+  subtitle: {
+    fontSize: 16,
+    color: '#90a4ae',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  filterSection: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  filterChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    minWidth: 80,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.lg },
-  sectionHeader: {
-    marginBottom: Spacing.md,
+  filterChipActive: {
+    backgroundColor: '#263238',
   },
-  overline: {
-    ...Typography.labelSm,
-    color: Colors.onSurfaceVariant,
-    marginBottom: 2,
-  },
-  sectionTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: -0.4,
-    color: Colors.onSurface,
-  },
-  filterScroll: {
-    marginBottom: Spacing.lg,
+  filterChipInactive: {
+    backgroundColor: '#f1f5f9',
   },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.surfaceContainerLow,
-    padding: 3,
-    borderRadius: 9999,
-  },
-  filterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 9999,
-  },
-  filterPillActive: {
-    backgroundColor: Colors.inverseSurface,
   },
   filterText: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
-    color: Colors.onSurfaceVariant,
   },
   filterTextActive: {
     color: '#fff',
   },
-  filterBadge: {
-    backgroundColor: Colors.primary,
-    marginLeft: 5,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  filterTextInactive: {
+    color: '#90a4ae',
+  },
+  countBadge: {
+    backgroundColor: '#af101a',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
+  countText: {
     color: '#fff',
-  },
-  ambientGlow: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 60,
-    height: '100%',
-    opacity: 0.05,
-    backgroundColor: Colors.primary,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 4,
-    flexWrap: 'wrap',
-    flex: 1,
-  },
-  timeAgo: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.onSurfaceVariant,
-  },
-  alertTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.15,
-    color: Colors.onSurface,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
-  },
-  alertBody: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: Spacing.md,
-  },
-  alertImage: {
-    width: 60,
-    height: 60,
-    borderRadius: Radius.lg,
-  },
-  alertDetails: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  detailText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.onSurfaceVariant,
-    flex: 1,
-  },
-  alertBodyCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: Colors.surfaceContainerLow,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.xl,
-  },
-  iconContainer: {
-    width: 34,
-    height: 34,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  detailTextBold: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onSurface,
-  },
-  detailTextSub: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.onSurfaceVariant,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: 1,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
-  },
-  respondBtn: {
-    paddingVertical: 12,
-    borderRadius: Radius.xl,
-    alignItems: 'center',
-  },
-  respondText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  shareBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xl,
-    marginBottom: Spacing.md,
-    borderRadius: Radius.xxl,
-    borderWidth: 2,
-    borderColor: Colors.surfaceContainerHighest,
-    borderStyle: 'dashed',
-    opacity: 0.7,
-  },
-  emptyText: {
-    ...Typography.labelMd,
-    color: Colors.onSurfaceVariant,
-    marginTop: 6,
-  },
-  sectionLabel: {
-    ...Typography.labelSm,
-    color: Colors.onSurfaceVariant,
-    marginBottom: Spacing.sm,
-  },
-  unitsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  unitCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.surfaceContainerHigh,
-    padding: Spacing.md,
-    borderRadius: Radius.xxl,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  unitName: {
     fontSize: 10,
     fontWeight: '900',
-    color: Colors.onSurface,
-    textTransform: 'uppercase',
   },
-  unitStatus: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: Colors.onSecondaryContainer,
-    textTransform: 'uppercase',
-    marginTop: 1,
+  alertList: {
+    gap: 16,
+  },
+  alertCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0px 4px 10px rgba(0,0,0,0.05)',
+      }
+    })
+  },
+  iconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  tagRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  alertType: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#263238',
+    marginBottom: 4,
+  },
+  address: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  timeAgo: {
+    fontSize: 12,
+    color: '#cbd5e1',
+    fontWeight: '600',
   },
 });
