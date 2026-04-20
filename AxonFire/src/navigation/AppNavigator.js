@@ -14,6 +14,7 @@ import AlertsScreen from '../screens/AlertsScreen';
 import ResourcesScreen from '../screens/ResourcesScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
+import EmergencyScreen from '../screens/EmergencyScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -62,11 +63,12 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator 
-        initialRouteName="MainApp" //
+        initialRouteName="MainApp" // cambiar a login al final
         screenOptions={{
           headerShown: false,
         }}
-      >
+      > 
+        <Stack.Screen name="Emergency" component={EmergencyScreen} />
         {/* Auth Flow */}
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
