@@ -17,9 +17,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { StatusBar } from 'expo-status-bar';
 
-const InputField = ({ label, icon, placeholder, value, onChangeText, keyboardType = 'default' }) => (
+const InputField = ({label, icon, placeholder, value, onChangeText, keyboardType = 'default',required = false }) => (
   <View style={styles.inputGroup}>
-    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.label}>
+      {label}
+      {required && <Text style={styles.required}> *</Text>}
+    </Text>
     <View style={styles.inputWrapper}>
       <MaterialCommunityIcons name={icon} size={20} color="#90a4ae" style={styles.inputIcon} />
       <TextInput
@@ -47,6 +50,8 @@ export default function AddFirefighterScreen() {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const [buttonText, setButtonText] = useState('GUARDAR FICHA');
+
   const updateForm = (key, value) => {
     setFormData({ ...formData, [key]: value });
   };
@@ -59,13 +64,21 @@ export default function AddFirefighterScreen() {
 
     setIsLoading(true);
     setTimeout(() => {
-      setIsLoading(false);
-      Alert.alert('Registro Exitoso', 'La ficha del bombero ha sido cargada en el sistema AXON.');
-      setFormData({
-        dni: '', nombres: '', apellidos: '', telefono: '', 
-        contactoEmergencia: '', rango: 'Aspirante', grupoSanguineo: 'O+'
-      });
+    setIsLoading(false);
+
+    setButtonText('BOMBERO CARGADO');
+
+    setTimeout(() => {
+      setButtonText('GUARDAR FICHA');
     }, 2000);
+
+    Alert.alert('Registro Exitoso', 'La ficha del bombero ha sido cargada en el sistema AXON.');
+
+    setFormData({
+      dni: '', nombres: '', apellidos: '', telefono: '', 
+      contactoEmergencia: '', rango: 'Aspirante', grupoSanguineo: 'O+'
+    });
+   }, 2000);
   };
 
   return (
@@ -94,6 +107,7 @@ export default function AddFirefighterScreen() {
                 keyboardType="numeric"
                 value={formData.dni}
                 onChangeText={(text) => updateForm('dni', text)}
+                required
               />
 
               <InputField
@@ -102,6 +116,7 @@ export default function AddFirefighterScreen() {
                 placeholder="Nombres completos"
                 value={formData.nombres}
                 onChangeText={(text) => updateForm('nombres', text)}
+                required
               />
 
               <InputField
@@ -110,6 +125,7 @@ export default function AddFirefighterScreen() {
                 placeholder="Apellidos"
                 value={formData.apellidos}
                 onChangeText={(text) => updateForm('apellidos', text)}
+                required
               />
 
               <InputField
@@ -171,7 +187,7 @@ export default function AddFirefighterScreen() {
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
                     <>
-                      <Text style={styles.buttonText}>GUARDAR FICHA</Text>
+                      <Text style={styles.buttonText}>{buttonText}</Text>
                       <MaterialCommunityIcons name="content-save-outline" size={20} color="#fff" />
                     </>
                   )}
@@ -273,7 +289,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   picker: {
-    color: '#fff',
+    color: '#000000',
     height: 50,
   },
   primaryButton: {
@@ -294,4 +310,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2,
   },
+  required: {
+  color: '#ef4444', // rojo
+},
 });

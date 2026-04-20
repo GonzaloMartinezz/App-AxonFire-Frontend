@@ -13,6 +13,7 @@ import MapScreen from '../screens/MapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import ResourcesScreen from '../screens/ResourcesScreen';
 import ReportsScreen from '../screens/ReportsScreen';
+import NewAlertScreen from '../screens/NewAlertScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -27,6 +28,7 @@ function MainTabNavigator() {
           let iconName;
           if (route.name === 'Mapa') iconName = 'map-marker-radius';
           else if (route.name === 'Alertas') iconName = 'bell-ring';
+          else if (route.name === 'Crear Alertas') iconName = 'alarm-light';
           else if (route.name === 'Personal') iconName = 'account-plus';
           else if (route.name === 'Recursos') iconName = 'account-group-outline';
           else if (route.name === 'Reportes') iconName = 'chart-areaspline';
@@ -48,6 +50,7 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Mapa" component={MapScreen} options={{ headerShown: false }} />
       <Tab.Screen name="Alertas" component={AlertsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Crear Alertas" component={NewAlertScreen} options={{ headerShown: false }} />
       <Tab.Screen name="Personal" component={AddFirefighterScreen} options={{ title: 'ALTA PERSONAL', headerShown: false }} />
       <Tab.Screen name="Recursos" component={ResourcesScreen} options={{ headerShown: false }} />
       <Tab.Screen name="Reportes" component={ReportsScreen} options={{ headerShown: false }} />
@@ -59,7 +62,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator 
-        initialRouteName="Login"
+        initialRouteName="MainApp" //
         screenOptions={{
           headerShown: false,
         }}
