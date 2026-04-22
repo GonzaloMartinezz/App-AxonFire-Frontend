@@ -38,7 +38,7 @@ const PENDING_REQUESTS = [
   },
 ];
 
-export default function ResourcesScreen() {
+export default function ResourcesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -47,9 +47,9 @@ export default function ResourcesScreen() {
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatar}>
-            <MaterialCommunityIcons name="fire-extinguisher" size={16} color={Colors.primary} />
-          </View>
+          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatar}>
+            <MaterialCommunityIcons name="home" size={18} color="#fff" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>AXON FIRE</Text>
         </View>
         <TouchableOpacity style={styles.emergencyBtn}>

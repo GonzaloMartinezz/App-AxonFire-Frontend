@@ -25,7 +25,7 @@ const ALERTS = [
     severity: 'critica',
     status: 'activa',
     address: 'Av. Corrientes 1500, CABA',
-    timeAgo: '17 hours ago',
+    timeAgo: 'Hace 17 horas',
     icon: 'fire',
     iconColor: '#dc2626',
     iconBg: '#fee2e2',
@@ -36,7 +36,7 @@ const ALERTS = [
     severity: 'alta',
     status: 'despachada',
     address: 'Autopista 25 de Mayo, Km 3',
-    timeAgo: '17 hours ago',
+    timeAgo: 'Hace 17 horas',
     icon: 'car-wrench',
     iconColor: '#d97706',
     iconBg: '#fef3c7',
@@ -47,7 +47,7 @@ const ALERTS = [
     severity: 'alta',
     status: 'progreso',
     address: 'Calle Juramento 2800, Belgrano',
-    timeAgo: '17 hours ago',
+    timeAgo: 'Hace 17 horas',
     icon: 'biohazard',
     iconColor: '#b91c1c',
     iconBg: '#fff7ed',
@@ -106,12 +106,20 @@ export default function AlertsScreen({ navigation }) {
         <View style={styles.responsiveWrapper}>
           {/* Header Bar */}
           <View style={{ zIndex: 100, position: 'relative' }}>
-            <TouchableOpacity 
-              style={styles.menuButton}
-              onPress={() => setShowMenu(!showMenu)}
-            >
-              <MaterialCommunityIcons name="menu" size={24} color="#fff" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity 
+                style={styles.menuButton}
+                onPress={() => setShowMenu(!showMenu)}
+              >
+                <MaterialCommunityIcons name="menu" size={24} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuButton}
+                onPress={() => navigation?.navigate('Mapa')}
+              >
+                <MaterialCommunityIcons name="home" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
 
             {showMenu && (
               <View style={styles.dropdownMenu}>

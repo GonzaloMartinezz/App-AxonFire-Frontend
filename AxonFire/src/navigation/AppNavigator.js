@@ -12,6 +12,10 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import MapScreen from '../screens/MapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
+import AdminPersonnelScreen from '../screens/AdminPersonnelScreen';
+import AdminEquipmentScreen from '../screens/AdminEquipmentScreen';
+import AdminRoutesScreen from '../screens/AdminRoutesScreen';
+import AdminAlertsScreen from '../screens/AdminAlertsScreen';
 import ResourcesScreen from '../screens/ResourcesScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import AddFirefighterScreen from '../screens/AddFirefighterScreen';
@@ -19,6 +23,7 @@ import AlertDetailScreen from '../screens/AlertDetailScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
 import ChecklistScreen from '../screens/ChecklistScreen';
 import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -99,7 +104,87 @@ function MainTabNavigator() {
       <Tab.Screen name="Alertas" component={AlertsScreen} />
       <Tab.Screen name="SOS" component={AddFirefighterScreen} options={{ title: 'ALERTA' }} />
       <Tab.Screen name="Cuarteles" component={ResourcesScreen} />
-      <Tab.Screen name="Perfil" component={ReportsScreen} />
+      <Tab.Screen name="Perfil" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+}
+
+function AdminTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
+  
+  return (
+    <View style={[styles.tabBarContainer, { backgroundColor: '#1a1c23', paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
+      <View style={styles.tabBarInner}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          if (route.name === 'SOS') {
+            return (
+              <TouchableOpacity key={route.key} onPress={onPress} style={styles.fabContainerAdmin} activeOpacity={0.8}>
+                <View style={styles.fabAdmin}>
+                  <MaterialCommunityIcons name="asterisk" size={32} color="#fff" />
+                </View>
+                <Text style={styles.tabLabelAdminRed}>SOS</Text>
+              </TouchableOpacity>
+            );
+          }
+
+          let iconName;
+          if (route.name === 'Personal') iconName = 'account-group';
+          else if (route.name === 'Equipos') iconName = 'fire-truck';
+          else if (route.name === 'Rutas') iconName = 'map';
+          else if (route.name === 'Alertas') iconName = 'alert';
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={styles.tabItem}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.adminIconBox, isFocused && { backgroundColor: '#dc2626' }]}>
+                 <MaterialCommunityIcons 
+                   name={iconName} 
+                   size={22} 
+                   color={isFocused ? '#fff' : '#64748b'} 
+                 />
+              </View>
+              <Text style={[styles.tabLabel, { color: isFocused ? '#fff' : '#64748b', fontSize: 9, letterSpacing: 1 }]}>
+                {label.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function AdminTabNavigator() {
+  return (
+    <Tab.Navigator
+      tabBar={props => <AdminTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="Personal" component={AdminPersonnelScreen} />
+      <Tab.Screen name="Equipos" component={AdminEquipmentScreen} />
+      <Tab.Screen name="SOS" component={NewAlertScreen} />
+      <Tab.Screen name="Rutas" component={AdminRoutesScreen} />
+      <Tab.Screen name="Alertas" component={AdminAlertsScreen} />
     </Tab.Navigator>
   );
 }
@@ -111,11 +196,13 @@ export default function AppNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="MainApp" component={MainTabNavigator} />
+        <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
         <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen name="NewAlert" component={NewAlertScreen} />
         <Stack.Screen name="Checklist" component={ChecklistScreen} />
         <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
         <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
+        <Stack.Screen name="Reports" component={ReportsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -197,4 +284,42 @@ const styles = StyleSheet.create({
       }
     })
   },
+  fabContainerAdmin: {
+    alignItems: 'center',
+    top: -16,
+  },
+  fabAdmin: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#b91c1c',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#b91c1c',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: '0px 4px 16px rgba(185, 28, 28, 0.6)',
+      }
+    })
+  },
+  tabLabelAdminRed: {
+    fontSize: 9,
+    fontWeight: '900',
+    marginTop: 6,
+    color: '#fca5a5',
+    letterSpacing: 1,
+  },
+  adminIconBox: {
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 4,
+  }
 });

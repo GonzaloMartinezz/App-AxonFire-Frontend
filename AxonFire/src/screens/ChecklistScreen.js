@@ -40,7 +40,9 @@ export default function ChecklistScreen({ navigation }) {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <MaterialCommunityIcons name="shield-half-full" size={20} color="#dc2626" />
+          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatarPlaceholder}>
+             <MaterialCommunityIcons name="home" size={20} color="#fff" />
+          </TouchableOpacity>
           <Text style={styles.topBarTitle}>TACTICAL VANGUARD</Text>
         </View>
         <View style={styles.avatarPlaceholder}>
