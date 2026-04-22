@@ -64,7 +64,7 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.header}>
               <View style={styles.logoContainer}>
                 <View style={styles.logoBox}>
-                  <MaterialCommunityIcons name="shield-fire" size={32} color="#fff" />
+                  <MaterialCommunityIcons name="fire" size={32} color="#fff" />
                 </View>
                 <Text style={styles.logoText}>
                   <Text style={styles.logoAxon}>AXON </Text>
@@ -206,11 +206,20 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     marginRight: 14,
-    shadowColor: '#af101a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#af101a',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.8,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0px 4px 10px rgba(175, 16, 26, 0.8)',
+      },
+    }),
   },
   logoText: {
     fontSize: 32,
@@ -237,11 +246,20 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 15,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 15,
+      },
+      web: {
+        boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.5)',
+      },
+    }),
   },
   inputGroup: {
     marginBottom: 20,

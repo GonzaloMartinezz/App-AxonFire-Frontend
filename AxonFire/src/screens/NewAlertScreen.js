@@ -1,318 +1,311 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
+import { 
+  ScrollView, 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ActivityIndicator, 
+  Alert,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Typography, Spacing, Radius } from '../theme';
-import TacticalCard from '../components/TacticalCard';
 
-const EMERGENCY_TYPES = [
-  { id: 'incendio', icon: 'fire', label: 'Incendio' },
-  { id: 'rescate', icon: 'car-wrench', label: 'Rescate' },
-  { id: 'peligroso', icon: 'hazard-lights', label: 'Peligroso' },
-  { id: 'medica', icon: 'medical-bag', label: 'Médica' },
-  { id: 'estructural', icon: 'office-building', label: 'Estructural' },
-  { id: 'otro', icon: 'alert-outline', label: 'Otro' },
-];
+const InputField = ({ label, placeholder, value, onChangeText, multiline = false }) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>{label}</Text>
+    <View style={[styles.inputWrapper, multiline && styles.inputWrapperMultiline]}>
+      <TextInput
+        style={[styles.input, multiline && styles.inputMultiline]}
+        placeholder={placeholder}
+        placeholderTextColor="#52525b"
+        value={value}
+        onChangeText={onChangeText}
+        multiline={multiline}
+        textAlignVertical={multiline ? 'top' : 'center'}
+      />
+    </View>
+  </View>
+);
 
-const SEVERITY_LEVELS = ['Crítica', 'Alta', 'Media', 'Baja'];
+const DropdownField = ({ label, value }) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>{label}</Text>
+    <TouchableOpacity style={styles.dropdownWrapper}>
+      <Text style={styles.dropdownValue}>{value}</Text>
+      <MaterialCommunityIcons name="chevron-down" size={20} color="#a1a1aa" />
+    </TouchableOpacity>
+  </View>
+);
 
-export default function NewAlertScreen() {
-  const [selectedType, setSelectedType] = useState('incendio');
-  const [selectedSeverity, setSelectedSeverity] = useState('Alta');
+export default function NewAlertScreen({ navigation }) {
+  const [formData, setFormData] = useState({
+    type: 'INCENDIO ESTRUCTURAL',
+    severity: 'NIVEL 4 - CRÍTICO',
+    location: '',
+    description: '',
+  });
+  const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const updateForm = (key, value) => {
+    setFormData({ ...formData, [key]: value });
+  };
+
+  const submitAlertData = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      Alert.alert('Dispatch Confirmed', 'Emergency units have been notified.');
+      setFormData({
+        type: 'INCENDIO ESTRUCTURAL', severity: 'NIVEL 4 - CRÍTICO', location: '', description: ''
+      });
+    }, 1500);
+  };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
-
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.menuBtn}>
-            <MaterialCommunityIcons name="menu" size={20} color={Colors.onSurface} />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.headerTitle}>Nueva Alerta</Text>
-            <Text style={styles.headerSubtitle}>Reportar emergencia</Text>
+      <StatusBar style="light" backgroundColor="#1a1c23" />
+      
+      {/* Top Bar */}
+      <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
+        <View style={styles.topBarLeft}>
+          <View style={styles.avatarPlaceholder}>
+             <MaterialCommunityIcons name="shield-half-full" size={20} color="#dc2626" />
           </View>
+          <Text style={styles.topBarTitle}>VANGUARD COMMAND</Text>
         </View>
+        <TouchableOpacity onPress={() => navigation?.goBack()}>
+          <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Emergency Type ── */}
-        <Text style={styles.fieldLabel}>Tipo de Emergencia</Text>
-        <View style={styles.typeGrid}>
-          {EMERGENCY_TYPES.map((type) => (
-            <TouchableOpacity
-              key={type.id}
-              style={[styles.typeCard, selectedType === type.id && styles.typeCardActive]}
-              onPress={() => setSelectedType(type.id)}
-            >
-              <MaterialCommunityIcons
-                name={type.icon}
-                size={22}
-                color={selectedType === type.id ? Colors.primary : Colors.onSurfaceVariant}
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Header Title Section */}
+            <View style={styles.headerTitleBox}>
+              <View style={styles.redBorder} />
+              <View>
+                <Text style={styles.mainTitle}>EMERGENCY DISPATCH</Text>
+                <Text style={styles.subtitle}>TACTICAL OPERATIONS CENTER // {'\n'}AXON FIRE</Text>
+              </View>
+            </View>
+
+            <View style={styles.formContainer}>
+              <DropdownField 
+                label="INCIDENT TYPE"
+                value={formData.type}
               />
-              <Text style={[styles.typeLabel, selectedType === type.id && styles.typeLabelActive]}>
-                {type.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
-        {/* ── Severity ── */}
-        <Text style={styles.fieldLabel}>Severidad</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.severityRow}>
-            {SEVERITY_LEVELS.map((lvl) => (
+              <DropdownField 
+                label="SEVERITY LEVEL"
+                value={formData.severity}
+              />
+
+              <InputField
+                label="INCIDENT LOCATION"
+                placeholder="STREET ADDRESS OR COORDINATES"
+                value={formData.location}
+                onChangeText={(text) => updateForm('location', text)}
+              />
+
+              <InputField
+                label="ADDITIONAL DETAILS"
+                placeholder="PROVIDE ANY RELEVANT DISPATCH INFORMATION..."
+                value={formData.description}
+                onChangeText={(text) => updateForm('description', text)}
+                multiline={true}
+              />
+
               <TouchableOpacity
-                key={lvl}
-                style={[styles.severityPill, selectedSeverity === lvl && styles.severityPillActive]}
-                onPress={() => setSelectedSeverity(lvl)}
+                style={styles.primaryButton}
+                onPress={submitAlertData}
+                disabled={isLoading}
               >
-                <Text style={[styles.severityText, selectedSeverity === lvl && styles.severityTextActive]}>
-                  {lvl}
-                </Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="broadcast" size={20} color="#fff" />
+                    <Text style={styles.buttonText}>DISPATCH UNITS</Text>
+                  </>
+                )}
               </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* ── Title Input ── */}
-        <Text style={styles.fieldLabel}>
-          Título <Text style={{ color: Colors.primary }}>*</Text>
-        </Text>
-        <View style={styles.inputField}>
-          <Text style={styles.placeholder}>Describe la emergencia...</Text>
-        </View>
-
-        {/* ── Description ── */}
-        <Text style={styles.fieldLabel}>Descripción</Text>
-        <View style={[styles.inputField, styles.textArea]}>
-          <Text style={styles.placeholder}>Detalles adicionales...</Text>
-        </View>
-
-        {/* ── Location ── */}
-        <Text style={styles.fieldLabel}>Ubicación</Text>
-        <TacticalCard elevated>
-          <View style={styles.locationRow}>
-            <View style={styles.locationIcon}>
-              <MaterialIcons name="my-location" size={18} color={Colors.primary} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.locationTitle}>Usar ubicación actual</Text>
-              <Text style={styles.locationSub}>GPS activado · Precisión alta</Text>
+
+            {/* Bottom Actions */}
+            <View style={styles.bottomActions}>
+               <TouchableOpacity style={styles.actionBtn}>
+                 <MaterialCommunityIcons name="map-marker-radius" size={16} color="#e2e8f0" />
+                 <Text style={styles.actionBtnText}>GEO-LOCATE</Text>
+               </TouchableOpacity>
+               <View style={styles.divider} />
+               <TouchableOpacity style={styles.actionBtn}>
+                 <MaterialCommunityIcons name="radio-handheld" size={16} color="#e2e8f0" />
+                 <Text style={styles.actionBtnText}>RADIO COMMS</Text>
+               </TouchableOpacity>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={Colors.onSurfaceVariant} />
-          </View>
-        </TacticalCard>
-
-        <View style={styles.coordRow}>
-          <View style={[styles.coordField, { marginRight: 6 }]}>
-            <Text style={styles.coordLabel}>Latitud</Text>
-            <Text style={styles.coordValue}>-26.8241</Text>
-          </View>
-          <View style={styles.coordField}>
-            <Text style={styles.coordLabel}>Longitud</Text>
-            <Text style={styles.coordValue}>-65.2226</Text>
-          </View>
-        </View>
-
-        {/* ── Submit Button ── */}
-        <TouchableOpacity style={{ marginTop: Spacing.xl }}>
-          <LinearGradient
-            colors={[Colors.primaryGradientStart, Colors.primaryGradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.submitBtn}
-          >
-            <MaterialCommunityIcons name="alert-plus" size={20} color="#fff" />
-            <Text style={styles.submitText}>ENVIAR ALERTA</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
+            
+            <View style={{ height: 100 }} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  menuBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surfaceContainerLow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.15,
-    color: Colors.onSurface,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: Colors.onSurfaceVariant,
-  },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.lg },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.onSurface,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.lg,
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  typeCard: {
-    width: '31%',
-    backgroundColor: Colors.surfaceContainerLow,
-    borderRadius: Radius.xl,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    gap: 6,
-  },
-  typeCardActive: {
-    backgroundColor: Colors.primaryFixed,
-  },
-  typeLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.onSurfaceVariant,
-  },
-  typeLabelActive: {
-    color: Colors.primary,
-    fontWeight: '700',
-  },
-  severityRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  severityPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    backgroundColor: Colors.surfaceContainerLow,
-  },
-  severityPillActive: {
-    backgroundColor: Colors.primary,
-  },
-  severityText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onSurfaceVariant,
-  },
-  severityTextActive: {
-    color: '#fff',
-  },
-  inputField: {
-    backgroundColor: Colors.surfaceContainerLow,
-    borderRadius: Radius.xl,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    minHeight: 46,
-    justifyContent: 'center',
-  },
-  textArea: {
-    minHeight: 80,
-    justifyContent: 'flex-start',
-    paddingTop: Spacing.md,
-  },
-  placeholder: {
-    fontSize: 13,
-    color: Colors.onSurfaceVariant,
-    opacity: 0.5,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  locationIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locationTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.onSurface,
-  },
-  locationSub: {
-    fontSize: 11,
-    color: Colors.onSurfaceVariant,
-    marginTop: 1,
-  },
-  coordRow: {
-    flexDirection: 'row',
-    marginTop: Spacing.sm,
-  },
-  coordField: {
+  container: {
     flex: 1,
-    backgroundColor: Colors.surfaceContainerLow,
-    borderRadius: Radius.xl,
-    padding: Spacing.md,
+    backgroundColor: '#16181d',
   },
-  coordLabel: {
-    fontSize: 9,
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: '#1a1c23',
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '800',
-    color: Colors.onSurfaceVariant,
     letterSpacing: 1,
+  },
+  scrollContent: {
+    padding: 24,
+  },
+  headerTitleBox: {
+    flexDirection: 'row',
+    marginBottom: 32,
+  },
+  redBorder: {
+    width: 3,
+    backgroundColor: '#dc2626',
+    marginRight: 12,
+  },
+  mainTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 11,
+    color: '#94a3b8',
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
-    marginBottom: 3,
   },
-  coordValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.onSurface,
+  formContainer: {
+    backgroundColor: '#1b1d24',
+    padding: 24,
+    borderRadius: 4,
   },
-  submitBtn: {
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  inputWrapper: {
+    backgroundColor: '#26282f',
+    borderRadius: 4,
+    height: 48,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  inputWrapperMultiline: {
+    height: 120,
+    paddingTop: 16,
+  },
+  input: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  inputMultiline: {
+    height: '100%',
+  },
+  dropdownWrapper: {
+    backgroundColor: '#26282f',
+    borderRadius: 4,
+    height: 48,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownValue: {
+    color: '#e2e8f0',
+    fontSize: 14,
+  },
+  primaryButton: {
+    backgroundColor: '#dc2626',
+    borderRadius: 4,
+    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: Radius.xl,
-    boxShadow: '0px 6px 16px rgba(175,16,26,0.3)',
-    elevation: 8,
+    gap: 12,
+    marginTop: 12,
   },
-  submitText: {
+  buttonText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 32,
+    gap: 20,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionBtnText: {
+    color: '#e2e8f0',
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
   },
+  divider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#334155',
+  }
 });
