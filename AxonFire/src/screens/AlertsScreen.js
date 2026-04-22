@@ -86,8 +86,9 @@ const StatusBadge = ({ severity, type = 'severity' }) => {
   );
 };
 
-export default function AlertsScreen() {
+export default function AlertsScreen({ navigation }) {
   const [activeFilter, setActiveFilter] = useState('Activas');
+  const [showMenu, setShowMenu] = useState(false);
   const insets = useSafeAreaInsets();
 
   return (
@@ -104,9 +105,51 @@ export default function AlertsScreen() {
       >
         <View style={styles.responsiveWrapper}>
           {/* Header Bar */}
-          <TouchableOpacity style={styles.menuButton}>
-            <MaterialCommunityIcons name="menu" size={24} color="#fff" />
-          </TouchableOpacity>
+          <View style={{ zIndex: 100, position: 'relative' }}>
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={() => setShowMenu(!showMenu)}
+            >
+              <MaterialCommunityIcons name="menu" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            {showMenu && (
+              <View style={styles.dropdownMenu}>
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('AddFirefighter');
+                  }}
+                >
+                  <MaterialCommunityIcons name="account-multiple-plus" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Cargar Bomberos</Text>
+                </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('NewAlert');
+                  }}
+                >
+                  <MaterialCommunityIcons name="alert-plus" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Cargar Emergencia</Text>
+                </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('Checklist');
+                  }}
+                >
+                  <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Cargar Inventario</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
 
           {/* Title Section */}
           <View style={styles.titleSection}>
@@ -145,7 +188,12 @@ export default function AlertsScreen() {
           {/* Alert List */}
           <View style={styles.alertList}>
             {ALERTS.map((alert) => (
-              <TouchableOpacity key={alert.id} style={styles.alertCard} activeOpacity={0.7}>
+              <TouchableOpacity 
+                key={alert.id} 
+                style={styles.alertCard} 
+                activeOpacity={0.7}
+                onPress={() => navigation?.navigate('AlertDetail')}
+              >
                 <View style={[styles.iconBox, { backgroundColor: alert.iconBg }]}>
                   <MaterialCommunityIcons name={alert.icon} size={28} color={alert.iconColor} />
                 </View>
@@ -212,6 +260,46 @@ const styles = StyleSheet.create({
       }
     })
   },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 8,
+    minWidth: 200,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0px 4px 12px rgba(0,0,0,0.15)',
+      }
+    }),
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginHorizontal: 16,
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#263238',
+  },
   titleSection: {
     marginTop: 24,
     marginBottom: 24,
@@ -232,6 +320,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginBottom: 24,
+    flexWrap: 'wrap',
   },
   filterChip: {
     paddingVertical: 10,

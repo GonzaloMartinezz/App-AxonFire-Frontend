@@ -3,244 +3,558 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   StatusBar,
+  ScrollView,
+  Platform,
+  Image,
+  Dimensions
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Typography, Spacing, Radius } from '../theme';
-import TacticalCard from '../components/TacticalCard';
-import StatusBadge from '../components/StatusBadge';
 
-export default function AlertDetailScreen() {
+const { width } = Dimensions.get('window');
+
+const PERSONNEL = [
+  {
+    id: '1',
+    name: 'CAP. MENDOZA, R.',
+    role: 'Móvil 12 - Dotación 04',
+    status: 'EN SITIO',
+    statusColor: '#475569',
+    icon: 'fire-truck',
+  },
+  {
+    id: '2',
+    name: 'SGT. ESPINOZA, J.',
+    role: 'Móvil 05 - Soporte Médico',
+    status: 'EN CAMINO',
+    statusColor: '#0f766e',
+    icon: 'ambulance',
+  },
+  {
+    id: '3',
+    name: 'OF. TORRES, L.',
+    role: 'Seguridad Perimetral',
+    status: 'ASIGNADO',
+    statusColor: '#334155',
+    icon: 'shield-check',
+  },
+  {
+    id: '4',
+    name: 'SUB-OF. GOMEZ, F.',
+    role: 'Móvil 08 - Logística',
+    status: 'EN SITIO',
+    statusColor: '#475569',
+    icon: 'truck-cargo-container',
+  },
+];
+
+export default function AlertDetailScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
-
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <StatusBar barStyle="light-content" backgroundColor="#121417" />
+      
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatar}>
-            <MaterialCommunityIcons name="fire-extinguisher" size={16} color={Colors.primary} />
-          </View>
-          <Text style={styles.headerTitle}>AXON FIRE</Text>
+           <MaterialCommunityIcons name="shield-half-full" size={24} color="#e11d48" />
+           <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
         </View>
-        <TouchableOpacity style={styles.emergencyBtn}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={18} color={Colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.iconBtn}>
+            <MaterialCommunityIcons name="bell" size={22} color="#94a3b8" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.avatarBtn}>
+            <MaterialCommunityIcons name="account" size={20} color="#e2e8f0" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.contentScroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Alert Badge Row ── */}
-        <View style={styles.badgeRow}>
-          <StatusBadge severity="critica" />
-          <Text style={styles.alertId}>ALERTA #442-B</Text>
+        {/* Main Alert Card */}
+        <View style={styles.mainCard}>
+          <View style={styles.cardLeftBorder} />
+          <View style={styles.mainCardContent}>
+            <View style={styles.titleRow}>
+              <Text style={styles.mainTitle}>Incendio Estructural</Text>
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelText}>NIVEL 4</Text>
+              </View>
+            </View>
+            
+            <View style={styles.locationRow}>
+              <MaterialIcons name="location-on" size={16} color="#94a3b8" />
+              <Text style={styles.locationText}>Av. Corrientes 1500</Text>
+            </View>
+
+            <View style={styles.timeStatsBox}>
+              <View style={styles.timeStatItem}>
+                <Text style={styles.timeLabel}>LLAMADO</Text>
+                <Text style={styles.timeValueRed}>14:30 HS</Text>
+              </View>
+              <View style={styles.timeStatItemRight}>
+                <Text style={styles.timeLabel}>TRANSCURRIDO</Text>
+                <Text style={styles.timeValueWhite}>00:42:15</Text>
+              </View>
+            </View>
+          </View>
         </View>
 
-        {/* ── Location Hero Card ── */}
-        <View style={styles.locationHero}>
-          <LinearGradient
-            colors={['rgba(38,50,56,0.3)', 'rgba(38,50,56,0.88)']}
-            style={styles.locationGradient}
-          >
-            <Text style={styles.locationLabel}>UBICACIÓN</Text>
-            <Text style={styles.locationAddress}>
-              Av. Central & Calle 12, Bodega Sur
-            </Text>
-          </LinearGradient>
-          <TouchableOpacity style={styles.gpsBtn}>
-            <MaterialIcons name="my-location" size={18} color={Colors.primary} />
+        {/* Logistics Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="archive" size={20} color="#e2e8f0" />
+            <Text style={styles.sectionTitle}>LOGÍSTICA Y SUMINISTROS</Text>
+          </View>
+
+          <View style={styles.logisticsItem}>
+            <View style={[styles.logisticsIcon, { backgroundColor: '#1e3a8a' }]}>
+              <MaterialCommunityIcons name="water" size={18} color="#60a5fa" />
+            </View>
+            <View>
+              <Text style={styles.logisticsTitle}>Abastecimiento Hídrico</Text>
+              <Text style={styles.logisticsSubtitle}>Móvil 08 - En ruta</Text>
+            </View>
+          </View>
+
+          <View style={styles.logisticsItem}>
+            <View style={[styles.logisticsIcon, { backgroundColor: '#451a1a' }]}>
+              <MaterialCommunityIcons name="account-group" size={18} color="#fca5a5" />
+            </View>
+            <View>
+              <Text style={styles.logisticsTitle}>Refuerzo de Personal</Text>
+              <Text style={styles.logisticsSubtitle}>Dotación B - Solicitado</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.requestButton}>
+            <Text style={styles.requestButtonText}>+ SOLICITAR RECURSOS</Text>
           </TouchableOpacity>
         </View>
 
-        {/* ── Stats Row ── */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <View style={styles.statIconRow}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color={Colors.onSurfaceVariant} />
-              <Text style={styles.statLabel}>TIEMPO{'\n'}TRANSCURRIDO</Text>
-            </View>
-            <Text style={styles.statValue}>04:22</Text>
+        {/* Live Tracking Map Placeholder */}
+        <View style={styles.mapContainer}>
+          {/* Map Background Simulation */}
+          <View style={styles.mapBackgroundOverlay} />
+          
+          <View style={styles.liveBadge}>
+            <View style={styles.redDot} />
+            <Text style={styles.liveText}>LIVE TRACKING</Text>
           </View>
-          <View style={styles.statCard}>
-            <View style={styles.statIconRow}>
-              <MaterialCommunityIcons name="account-group" size={14} color={Colors.onSurfaceVariant} />
-              <Text style={styles.statLabel}>RESPONDIENDO</Text>
-            </View>
-            <Text style={styles.statValue}>12</Text>
+
+          <View style={styles.mapControls}>
+            <TouchableOpacity style={styles.mapFab}>
+              <MaterialCommunityIcons name="layers" size={22} color="#e2e8f0" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.mapFab}>
+              <MaterialCommunityIcons name="crosshairs-gps" size={22} color="#e2e8f0" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.impactCard}>
+            <Text style={styles.impactLabel}>RADIO DE IMPACTO</Text>
+            <Text style={styles.impactValue}>250 METROS</Text>
           </View>
         </View>
 
-        {/* ── Confirm Button ── */}
-        <TouchableOpacity style={{ marginBottom: Spacing.sm }}>
-          <LinearGradient
-            colors={[Colors.primaryGradientStart, Colors.primaryGradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.confirmBtn}
-          >
-            <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
-            <Text style={styles.confirmText}>CONFIRMAR ASISTENCIA</Text>
-            <MaterialIcons name="arrow-forward" size={18} color="rgba(255,255,255,0.6)" />
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* ── Decline ── */}
-        <TouchableOpacity style={styles.declineBtn}>
-          <MaterialCommunityIcons name="close-circle" size={18} color={Colors.onSurfaceVariant} />
-          <Text style={styles.declineText}>NO PUEDO ASISTIR</Text>
-        </TouchableOpacity>
-
-        {/* ── Tactical Details ── */}
-        <Text style={styles.sectionLabel}>DETALLES TÁCTICOS</Text>
-
-        <TacticalCard>
-          <View style={styles.detailItemRow}>
-            <View style={[styles.detailIcon, { backgroundColor: Colors.tertiaryFixed }]}>
-              <MaterialCommunityIcons name="fire" size={18} color={Colors.tertiary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.detailTitle}>Fuego Estructural</Text>
-              <Text style={styles.detailDesc}>
-                Bodega de materiales inflamables. Reportan personas en el ala norte.
-              </Text>
-            </View>
+        {/* Personnel Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="account-group" size={20} color="#e2e8f0" />
+            <Text style={styles.sectionTitle}>PERSONAL EN RESPUESTA</Text>
           </View>
-        </TacticalCard>
 
-        <TacticalCard>
-          <View style={styles.detailItemRow}>
-            <View style={[styles.detailIcon, { backgroundColor: Colors.alertBlueLight }]}>
-              <MaterialCommunityIcons name="information" size={18} color={Colors.alertBlue} />
+          {PERSONNEL.map((person) => (
+            <View key={person.id} style={styles.personnelCard}>
+              <View style={styles.personTopRow}>
+                <Text style={styles.personName}>{person.name}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: person.statusColor }]}>
+                  <Text style={styles.statusText}>{person.status}</Text>
+                </View>
+              </View>
+              <View style={styles.personRoleRow}>
+                <MaterialCommunityIcons name={person.icon} size={16} color="#94a3b8" />
+                <Text style={styles.personRoleText}>{person.role}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.detailTitle}>Unidad Asignada</Text>
-              <Text style={styles.detailDesc}>B-1, R-3, A-2</Text>
-            </View>
-          </View>
-        </TacticalCard>
+          ))}
+        </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Replicating the exact bottom navigation from the image to look identical */}
+      <View style={styles.fakeBottomNav}>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="view-grid" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>STATUS</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation?.navigate('PersonnelStatus')}
+        >
+          <MaterialCommunityIcons name="account-group" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>UNITS</Text>
+        </TouchableOpacity>
+        <View style={styles.sosContainer}>
+           <MaterialCommunityIcons name="asterisk" size={28} color="#e11d48" />
+           <Text style={styles.sosLabel}>SOS</Text>
+        </View>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="archive" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>LOGISTICS</Text>
+        </View>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>MAP</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
+  container: {
+    flex: 1,
+    backgroundColor: '#16181d',
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Colors.primaryFixed,
-    alignItems: 'center', justifyContent: 'center',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   headerTitle: {
-    fontSize: 16, fontWeight: '900', letterSpacing: -0.5,
-    color: Colors.onSurface, textTransform: 'uppercase',
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#e11d48', 
+    letterSpacing: 0.5,
   },
-  emergencyBtn: {
-    width: 36, height: 36, borderRadius: Radius.lg,
-    backgroundColor: Colors.surfaceContainerLow,
-    alignItems: 'center', justifyContent: 'center',
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.lg },
-  badgeRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: 10, marginBottom: Spacing.md,
+  iconBtn: {
+    padding: 4,
   },
-  alertId: {
-    fontSize: 13, fontWeight: '700', letterSpacing: 0.4,
-    color: Colors.onSurface, textTransform: 'uppercase',
+  avatarBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#2d333b',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  locationHero: {
-    height: 140, borderRadius: Radius.xxl, overflow: 'hidden',
-    backgroundColor: Colors.inverseSurface,
-    marginBottom: Spacing.md, position: 'relative',
+  scrollView: {
+    flex: 1,
   },
-  locationGradient: {
-    flex: 1, justifyContent: 'flex-end', padding: Spacing.lg,
+  contentScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 100, // For the bottom nav
   },
-  locationLabel: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 1,
-    color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase',
-    marginBottom: 3,
+  mainCard: {
+    backgroundColor: '#1b1d24',
+    borderRadius: 8,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    marginBottom: 24,
   },
-  locationAddress: {
-    fontSize: 16, fontWeight: '800', color: '#fff', lineHeight: 22,
+  cardLeftBorder: {
+    width: 4,
+    backgroundColor: '#e11d48',
   },
-  gpsBtn: {
-    position: 'absolute', bottom: Spacing.lg, right: Spacing.lg,
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: Colors.surfaceContainerLowest,
-    alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.15)',
-    elevation: 6,
+  mainCardContent: {
+    flex: 1,
+    padding: 20,
   },
-  statsRow: {
-    flexDirection: 'row', gap: 8, marginBottom: Spacing.lg,
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
-  statCard: {
-    flex: 1, backgroundColor: Colors.surfaceContainerLowest,
-    borderRadius: Radius.xxl, padding: Spacing.md,
+  mainTitle: {
+    color: '#f8fafc',
+    fontSize: 22,
+    fontWeight: '800',
+    flex: 1,
   },
-  statIconRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: 5, marginBottom: 6,
+  levelBadge: {
+    backgroundColor: '#b91c1c',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginLeft: 12,
   },
-  statLabel: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 0.8,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase',
+  levelText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  statValue: {
-    fontSize: 28, fontWeight: '900', color: Colors.onSurface, letterSpacing: -0.5,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 20,
   },
-  confirmBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 8,
-    paddingVertical: 16, borderRadius: Radius.xxl,
-    boxShadow: '0px 8px 20px rgba(175,16,26,0.35)',
-    elevation: 10,
+  locationText: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '500',
   },
-  confirmText: {
-    color: '#fff', fontSize: 13, fontWeight: '900',
-    letterSpacing: 0.6, flex: 1,
+  timeStatsBox: {
+    backgroundColor: '#13141a',
+    borderRadius: 6,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  declineBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-    paddingVertical: 14, borderRadius: Radius.xxl,
-    backgroundColor: Colors.surfaceContainerHigh,
-    marginBottom: Spacing.xl,
+  timeStatItem: {
+    flex: 1,
   },
-  declineText: {
-    fontSize: 12, fontWeight: '700', color: Colors.onSurfaceVariant, letterSpacing: 0.4,
+  timeStatItemRight: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', letterSpacing: 0.8,
-    color: Colors.onSurface, textTransform: 'uppercase',
-    marginBottom: Spacing.md,
+  timeLabel: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 4,
   },
-  detailItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  detailIcon: {
-    width: 38, height: 38, borderRadius: Radius.lg,
-    alignItems: 'center', justifyContent: 'center',
+  timeValueRed: {
+    color: '#fca5a5',
+    fontSize: 16,
+    fontWeight: '800',
   },
-  detailTitle: {
-    fontSize: 14, fontWeight: '700', color: Colors.onSurface, marginBottom: 3,
+  timeValueWhite: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '800',
   },
-  detailDesc: {
-    fontSize: 12, color: Colors.onSurfaceVariant, lineHeight: 18,
+  sectionContainer: {
+    backgroundColor: '#1b1d24',
+    borderRadius: 8,
+    padding: 20,
+    marginBottom: 24,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  logisticsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  logisticsIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logisticsTitle: {
+    color: '#f8fafc',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  logisticsSubtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+  },
+  requestButton: {
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderStyle: 'dashed',
+    borderRadius: 6,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  requestButtonText: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  mapContainer: {
+    height: 250,
+    backgroundColor: '#1a1d24',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 24,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  mapBackgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#1a1d24',
+    opacity: 0.8,
+  },
+  liveBadge: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  redDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fca5a5',
+  },
+  liveText: {
+    color: '#f8fafc',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  mapControls: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    gap: 8,
+  },
+  mapFab: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#2d333b',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  impactCard: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    backgroundColor: '#2d333b',
+    padding: 12,
+    borderRadius: 4,
+  },
+  impactLabel: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  impactValue: {
+    color: '#f8fafc',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  personnelCard: {
+    borderLeftWidth: 2,
+    borderLeftColor: '#334155',
+    paddingLeft: 16,
+    marginBottom: 20,
+  },
+  personTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  personName: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusText: {
+    color: '#cbd5e1',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  personRoleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  personRoleText: {
+    color: '#94a3b8',
+    fontSize: 13,
+  },
+  fakeBottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    backgroundColor: '#1b1d24',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#26282f',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+  },
+  navItem: {
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  navLabel: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  sosContainer: {
+    backgroundColor: '#2d333b',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    gap: 2,
+    flex: 1.2,
+  },
+  sosLabel: {
+    color: '#e11d48',
+    fontSize: 10,
+    fontWeight: '800',
+  }
 });

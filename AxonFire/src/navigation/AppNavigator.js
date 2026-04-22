@@ -15,6 +15,10 @@ import AlertsScreen from '../screens/AlertsScreen';
 import ResourcesScreen from '../screens/ResourcesScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import AddFirefighterScreen from '../screens/AddFirefighterScreen';
+import AlertDetailScreen from '../screens/AlertDetailScreen';
+import NewAlertScreen from '../screens/NewAlertScreen';
+import ChecklistScreen from '../screens/ChecklistScreen';
+import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -107,6 +111,11 @@ export default function AppNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="MainApp" component={MainTabNavigator} />
+        <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="NewAlert" component={NewAlertScreen} />
+        <Stack.Screen name="Checklist" component={ChecklistScreen} />
+        <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
+        <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -147,7 +156,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: 10,
-    width: 65,
+    flex: 1,
+    maxWidth: 70,
   },
   tabLabel: {
     fontSize: 10,
