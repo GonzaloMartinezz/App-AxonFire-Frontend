@@ -35,7 +35,10 @@ export default function LoginScreen({ navigation }) {
 
     setTimeout(() => {
       setIsLoading(false);
-      if (email.includes('@')) {
+      if (email.toLowerCase().includes('admin')) {
+        navigation.replace('AdminApp');
+        Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');
+      } else if (email.includes('@')) {
         navigation.replace('MainApp'); 
         Alert.alert('Acceso Autorizado', 'Bienvenido a la red táctica Axon Fire');
       } else {

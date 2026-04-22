@@ -64,10 +64,10 @@ export default function AddFirefighterScreen({ navigation }) {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      Alert.alert('Success', 'Personnel saved successfully.');
+      Alert.alert('Éxito', 'Personal guardado correctamente.');
       setFormData({
         nombres: '', dni: '', telefono: '', 
-        contactoEmergencia: '', rango: 'Probationary Firefighter', grupoSanguineo: 'O POSITIVE (O+)', unidad: ''
+        contactoEmergencia: '', rango: 'Bombero en Período de Prueba', grupoSanguineo: 'O POSITIVO (O+)', unidad: ''
       });
     }, 1500);
   };
@@ -79,10 +79,10 @@ export default function AddFirefighterScreen({ navigation }) {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <View style={styles.avatarPlaceholder}>
-             <MaterialCommunityIcons name="account-tie" size={20} color="#fff" />
-          </View>
-          <Text style={styles.topBarTitle}>VANGUARD COMMAND</Text>
+          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatarPlaceholder}>
+             <MaterialCommunityIcons name="home" size={20} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.topBarTitle}>COMANDO VANGUARDIA</Text>
         </View>
         <TouchableOpacity>
           <MaterialCommunityIcons name="cog" size={24} color="#94a3b8" />
@@ -99,21 +99,21 @@ export default function AddFirefighterScreen({ navigation }) {
             <View style={styles.headerTitleBox}>
               <View style={styles.redBorder} />
               <View>
-                <Text style={styles.mainTitle}>PERSONNEL INDUCTION</Text>
-                <Text style={styles.subtitle}>DEPARTMENT OF EMERGENCY SERVICES // {'\n'}AXON FIRE</Text>
+                <Text style={styles.mainTitle}>INDUCCIÓN DE PERSONAL</Text>
+                <Text style={styles.subtitle}>DEPARTAMENTO DE SERVICIOS DE EMERGENCIA // {'\n'}AXON FIRE</Text>
               </View>
             </View>
 
             <View style={styles.formContainer}>
               <InputField
-                label="FULL NAME"
-                placeholder="OPERATIVE LEGAL NAME"
+                label="NOMBRE COMPLETO"
+                placeholder="NOMBRE LEGAL DEL OPERATIVO"
                 value={formData.nombres}
                 onChangeText={(text) => updateForm('nombres', text)}
               />
 
               <InputField
-                label="DNI / ID NUMBER"
+                label="DNI / NÚMERO DE IDENTIDAD"
                 placeholder="00-00000000-0"
                 keyboardType="numeric"
                 value={formData.dni}
@@ -121,7 +121,7 @@ export default function AddFirefighterScreen({ navigation }) {
               />
 
               <InputField
-                label="CONTACT NUMBER"
+                label="NÚMERO DE CONTACTO"
                 placeholder="+1 (555) 000-0000"
                 keyboardType="phone-pad"
                 value={formData.telefono}
@@ -129,25 +129,25 @@ export default function AddFirefighterScreen({ navigation }) {
               />
 
               <InputField
-                label="EMERGENCY CONTACT INFORMATION"
-                placeholder="NAME - RELATIONSHIP - CONTACT #..."
+                label="INFORMACIÓN DE CONTACTO DE EMERGENCIA"
+                placeholder="NOMBRE - RELACIÓN - TELÉFONO..."
                 value={formData.contactoEmergencia}
                 onChangeText={(text) => updateForm('contactoEmergencia', text)}
               />
 
               <DropdownField 
-                label="RANK / HIERARCHY"
+                label="RANGO / JERARQUÍA"
                 value={formData.rango}
               />
 
               <DropdownField 
-                label="BLOOD TYPE"
+                label="GRUPO SANGUÍNEO"
                 value={formData.grupoSanguineo}
               />
 
               <InputField
-                label="UNIT ASSIGNMENT"
-                placeholder="STATION ID - TRUCK/ENGINE DESIGNATION"
+                label="ASIGNACIÓN DE UNIDAD"
+                placeholder="ID ESTACIÓN - DESIGNACIÓN VEHÍCULO"
                 value={formData.unidad}
                 onChangeText={(text) => updateForm('unidad', text)}
               />
@@ -162,7 +162,7 @@ export default function AddFirefighterScreen({ navigation }) {
                 ) : (
                   <>
                     <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
-                    <Text style={styles.buttonText}>SAVE PERSONNEL</Text>
+                    <Text style={styles.buttonText}>GUARDAR PERSONAL</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -172,12 +172,12 @@ export default function AddFirefighterScreen({ navigation }) {
             <View style={styles.bottomActions}>
                <TouchableOpacity style={styles.actionBtn}>
                  <MaterialCommunityIcons name="printer" size={16} color="#e2e8f0" />
-                 <Text style={styles.actionBtnText}>PRINT BADGE</Text>
+                 <Text style={styles.actionBtnText}>IMPRIMIR CREDENCIAL</Text>
                </TouchableOpacity>
                <View style={styles.divider} />
                <TouchableOpacity style={styles.actionBtn}>
                  <MaterialCommunityIcons name="history" size={16} color="#e2e8f0" />
-                 <Text style={styles.actionBtnText}>AUDIT LOG</Text>
+                 <Text style={styles.actionBtnText}>REGISTRO DE AUDITORÍA</Text>
                </TouchableOpacity>
             </View>
             
@@ -190,24 +190,22 @@ export default function AddFirefighterScreen({ navigation }) {
       <View style={styles.fakeBottomNav}>
         <View style={styles.navItem}>
           <MaterialCommunityIcons name="map" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>TACTICAL</Text>
+          <Text style={styles.navLabel}>TÁCTICO</Text>
         </View>
         <View style={styles.navItem}>
           <MaterialCommunityIcons name="account-group" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>UNITS</Text>
+          <Text style={styles.navLabel}>UNIDADES</Text>
         </View>
         <View style={styles.sosContainer}>
            <MaterialCommunityIcons name="asterisk" size={28} color="#fff" />
-           <Text style={styles.sosLabel}>ALERT</Text>
         </View>
         <View style={styles.navItem}>
-          <MaterialCommunityIcons name="clipboard-text" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>LOGS</Text>
+          <MaterialCommunityIcons name="history" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>REGISTROS</Text>
         </View>
-        <View style={styles.navItemActive}>
-          <MaterialCommunityIcons name="account" size={24} color="#fff" />
-          <Text style={[styles.navLabel, { color: '#fff' }]}>SQUAD</Text>
-          <View style={styles.activeBar} />
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="chart-box" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>ESTADO</Text>
         </View>
       </View>
     </View>

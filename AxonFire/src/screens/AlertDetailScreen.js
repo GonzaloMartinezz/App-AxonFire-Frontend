@@ -60,7 +60,9 @@ export default function AlertDetailScreen({ navigation }) {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
-           <MaterialCommunityIcons name="shield-half-full" size={24} color="#e11d48" />
+           <TouchableOpacity onPress={() => navigation?.navigate('Mapa')}>
+              <MaterialCommunityIcons name="home" size={24} color="#e11d48" />
+           </TouchableOpacity>
            <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
         </View>
         <View style={styles.headerRight}>

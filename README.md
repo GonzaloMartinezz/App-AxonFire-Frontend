@@ -8,13 +8,13 @@
   <strong>Sistema de Gestión de Emergencias para Bomberos Voluntarios</strong>
 </p>
 
-<p align="center">
+<!-- <p align="center">
   <img src="https://img.shields.io/badge/React_Native-0.81.5-61DAFB?style=flat-square&logo=react&logoColor=white" />
   <img src="https://img.shields.io/badge/Expo-54-000020?style=flat-square&logo=expo&logoColor=white" />
   <img src="https://img.shields.io/badge/Platform-iOS%20|%20Android%20|%20Web-4caf50?style=flat-square" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" />
   <img src="https://img.shields.io/badge/Status-En%20Desarrollo-orange?style=flat-square" />
-</p>
+</p> -->
 
 <p align="center">
   <em>Proyecto Final de Carrera — Universidad del Norte Santo Tomás de Aquino (UNSTA)</em>
@@ -28,18 +28,14 @@
 - [Problemática](#-problemática)
 - [Solución Propuesta](#-solución-propuesta)
 - [Funcionalidades](#-funcionalidades)
-- [Capturas de Pantalla](#-capturas-de-pantalla)
 - [Arquitectura del Proyecto](#-arquitectura-del-proyecto)
 - [Tecnologías Utilizadas](#-tecnologías-utilizadas)
-- [Design System](#-design-system)
 - [Requisitos Previos](#-requisitos-previos)
 - [Instalación y Ejecución](#-instalación-y-ejecución)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Componentes Principales](#-componentes-principales)
 - [Pantallas de la Aplicación](#-pantallas-de-la-aplicación)
-- [Roadmap](#-roadmap)
 - [Autores](#-autores)
-- [Licencia](#-licencia)
 
 ---
 
@@ -126,38 +122,6 @@ Axon Fire propone una **plataforma móvil integral** que digitaliza el flujo ope
 
 ---
 
-## 🏗️ Arquitectura del Proyecto
-
-```
-┌─────────────────────────────────────────────────┐
-│                   FRONTEND                       │
-│            React Native + Expo                   │
-│                                                  │
-│  ┌─────────┐  ┌──────────┐  ┌───────────────┐   │
-│  │ Screens │  │Components│  │ Theme System  │   │
-│  │         │  │          │  │               │   │
-│  │ • Map   │  │• Tactical│  │ • Colors      │   │
-│  │ • Alerts│  │  Card    │  │ • Typography  │   │
-│  │ • SOS   │  │• Status  │  │ • Spacing     │   │
-│  │ • Logs  │  │  Badge   │  │ • Radius      │   │
-│  │ • Report│  │• Primary │  │               │   │
-│  │ • HQ    │  │  Button  │  │               │   │
-│  └────┬────┘  └────┬─────┘  └───────┬───────┘   │
-│       │            │                │            │
-│  ┌────┴────────────┴────────────────┴───────┐    │
-│  │          Navigation Layer                 │    │
-│  │   Bottom Tab Navigator + FAB Central     │    │
-│  └──────────────────────────────────────────┘    │
-│                                                  │
-│  ┌──────────────────────────────────────────┐    │
-│  │         Platform Abstraction              │    │
-│  │   iOS  ←→  Android  ←→  Web              │    │
-│  └──────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────┘
-```
-
----
-
 ## 🛠️ Tecnologías Utilizadas
 
 ### Core
@@ -192,46 +156,6 @@ Axon Fire propone una **plataforma móvil integral** que digitaliza el flujo ope
 | **react-native-maps** | 1.27.2 | Visualización de mapas nativos |
 | **react-native-web** | 0.21.0 | Compatibilidad con navegadores web |
 
----
-
-## 🎨 Design System
-
-Axon Fire implementa un design system propio denominado **"Tactical Monolith"**, diseñado para entornos de alta presión donde la **claridad es un requisito, no una característica**.
-
-### Principios de Diseño
-
-| Principio | Descripción |
-|-----------|-------------|
-| **No-Line Rule** | Prohibido el uso de bordes de 1px. La separación se logra mediante capas tonales |
-| **Tonal Layering** | Profundidad visual a través de cambios sutiles de color de fondo |
-| **Glassmorphism** | Elementos flotantes con transparencia y desenfoque |
-| **Ready-State** | Paleta de colores que comunica estado de alerta constante |
-
-### Paleta de Colores
-
-```
-┌──────────────────────────────────────────────────────┐
-│  PRIMARY (Emergency Red)                              │
-│  ██████  #af101a  →  ██████  #d32f2f                 │
-│                                                       │
-│  SURFACE HIERARCHY                                    │
-│  ░░░░░░  #ffffff  surfaceContainerLowest              │
-│  ▒▒▒▒▒▒  #e9f6fd  surfaceContainerLow                │
-│  ▓▓▓▓▓▓  #ddeaf2  surfaceContainerHigh               │
-│  ██████  #263238  inverseSurface                      │
-│                                                       │
-│  SEMANTIC ACCENTS                                     │
-│  ██████  #388e3c  success (Operativo)                 │
-│  ██████  #1976d2  alertBlue (Información)             │
-│  ██████  #F57C00  warningOrange (Precaución)          │
-└──────────────────────────────────────────────────────┘
-```
-
-### Tipografía
-
-- **Font Family**: Inter (sistema/nativa)
-- **Escala**: Display → Headline → Title → Body → Label
-- **Peso**: `Medium` y `Semi-Bold` prioritarios para legibilidad en condiciones adversas
 
 ### Componentes Reutilizables
 
@@ -282,8 +206,14 @@ cd App-AxonFire-Frontend/AxonFire
 
 ### 2. Instalar dependencias
 
+Para asegurar que todo funcione correctamente al clonar (especialmente las librerías nativas de navegación y mapas), ejecuta la instalación de la siguiente manera:
+
 ```bash
+# 1. Instalar dependencias base
 npm install
+
+# 2. Asegurar módulos core y dependencias nativas de Expo
+npx expo install @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context react-native-gesture-handler @expo/vector-icons expo-linear-gradient expo-location react-native-maps @react-native-picker/picker
 ```
 
 ### 3. Ejecutar la aplicación
@@ -411,28 +341,6 @@ Directorio de cuarteles con información operativa:
 
 ---
 
-## 🗺️ Roadmap
-
-```mermaid
-gantt
-    title Axon Fire — Plan de Desarrollo
-    dateFormat  YYYY-MM
-    section v1.0 - UI/UX ✅
-    Design System           :done, 2026-03, 2026-04
-    Pantallas principales   :done, 2026-03, 2026-04
-    Responsive mobile       :done, 2026-04, 2026-04
-    section v2.0 - Funcionalidad
-    Autenticación           :active, 2026-04, 2026-05
-    Mapas reales            :2026-04, 2026-05
-    API Backend             :2026-05, 2026-06
-    section v3.0 - Producción
-    Notificaciones push     :2026-06, 2026-07
-    Modo offline            :2026-06, 2026-07
-    Integración SMS/GPS     :2026-07, 2026-08
-```
-
----
-
 ## 👨‍💻 Autores
 
 | Rol | Nombre | Contacto |
@@ -443,19 +351,3 @@ gantt
 > **Institución**: Universidad del Norte Santo Tomás de Aquino (UNSTA)
 > **Ubicación**: Tucumán, Argentina
 > **Año**: 2026
-
----
-
-## 📄 Licencia
-
-Este proyecto está bajo la **Licencia MIT**. Consulta el archivo [LICENSE](LICENSE) para más información.
-
----
-
-<p align="center">
-  <strong>🔥 AXON FIRE — Cuando cada segundo cuenta 🔥</strong>
-</p>
-
-<p align="center">
-  <sub>Hecho con ❤️ para los Bomberos Voluntarios de Argentina</sub>
-</p>

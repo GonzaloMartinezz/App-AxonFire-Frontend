@@ -61,7 +61,7 @@ export default function NewAlertScreen({ navigation }) {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      Alert.alert('Dispatch Confirmed', 'Emergency units have been notified.');
+      Alert.alert('Despacho Confirmado', 'Las unidades de emergencia han sido notificadas.');
       setFormData({
         type: 'INCENDIO ESTRUCTURAL', severity: 'NIVEL 4 - CRÍTICO', location: '', description: ''
       });
@@ -75,10 +75,10 @@ export default function NewAlertScreen({ navigation }) {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <View style={styles.avatarPlaceholder}>
-             <MaterialCommunityIcons name="shield-half-full" size={20} color="#dc2626" />
-          </View>
-          <Text style={styles.topBarTitle}>VANGUARD COMMAND</Text>
+          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatarPlaceholder}>
+             <MaterialCommunityIcons name="home" size={20} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.topBarTitle}>COMANDO VANGUARDIA</Text>
         </View>
         <TouchableOpacity onPress={() => navigation?.goBack()}>
           <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
@@ -95,32 +95,32 @@ export default function NewAlertScreen({ navigation }) {
             <View style={styles.headerTitleBox}>
               <View style={styles.redBorder} />
               <View>
-                <Text style={styles.mainTitle}>EMERGENCY DISPATCH</Text>
-                <Text style={styles.subtitle}>TACTICAL OPERATIONS CENTER // {'\n'}AXON FIRE</Text>
+                <Text style={styles.mainTitle}>DESPACHO DE EMERGENCIA</Text>
+                <Text style={styles.subtitle}>CENTRO DE OPERACIONES TÁCTICAS // {'\n'}AXON FIRE</Text>
               </View>
             </View>
 
             <View style={styles.formContainer}>
               <DropdownField 
-                label="INCIDENT TYPE"
+                label="TIPO DE INCIDENTE"
                 value={formData.type}
               />
 
               <DropdownField 
-                label="SEVERITY LEVEL"
+                label="NIVEL DE SEVERIDAD"
                 value={formData.severity}
               />
 
               <InputField
-                label="INCIDENT LOCATION"
-                placeholder="STREET ADDRESS OR COORDINATES"
+                label="UBICACIÓN EXACTA"
+                placeholder="COODENADAS O DIRECCIÓN..."
                 value={formData.location}
                 onChangeText={(text) => updateForm('location', text)}
               />
 
               <InputField
-                label="ADDITIONAL DETAILS"
-                placeholder="PROVIDE ANY RELEVANT DISPATCH INFORMATION..."
+                label="EVALUACIÓN INICIAL / DESCRIPCIÓN"
+                placeholder="DETALLES TÁCTICOS DEL INCIDENTE..."
                 value={formData.description}
                 onChangeText={(text) => updateForm('description', text)}
                 multiline={true}
@@ -135,8 +135,8 @@ export default function NewAlertScreen({ navigation }) {
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="broadcast" size={20} color="#fff" />
-                    <Text style={styles.buttonText}>DISPATCH UNITS</Text>
+                    <MaterialCommunityIcons name="alert-decagram" size={20} color="#fff" />
+                    <Text style={styles.buttonText}>INICIAR PROTOCOLO DE DESPACHO</Text>
                   </>
                 )}
               </TouchableOpacity>
