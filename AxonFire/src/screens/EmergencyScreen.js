@@ -1,18 +1,61 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView
-} from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity, SafeAreaView} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import { Vibration } from 'react-native';
+import { useEffect, useRef } from 'react';
 
 export default function EmergencyScreen() {
   const currentTime = new Date().toLocaleTimeString('es-ES', {
     hour: '2-digit',
     minute: '2-digit'
   });
+
+// sonido aca vvv
+  const soundRef = useRef(null);
+const vibrationRef = useRef(null);
+
+const startEmergencyAlert = async () => {
+  await Audio.setAudioModeAsync({playsInSilentModeIOS: true, staysActiveInBackground: true,}); //<<<<
+
+  const { sound } = await Audio.Sound.createAsync(
+    require('../../assets/siren.mp3'), // <<archivo de sonido
+    { isLooping: true, volume: 1.0 }
+  );
+
+  soundRef.current = sound;
+  await sound.playAsync();
+
+  // vibración constante
+  vibrationRef.current = setInterval(() => {
+    Vibration.vibrate(1000);
+  }, 1500);
+};
+
+const stopEmergencyAlert = async () => {
+  if (soundRef.current) {
+    await soundRef.current.stopAsync();
+    await soundRef.current.unloadAsync();
+    soundRef.current = null;
+  }
+
+  if (vibrationRef.current) {
+    clearInterval(vibrationRef.current);
+    vibrationRef.current = null;
+  }
+
+  Vibration.cancel();
+};
+
+useEffect(() => {
+  startEmergencyAlert();
+
+  return () => {
+    stopEmergencyAlert(); // limpieza al salir
+  };
+}, []);
+
+ // sonido aca^^^
 
   const currentDate = new Date().toLocaleDateString('es-ES', {
     weekday: 'long',
@@ -66,12 +109,12 @@ export default function EmergencyScreen() {
 
         {/* BOTONES */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.confirmButton}>
+          <TouchableOpacity style={styles.confirmButton} onPress={stopEmergencyAlert}>
             <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
             <Text style={styles.buttonText}>CONFIRMAR ASISTENCIA</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.rejectButton}>
+          <TouchableOpacity style={styles.rejectButton} onPress={stopEmergencyAlert}>
             <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
             <Text style={styles.buttonText}>RECHAZAR</Text>
           </TouchableOpacity>
