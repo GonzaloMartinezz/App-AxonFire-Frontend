@@ -6,8 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Image
-} from 'react-native';
+  Image} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';

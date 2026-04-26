@@ -5,8 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Platform,
-} from 'react-native';
+  Platform,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';

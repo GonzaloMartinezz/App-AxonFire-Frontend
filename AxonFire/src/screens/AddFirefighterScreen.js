@@ -10,8 +10,7 @@ import {
   Alert,
   SafeAreaView,
   KeyboardAvoidingView,
-  Platform
-} from 'react-native';
+  Platform} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
