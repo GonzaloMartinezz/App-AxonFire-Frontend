@@ -101,26 +101,6 @@ Axon Fire propone una **plataforma móvil integral** que digitaliza el flujo ope
 - [ ] Integración SMS para zonas de baja conectividad
 - [ ] Generación de PDF de reportes
 
----
-
-## 📸 Capturas de Pantalla
-
-<table>
-  <tr>
-    <td align="center"><strong>🗺️ Mapa Táctico</strong></td>
-    <td align="center"><strong>🚨 Centro de Alertas</strong></td>
-    <td align="center"><strong>📦 Centro Logístico</strong></td>
-    <td align="center"><strong>📊 Reportes</strong></td>
-  </tr>
-  <tr>
-    <td><img src="Proyecto-Mockup-AxonFire/app.seccion_mapa.png/screen.png" width="200"/></td>
-    <td><img src="Proyecto-Mockup-AxonFire/app_seccion_alertas.png/screen.png" width="200"/></td>
-    <td><img src="Proyecto-Mockup-AxonFire/logistics_hub_tactical_grey/screen.png" width="200"/></td>
-    <td><img src="Proyecto-Mockup-AxonFire/post_incident_report_summary/screen.png" width="200"/></td>
-  </tr>
-</table>
-
----
 
 ## 🛠️ Tecnologías Utilizadas
 
@@ -199,26 +179,26 @@ Para asegurar que todo funcione correctamente al clonar (especialmente las libre
 
 ```bash
 # 1. Instalar dependencias base
-npm install
+# npm install
 
 # 2. Asegurar módulos core y dependencias nativas de Expo
-npx expo install @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context react-native-gesture-handler @expo/vector-icons expo-linear-gradient expo-location react-native-maps @react-native-picker/picker
+# npx expo install @react-navigation/native @react-navigation/stack @react-navigation/bottom-tabs react-native-screens react-native-safe-area-context react-native-gesture-handler @expo/vector-icons expo-linear-gradient expo-location react-native-maps @react-native-picker/picker
 ```
 
 ### 3. Ejecutar la aplicación
 
 ```bash
 # Iniciar en modo desarrollo (todas las plataformas)
-npx expo start
+# npx expo start
 
 # Solo Web (navegador)
-npx expo start --web
+# npx expo start --web
 
 # Solo Android
-npx expo start --android
+# npx expo start --android
 
 # Solo iOS (requiere macOS + Xcode)
-npx expo start --ios
+# npx expo start --ios
 ```
 
 ### 4. Abrir en el dispositivo
