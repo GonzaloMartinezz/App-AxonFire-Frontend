@@ -11,7 +11,8 @@ import {
   Platform,
   ScrollView,
   SafeAreaView,
-  Dimensions} from 'react-native';
+  Dimensions
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -23,7 +24,6 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Por favor completa todos los campos operativos.');
@@ -34,7 +34,10 @@ export default function LoginScreen({ navigation }) {
 
     setTimeout(() => {
       setIsLoading(false);
-      if (email.includes('@')) {
+      if (email.toLowerCase().includes('admin')) {
+        navigation.replace('AdminApp');
+        Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');
+      } else if (email.includes('@')) {
         navigation.replace('MainApp'); 
         Alert.alert('Acceso Autorizado', 'Bienvenido a la red táctica Axon Fire');
       } else {
@@ -63,7 +66,7 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.header}>
               <View style={styles.logoContainer}>
                 <View style={styles.logoBox}>
-                  <MaterialCommunityIcons name="shield-fire" size={32} color="#fff" />
+                  <MaterialCommunityIcons name="fire" size={32} color="#fff" />
                 </View>
                 <Text style={styles.logoText}>
                   <Text style={styles.logoAxon}>AXON </Text>
@@ -145,14 +148,6 @@ export default function LoginScreen({ navigation }) {
               </View>
             </View>
 
-            <TouchableOpacity 
-              style={styles.footerLink}
-              onPress={() => navigation.navigate('Register')}
-            >
-              <Text style={styles.footerLinkText}>SOLICITA ACCESO AQUÍ</Text>
-              <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#fff" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
-
             <View style={styles.statusFooter}>
               <Text style={styles.statusText}>STATUS: OPERATIONAL</Text>
               <Text style={styles.statusText}>NODE: STATION-42</Text>
@@ -205,11 +200,20 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     marginRight: 14,
-    shadowColor: '#af101a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#af101a',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.8,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0px 4px 10px rgba(175, 16, 26, 0.8)',
+      },
+    }),
   },
   logoText: {
     fontSize: 32,
@@ -236,11 +240,20 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 15,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 15,
+      },
+      web: {
+        boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.5)',
+      },
+    }),
   },
   inputGroup: {
     marginBottom: 20,
@@ -317,17 +330,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginLeft: 12,
     flex: 1,
-  },
-  footerLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 60,
-  },
-  footerLinkText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
   },
   statusFooter: {
     flexDirection: 'row',

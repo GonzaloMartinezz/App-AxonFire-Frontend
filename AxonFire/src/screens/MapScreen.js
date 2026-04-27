@@ -5,13 +5,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Platform,} from 'react-native';
+  Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
-export default function MapScreen() {
+export default function MapScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -71,9 +72,14 @@ export default function MapScreen() {
             </View>
             <Text style={styles.headerTitle}>AXON FIRE</Text>
           </View>
-          <TouchableOpacity style={styles.emergencyIcon}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={Colors.primary} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity style={styles.emergencyIcon} onPress={() => navigation.navigate('AdminApp')} title="Admin Panel">
+              <MaterialCommunityIcons name="shield-account" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.emergencyIcon}>
+              <MaterialCommunityIcons name="logout" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Mission Status Card */}

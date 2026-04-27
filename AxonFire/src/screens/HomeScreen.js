@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Image} from 'react-native';
+  Image,
+  Platform
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -153,11 +155,20 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 20,
     marginBottom: 32,
-    shadowColor: '#dc2626',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#dc2626',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: '0px 8px 12px rgba(220, 38, 38, 0.4)',
+      },
+    }),
   },
   bannerLeft: {
     flexDirection: 'row',
