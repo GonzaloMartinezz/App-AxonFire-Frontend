@@ -8,11 +8,12 @@ import {
   StatusBar,
   Dimensions,
   Platform,
-  Image
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius } from '../theme';
+import { useAuth } from '../context/AuthContext';
+import { Colors } from '../theme';
 
 const { width } = Dimensions.get('window');
 
@@ -25,52 +26,61 @@ const STATS = [
 
 export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { logout, user } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => logout().then(() => navigation.replace('Login')), style: 'destructive' }
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
-      <ScrollView 
+
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
-          styles.scrollContent, 
+          styles.scrollContent,
           { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 100 }
         ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.responsiveWrapper}>
-          
-          {/* Header Bar */}
+
           <View style={styles.headerBar}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => navigation?.navigate('Mapa')}
             >
               <MaterialCommunityIcons name="home" size={24} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation?.navigate('Login')}
+              onPress={handleLogout}
             >
               <MaterialCommunityIcons name="logout" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
 
-          {/* Profile Section */}
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <View style={styles.avatar}>
                 <MaterialCommunityIcons name="shield-star" size={48} color={Colors.primary} />
               </View>
               <View style={styles.adminBadge}>
-                <Text style={styles.adminBadgeText}>ADMINISTRADOR</Text>
+                <Text style={styles.adminBadgeText}>{user?.rol || 'ADMINISTRADOR'}</Text>
               </View>
             </View>
             <Text style={styles.userName}>Jefatura Central</Text>
             <Text style={styles.userRole}>Comando Operativo - Cuartel 1</Text>
           </View>
 
-          {/* Quick Stats */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Métricas del Cuartel</Text>
             <View style={styles.statsGrid}>
@@ -86,11 +96,13 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Admin Actions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Gestión Administrativa</Text>
-            
-            <TouchableOpacity style={styles.adminMenuCard}>
+
+            <TouchableOpacity
+              style={styles.adminMenuCard}
+              onPress={() => navigation.navigate('AddFirefighter')}
+            >
               <View style={[styles.adminMenuIcon, { backgroundColor: '#e0e7ff' }]}>
                 <MaterialCommunityIcons name="account-cog" size={24} color="#4338ca" />
               </View>
@@ -122,7 +134,7 @@ export default function ProfileScreen({ navigation }) {
               </View>
               <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.adminMenuCard}>
               <View style={[styles.adminMenuIcon, { backgroundColor: '#f3f4f6' }]}>
                 <MaterialCommunityIcons name="cog" size={24} color="#4b5563" />

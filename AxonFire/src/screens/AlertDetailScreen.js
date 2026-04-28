@@ -57,19 +57,19 @@ export default function AlertDetailScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#121417" />
       
-      {/* Header */}
+{/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
-           <TouchableOpacity onPress={() => navigation?.navigate('Mapa')}>
-              <MaterialCommunityIcons name="home" size={24} color="#e11d48" />
+           <TouchableOpacity onPress={() => navigation?.goBack()}>
+               <MaterialCommunityIcons name="arrow-left" size={24} color="#e11d48" />
            </TouchableOpacity>
-           <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
+            <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Alerts')}>
             <MaterialCommunityIcons name="bell" size={22} color="#94a3b8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.avatarBtn}>
+          <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Perfil')}>
             <MaterialCommunityIcons name="account" size={20} color="#e2e8f0" />
           </TouchableOpacity>
         </View>
@@ -192,31 +192,40 @@ export default function AlertDetailScreen({ navigation }) {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Replicating the exact bottom navigation from the image to look identical */}
+      {/* Bottom Navigation */}
       <View style={styles.fakeBottomNav}>
-        <View style={styles.navItem}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => navigation?.navigate('PersonnelStatus')}
+        >
           <MaterialCommunityIcons name="view-grid" size={24} color="#64748b" />
           <Text style={styles.navLabel}>STATUS</Text>
-        </View>
-        <TouchableOpacity 
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.navItem}
           onPress={() => navigation?.navigate('PersonnelStatus')}
         >
           <MaterialCommunityIcons name="account-group" size={24} color="#64748b" />
           <Text style={styles.navLabel}>UNITS</Text>
         </TouchableOpacity>
-        <View style={styles.sosContainer}>
+        <TouchableOpacity
+          style={styles.sosContainer}
+          onPress={() => navigation?.navigate('NewAlert')}
+        >
            <MaterialCommunityIcons name="asterisk" size={28} color="#e11d48" />
            <Text style={styles.sosLabel}>SOS</Text>
-        </View>
-        <View style={styles.navItem}>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
           <MaterialCommunityIcons name="archive" size={24} color="#64748b" />
           <Text style={styles.navLabel}>LOGISTICS</Text>
-        </View>
-        <View style={styles.navItem}>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => navigation?.navigate('Mapa')}
+        >
           <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
           <Text style={styles.navLabel}>MAP</Text>
-        </View>
+        </TouchableOpacity>
       </View>
     </View>
   );
