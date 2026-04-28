@@ -24,7 +24,6 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Por favor completa todos los campos operativos.');
@@ -148,14 +147,6 @@ export default function LoginScreen({ navigation }) {
                 </Text>
               </View>
             </View>
-
-            <TouchableOpacity 
-              style={styles.footerLink}
-              onPress={() => navigation.navigate('Register')}
-            >
-              <Text style={styles.footerLinkText}>SOLICITA ACCESO AQUÍ</Text>
-              <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#fff" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
 
             <View style={styles.statusFooter}>
               <Text style={styles.statusText}>STATUS: OPERATIONAL</Text>
@@ -339,17 +330,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginLeft: 12,
     flex: 1,
-  },
-  footerLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 60,
-  },
-  footerLinkText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
   },
   statusFooter: {
     flexDirection: 'row',

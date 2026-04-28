@@ -111,10 +111,13 @@ export default function AdminPersonnelScreen({ navigation }) {
         <Text style={styles.mainTitle}>GESTIÓN DE{'\n'}PERSONAL</Text>
         <Text style={styles.subtitle}>PANEL DE CONTROL ADMINISTRATIVO /{'\n'}SECTOR 7G</Text>
 
-        <TouchableOpacity style={styles.actionBtn}>
-          <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
-          <Text style={styles.actionBtnText}>ALTA DE PERSONAL</Text>
-        </TouchableOpacity>
+        <TouchableOpacity 
+  style={styles.actionBtn}
+  onPress={() => navigation.navigate('AddFirefighter')}
+>
+  <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
+  <Text style={styles.actionBtnText}>ALTA DE PERSONAL</Text>
+</TouchableOpacity>
 
         {/* Filters Box */}
         <View style={styles.filtersBox}>

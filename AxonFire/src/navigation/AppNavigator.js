@@ -102,7 +102,7 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Mapa" component={MapScreen} />
       <Tab.Screen name="Alertas" component={AlertsScreen} />
-      <Tab.Screen name="SOS" component={AddFirefighterScreen} options={{ title: 'ALERTA' }} />
+      <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'ALERTA' }} />
       <Tab.Screen name="Cuarteles" component={ResourcesScreen} />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
@@ -136,7 +136,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
             return (
               <TouchableOpacity key={route.key} onPress={onPress} style={styles.fabContainerAdmin} activeOpacity={0.8}>
                 <View style={styles.fabAdmin}>
-                  <MaterialCommunityIcons name="asterisk" size={32} color="#fff" />
+                  <MaterialCommunityIcons name="alarm-light" size={32} color="#fff" />
                 </View>
                 <Text style={styles.tabLabelAdminRed}>SOS</Text>
               </TouchableOpacity>
