@@ -88,7 +88,7 @@ export default function NewAlertScreen({ navigation }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/alerta/crear`, {
+      const response = await fetch(`${API_BASE_URL}/alerta/crear-con-notificacion`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,8 +98,6 @@ export default function NewAlertScreen({ navigation }) {
           sub_categoria_alerta_id: '1',
           ubicacion: formData.location,
           observaciones: formData.description || 'Sin descripción',
-          fecha_hora: new Date().toISOString(),
-          estado_alerta_id: '1',
           usuario_alta_alerta: user?.id || 'abc1'
         }),
       });
@@ -134,7 +132,7 @@ export default function NewAlertScreen({ navigation }) {
           <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.avatarPlaceholder}>
             <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.topBarTitle}>COMANDO VANGUARDIA</Text>
+          <Text style={styles.topBarTitle}>ALERTA</Text>
         </View>
         <TouchableOpacity onPress={() => navigation?.goBack()}>
           <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
@@ -149,10 +147,6 @@ export default function NewAlertScreen({ navigation }) {
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.headerTitleBox}>
               <View style={styles.redBorder} />
-              <View>
-                <Text style={styles.mainTitle}>DESPACHO DE EMERGENCIA</Text>
-                <Text style={styles.subtitle}>CENTRO DE OPERACIONES TÁCTICAS // {'\n'}AXON FIRE</Text>
-              </View>
             </View>
 
             <View style={styles.formContainer}>
