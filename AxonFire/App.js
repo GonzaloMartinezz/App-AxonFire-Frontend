@@ -7,6 +7,14 @@ import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 function AppContent() {
   const { isLoading } = useAuth();
 
@@ -22,9 +30,24 @@ function AppContent() {
 }
 
 export default function App() {
+  const notificationListener = React.useRef();
+  const responseListener = React.useRef();
 
   useEffect(() => {
     registerForPushNotifications();
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('¡Notificación recibida en primer plano!:', notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Interacción con la notificación detectada:', response);
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener.current);
+      Notifications.removeNotificationSubscription(responseListener.current);
+    };
   }, []);
 
   return (
