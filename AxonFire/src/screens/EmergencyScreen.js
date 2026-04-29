@@ -55,7 +55,7 @@ useEffect(() => {
   };
 }, []);
 
- // sonido aca^^^
+  // sonido aca^^^
 
   const currentDate = new Date().toLocaleDateString('es-ES', {
     weekday: 'long',

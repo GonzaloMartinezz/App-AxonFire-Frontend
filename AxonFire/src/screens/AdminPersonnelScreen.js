@@ -112,7 +112,6 @@ export default function AdminPersonnelScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#dc2626" />}
       >
         <Text style={styles.mainTitle}>GESTIÓN DE{'\n'}PERSONAL</Text>
-        <Text style={styles.subtitle}>PANEL DE CONTROL ADMINISTRATIVO /{'\n'}SECTOR 7G</Text>
 
         <TouchableOpacity
           style={styles.actionBtn}

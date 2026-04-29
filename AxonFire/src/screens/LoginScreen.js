@@ -16,7 +16,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
@@ -57,35 +56,6 @@ export default function LoginScreen({ navigation }) {
 
       await login({ id: data.id, rol: data.rol }, data.token);
 
-      try {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        if (finalStatus === 'granted') {
-          const pushTokenString = (await Notifications.getExpoPushTokenAsync({
-            projectId: '239068a5-d358-4993-a32a-43bf87ca70e7',
-          })).data;
-          
-          await fetch(`${API_BASE_URL}/notificaciones/registrar-token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${data.token}`
-            },
-            body: JSON.stringify({
-              usuario_id: data.id,
-              token: pushTokenString,
-              plataforma: Platform.OS
-            })
-          });
-        }
-      } catch (e) {
-        console.warn('No se pudo obtener el token push de Expo:', e);
-      }
-
       if (data.rol === 'ADMIN') {
         navigation.replace('AdminApp');
         Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');
@@ -124,7 +94,6 @@ export default function LoginScreen({ navigation }) {
                   <Text style={styles.logoFire}>FIRE</Text>
                 </Text>
               </View>
-              <Text style={styles.versionText}>TACTICAL COMMAND INTERFACE V4.0</Text>
             </View>
 
             <View style={styles.card}>

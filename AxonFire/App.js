@@ -1,8 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Platform, View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { Audio } from 'expo-av';
+import { API_BASE_URL } from './src/config/api';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -15,8 +17,42 @@ Notifications.setNotificationHandler({
   }),
 });
 
+const sirenSound = require('./assets/siren.wav');
+
+async function playSiren() {
+  try {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      staysActiveInBackground: true,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+    });
+
+    const { sound } = await Audio.Sound.createAsync(sirenSound, {
+      shouldPlay: true,
+      volume: 1.0,
+      isLooping: false,
+    });
+
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        sound.unloadAsync();
+      }
+    });
+  } catch (error) {
+    console.warn('Error reproduciendo sirena:', error);
+  }
+}
+
 function AppContent() {
-  const { isLoading } = useAuth();
+  const { isLoading, user, token } = useAuth();
+
+  useEffect(() => {
+    if (user && token) {
+      registrarTokenPush(user, token);
+    }
+  }, [user, token]);
 
   if (isLoading) {
     return (
@@ -30,23 +66,25 @@ function AppContent() {
 }
 
 export default function App() {
-  const notificationListener = React.useRef();
-  const responseListener = React.useRef();
+  const notificationListener = useRef();
+  const responseListener = useRef();
 
   useEffect(() => {
     registerForPushNotifications();
 
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('¡Notificación recibida en primer plano!:', notification);
+    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
+      playSiren();
     });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Interacción con la notificación detectada:', response);
-    });
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {});
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationListener.current);
-      Notifications.removeNotificationSubscription(responseListener.current);
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+      }
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
     };
   }, []);
 
@@ -60,8 +98,6 @@ export default function App() {
 }
 
 async function registerForPushNotifications() {
-  await Notifications.requestPermissionsAsync();
-
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('emergency', {
       name: 'Emergencias',
@@ -69,6 +105,38 @@ async function registerForPushNotifications() {
       vibrationPattern: [0, 1000, 500, 1000],
       sound: 'default',
     });
+  }
+}
+
+async function registrarTokenPush(user, authToken) {
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus === 'granted') {
+      const pushTokenString = (await Notifications.getExpoPushTokenAsync({
+        projectId: 'ea3e82f6-533d-454d-8f71-1a7e2720dd3b',
+      })).data;
+
+      await fetch(`${API_BASE_URL}/notificaciones/registrar-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          usuario_id: user.id,
+          token: pushTokenString,
+          plataforma: Platform.OS
+        })
+      });
+    }
+  } catch (e) {
+    console.warn('Error registrando token push:', e);
   }
 }
 
