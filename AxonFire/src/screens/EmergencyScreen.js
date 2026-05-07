@@ -20,11 +20,16 @@ export default function EmergencyScreen({ route }) {
 
   const { user } = useAuth();
   const usuarioId = user?.id ?? null;
+  const token = user?.token ?? null;
 
   // Estado de respuesta: null | 'ACEPTADO' | 'RECHAZADO'
   const [respuesta, setRespuesta] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Datos de la alerta cargados desde el backend
+  const [alertaData, setAlertaData] = useState(null);
+  const [loadingAlerta, setLoadingAlerta] = useState(false);
 
   // Animación de confirmación
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -76,6 +81,27 @@ export default function EmergencyScreen({ route }) {
       stopEmergencyAlert();
     };
   }, []);
+
+  // ── Cargar detalles de la alerta desde el backend ────────────────────────
+  useEffect(() => {
+    if (!alertaId) return;
+    const fetchAlerta = async () => {
+      setLoadingAlerta(true);
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE_URL}/alerta/${alertaId}`, { headers });
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+        setAlertaData(data);
+      } catch (err) {
+        console.error('Error al cargar alerta:', err);
+      } finally {
+        setLoadingAlerta(false);
+      }
+    };
+    fetchAlerta();
+  }, [alertaId, token]);
 
   // ── Animación al confirmar/rechazar ─────────────────────────────────────
   const animateIn = () => {
@@ -236,13 +262,17 @@ export default function EmergencyScreen({ route }) {
         {/* DETALLES */}
         <View style={styles.card}>
           <Text style={styles.label}>TIPO DE INCIDENTE</Text>
-          <Text style={styles.text}>Incendio Estructural - Edificio</Text>
-          <Text style={styles.text}>Av. Corrientes</Text>
+          <Text style={styles.text}>{alertaData?.observaciones || 'Incendio Estructural - Edificio'}</Text>
+          <Text style={styles.text}>{alertaData?.ubicacion || 'Ubicación no disponible'}</Text>
 
           <View style={styles.row}>
             <View>
               <Text style={styles.label}>HORA</Text>
-              <Text style={styles.text}>{currentTime} HS</Text>
+              <Text style={styles.text}>
+                {alertaData?.fecha_hora
+                  ? new Date(alertaData.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+                  : currentTime} HS
+              </Text>
             </View>
             <View>
               <Text style={styles.label}>PRIORIDAD</Text>
@@ -253,10 +283,11 @@ export default function EmergencyScreen({ route }) {
           <View style={styles.location}>
             <MaterialCommunityIcons name="map-marker" size={20} color="#3b82f6" />
             <Text style={styles.locationText}>
-              Av. Corrientes 1234, CABA. Múltiples focos en piso 4 y 5.
+              {alertaData?.ubicacion || 'Av. Corrientes 1234, CABA. Múltiples focos en piso 4 y 5.'}
             </Text>
           </View>
         </View>
+
 
         {/* ERROR */}
         {error && (
