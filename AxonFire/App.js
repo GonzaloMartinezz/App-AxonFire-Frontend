@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import AppNavigator from './src/navigation/AppNavigator';
+import { AuthProvider } from './src/context/AuthContext';
 
 export default function App() {
 
@@ -13,9 +14,11 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <AppNavigator />
-    </SafeAreaProvider>
+    <AuthProvider>
+      <SafeAreaProvider>
+        <AppNavigator />
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }
 

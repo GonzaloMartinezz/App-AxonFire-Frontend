@@ -23,6 +23,8 @@ import AlertDetailScreen from '../screens/AlertDetailScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
 import ChecklistScreen from '../screens/ChecklistScreen';
 import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
+import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
+import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createStackNavigator();
@@ -192,7 +194,7 @@ function AdminTabNavigator() {
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName="AttendanceBoard" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="MainApp" component={MainTabNavigator} />
@@ -202,6 +204,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Checklist" component={ChecklistScreen} />
         <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
         <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
+        <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
+        <Stack.Screen name="Emergency" component={EmergencyScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
