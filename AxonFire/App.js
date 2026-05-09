@@ -30,7 +30,7 @@ async function registerForPushNotifications() {
       name: 'Emergencias',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 1000, 500, 1000],
-      sound: 'default',
+      sound: 'siren.mp3',
     });
   }
 }
