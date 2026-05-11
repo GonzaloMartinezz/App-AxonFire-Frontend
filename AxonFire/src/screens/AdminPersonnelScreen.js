@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,74 +6,56 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
-  Image,
   TextInput,
-  Alert
+  Alert,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const PERSONNEL = [
-  {
-    id: '1',
-    rank: 'CAPITÁN',
-    unit: 'UNIDAD ALFA-1',
-    name: 'CARLOS MENDOZA',
-    status: 'ACTIVO',
-    timeRest: '12H REST.',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg'
-  },
-  {
-    id: '2',
-    rank: 'SARGENTO',
-    unit: 'UNIDAD BRAVO-2',
-    name: 'DAVID ORTIZ',
-    status: 'ACTIVO',
-    timeRest: '04H REST.',
-    avatar: 'https://randomuser.me/api/portraits/men/22.jpg'
-  },
-  {
-    id: '3',
-    rank: 'BOMBERO',
-    unit: 'RESCATE X',
-    name: 'ELENA RÍOS',
-    status: 'LIBRE',
-    timeRest: '48H OFF',
-    isFree: true,
-    avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-  },
-  {
-    id: '4',
-    rank: 'BOMBERO',
-    unit: 'UNIDAD ALFA-1',
-    name: 'ANA GARCÍA',
-    status: 'ACTIVO',
-    timeRest: '08H REST.',
-    avatar: 'https://randomuser.me/api/portraits/women/68.jpg'
-  },
-  {
-    id: '5',
-    rank: 'SARGENTO',
-    unit: 'RESCATE-X',
-    name: 'JULIÁN SOTO',
-    status: 'ACTIVO',
-    timeRest: '02H REST.',
-    avatar: 'https://randomuser.me/api/portraits/men/46.jpg'
-  },
-  {
-    id: '6',
-    rank: 'CAPITÁN',
-    unit: 'UNIDAD BRAVO-2',
-    name: 'MARCO POLO',
-    status: 'ACTIVO',
-    timeRest: '10H REST.',
-    avatar: 'https://randomuser.me/api/portraits/men/90.jpg'
-  }
-];
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 export default function AdminPersonnelScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { token, logout } = useAuth();
+  const [personnel, setPersonnel] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    fetchPersonnel();
+  }, []);
+
+  const fetchPersonnel = async () => {
+    try {
+      setError(null);
+      const response = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      console.log(response)
+      if (!response.ok) {
+        throw new Error('Error al obtener el personal');
+      }
+      const data = await response.json();
+      setPersonnel(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPersonnel();
+  };
 
   const confirmLogout = () => {
     Alert.alert(
@@ -81,20 +63,38 @@ export default function AdminPersonnelScreen({ navigation }) {
       '¿Estás seguro que deseas cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: () => navigation.replace('Login'), style: 'destructive' }
+        { text: 'Confirmar', onPress: () => logout().then(() => navigation.replace('Login')), style: 'destructive' }
       ]
     );
   };
 
+  const getRangoColor = (rango) => {
+    const rangoNombre = rango?.toUpperCase();
+    if (['CAPITÁN', 'MAYOR', 'JEFE DE CUARTEL'].includes(rangoNombre)) return '#fca5a5';
+    if (['TENIENTE', 'SARGENTO'].includes(rangoNombre)) return '#fbbf24';
+    return '#6ee7b7';
+  };
+
+  const getStatusInfo = (item) => {
+    return { isFree: false, status: 'ACTIVO', timeRest: 'EN SERVICIO' };
+  };
+
+  const filteredPersonnel = personnel.filter(person => {
+    const fullName = `${person.nombre} ${person.apellido}`.toLowerCase();
+    const username = person.usuarioId?.nombre_usuario?.toLowerCase() || '';
+    const rango = person.rangoBombero?.nombre_rol?.toLowerCase() || '';
+    const query = searchQuery.toLowerCase();
+    return fullName.includes(query) || username.includes(query) || rango.includes(query);
+  });
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" backgroundColor="#16181d" />
-      
-      {/* Top Bar */}
+
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-           <Image source={{ uri: 'https://randomuser.me/api/portraits/men/41.jpg' }} style={styles.avatarTop} />
-           <Text style={styles.topBarTitle}>AXON FIRE</Text>
+          <View style={styles.avatarTop} />
+          <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
         <View style={styles.topBarRight}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('MainApp')}>
@@ -106,28 +106,36 @@ export default function AdminPersonnelScreen({ navigation }) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header Section */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#dc2626" />}
+      >
         <Text style={styles.mainTitle}>GESTIÓN DE{'\n'}PERSONAL</Text>
-        <Text style={styles.subtitle}>PANEL DE CONTROL ADMINISTRATIVO /{'\n'}SECTOR 7G</Text>
 
-        <TouchableOpacity 
-  style={styles.actionBtn}
-  onPress={() => navigation.navigate('AddFirefighter')}
->
-  <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
-  <Text style={styles.actionBtnText}>ALTA DE PERSONAL</Text>
-</TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate('AddFirefighter')}
+        >
+          <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
+          <Text style={styles.actionBtnText}>ALTA DE PERSONAL</Text>
+        </TouchableOpacity>
 
-        {/* Filters Box */}
         <View style={styles.filtersBox}>
           <View style={styles.searchRow}>
             <MaterialCommunityIcons name="magnify" size={20} color="#94a3b8" style={styles.searchIcon} />
-            <TextInput 
+            <TextInput
               style={styles.searchInput}
               placeholder="BUSCAR BOMBERO O UNIDAD"
               placeholderTextColor="#64748b"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <MaterialCommunityIcons name="close-circle" size={18} color="#64748b" />
+              </TouchableOpacity>
+            )}
           </View>
           <TouchableOpacity style={styles.dropdownRow}>
             <Text style={styles.dropdownText}>TODOS LOS RANGOS</Text>
@@ -139,49 +147,80 @@ export default function AdminPersonnelScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Personnel List */}
-        {PERSONNEL.map((person) => (
-          <View key={person.id} style={styles.personCard}>
-            <View style={styles.cardLeftBorder} />
-            <Image source={{ uri: person.avatar }} style={styles.personAvatar} />
-            
-            <View style={styles.personDetails}>
-              <View style={styles.rankUnitRow}>
-                <View style={styles.rankBadge}>
-                  <Text style={styles.rankText}>{person.rank}</Text>
-                </View>
-                <Text style={styles.unitText}>{person.unit}</Text>
-              </View>
-              <Text style={styles.personName}>{person.name}</Text>
-              <View style={styles.statusRow}>
-                <MaterialCommunityIcons 
-                  name={person.isFree ? "close-circle" : "check-circle"} 
-                  size={12} 
-                  color={person.isFree ? "#fca5a5" : "#38bdf8"} 
-                />
-                <Text style={[styles.statusText, { color: person.isFree ? "#fca5a5" : "#38bdf8" }]}>
-                  {person.status}
-                </Text>
-                <MaterialCommunityIcons name="clock-outline" size={12} color="#f8fafc" style={{ marginLeft: 12 }} />
-                <Text style={styles.timeText}>{person.timeRest}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.moreBtn}>
-              <MaterialCommunityIcons name="dots-vertical" size={20} color="#94a3b8" />
+        {isLoading ? (
+          <View style={styles.centerContent}>
+            <ActivityIndicator color="#dc2626" size="large" />
+            <Text style={styles.loadingText}>Cargando personal...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.centerContent}>
+            <MaterialCommunityIcons name="alert-circle" size={48} color="#ef4444" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchPersonnel}>
+              <Text style={styles.retryButtonText}>REINTENTAR</Text>
             </TouchableOpacity>
           </View>
-        ))}
-
-        {/* Pagination Info */}
-        <View style={styles.paginationRow}>
-          <Text style={styles.paginationText}>MOSTRANDO 6 DE 48{'\n'}EFECTIVOS</Text>
-          <View style={styles.paginationControls}>
-             <Text style={styles.pageBtnText}>ANTERIOR</Text>
-             <Text style={styles.pageCurrentText}>01</Text>
-             <Text style={styles.pageBtnText}>SIGUIENTE</Text>
+        ) : filteredPersonnel.length === 0 ? (
+          <View style={styles.centerContent}>
+            <MaterialCommunityIcons name="account-off" size={48} color="#64748b" />
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'No se encontraron resultados' : 'No hay bomberos registrados'}
+            </Text>
           </View>
-        </View>
+        ) : (
+          <>
+            {filteredPersonnel.map((person) => {
+              const statusInfo = getStatusInfo(person);
+              return (
+                <View key={person.id} style={styles.personCard}>
+                  <View style={[styles.cardLeftBorder, { backgroundColor: getRangoColor(person.rangoBombero?.nombre_rol) }]} />
+                  <View style={styles.avatarContainer}>
+                    <MaterialCommunityIcons name="account" size={28} color="#94a3b8" />
+                  </View>
+
+                  <View style={styles.personDetails}>
+                    <View style={styles.rankUnitRow}>
+                      <View style={[styles.rankBadge, { backgroundColor: getRangoColor(person.rangoBombero?.nombre_rol) + '30' }]}>
+                        <Text style={[styles.rankText, { color: getRangoColor(person.rangoBombero?.nombre_rol) }]}>
+                          {person.rangoBombero?.nombre_rol || 'SIN RANGO'}
+                        </Text>
+                      </View>
+                      <Text style={styles.unitText}>UNIDAD ACTIVA</Text>
+                    </View>
+                    <Text style={styles.personName}>{person.nombre} {person.apellido}</Text>
+                    <View style={styles.statusRow}>
+                      <MaterialCommunityIcons
+                        name={statusInfo.isFree ? "close-circle" : "check-circle"}
+                        size={12}
+                        color={statusInfo.isFree ? "#fca5a5" : "#38bdf8"}
+                      />
+                      <Text style={[styles.statusText, { color: statusInfo.isFree ? "#fca5a5" : "#38bdf8" }]}>
+                        {statusInfo.status}
+                      </Text>
+                      <MaterialCommunityIcons name="clock-outline" size={12} color="#f8fafc" style={{ marginLeft: 12 }} />
+                      <Text style={styles.timeText}>{statusInfo.timeRest}</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.moreBtn}>
+                    <MaterialCommunityIcons name="dots-vertical" size={20} color="#94a3b8" />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+
+            <View style={styles.paginationRow}>
+              <Text style={styles.paginationText}>
+                MOSTRANDO {filteredPersonnel.length} DE {personnel.length}{'\n'}EFECTIVOS
+              </Text>
+              <View style={styles.paginationControls}>
+                <Text style={styles.pageBtnText}>ANTERIOR</Text>
+                <Text style={styles.pageCurrentText}>01</Text>
+                <Text style={styles.pageBtnText}>SIGUIENTE</Text>
+              </View>
+            </View>
+          </>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -213,8 +252,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
+    backgroundColor: '#334155',
   },
   topBarTitle: {
     color: '#e11d48',
@@ -304,6 +342,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1,
   },
+  centerContent: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    color: '#64748b',
+    marginTop: 12,
+    fontSize: 12,
+  },
+  errorText: {
+    color: '#ef4444',
+    marginTop: 12,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: '#26282f',
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  emptyText: {
+    color: '#64748b',
+    marginTop: 12,
+    fontSize: 12,
+  },
   personCard: {
     flexDirection: 'row',
     backgroundColor: '#1b1d24',
@@ -316,13 +387,15 @@ const styles = StyleSheet.create({
   cardLeftBorder: {
     width: 4,
     height: '100%',
-    backgroundColor: '#fca5a5',
   },
-  personAvatar: {
+  avatarContainer: {
     width: 60,
     height: 60,
     borderRadius: 4,
     margin: 16,
+    backgroundColor: '#26282f',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   personDetails: {
     flex: 1,
@@ -334,14 +407,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   rankBadge: {
-    backgroundColor: '#fca5a5',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 2,
     marginRight: 8,
   },
   rankText: {
-    color: '#451a1a',
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 0.5,
