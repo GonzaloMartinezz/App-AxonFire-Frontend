@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { API_BASE_URL } from '../config/api';
 
 const InputField = ({ label, icon, placeholder, value, onChangeText, secureTextEntry, rightIcon, showPassword, onTogglePassword }) => (
   <View style={styles.inputGroup}>
@@ -41,42 +42,84 @@ const InputField = ({ label, icon, placeholder, value, onChangeText, secureTextE
 
 export default function RegisterScreen({ navigation }) {
   const [formData, setFormData] = useState({
-    nombre: '',
-    apellido: '',
-    email: '',
-    telefono: '',
+    nombre_usuario: '',
     password: '',
+    bombero: {
+      nombre: '',
+      apellido: '',
+      rango: ''
+    }
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showRangoPicker, setShowRangoPicker] = useState(false);
+
+  const rangosDisponibles = [
+    'CADETE',
+    'BOMBERO',
+    'CABO',
+    'SARGENTO',
+    'TENIENTE',
+    'CAPITÁN',
+    'MAYOR',
+    'JEFE DE CUARTEL'
+  ];
 
   const updateForm = (key, value) => {
-    setFormData({ ...formData, [key]: value });
+    if (key in formData.bombero) {
+      setFormData({ ...formData, bombero: { ...formData.bombero, [key]: value } });
+    } else {
+      setFormData({ ...formData, [key]: value });
+    }
   };
 
   const handleRegister = async () => {
-    const { nombre, apellido, email, telefono, password } = formData;
-    if (!nombre || !apellido || !email || !telefono || !password) {
+    const { nombre_usuario, password, bombero } = formData;
+    if (!nombre_usuario || !password || !bombero.nombre || !bombero.apellido || !bombero.rango) {
       Alert.alert('Error', 'Por favor completa todos los campos operativos.');
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      Alert.alert('Solicitud Enviada', 'Tu solicitud de acceso nivel 3 ha sido enviada a comando central.');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/usuarios/crear`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nombre_usuario,
+          password,
+          rol: 'USER',
+          bombero: {
+            nombre: bombero.nombre,
+            apellido: bombero.apellido,
+            rango: bombero.rango
+          }
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error en el registro');
+      }
+
+      Alert.alert('Solicitud Enviada', 'Tu solicitud de acceso ha sido enviada a comando central.');
       navigation.navigate('Login');
-    }, 2000);
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo completar el registro.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      {/* Fondo Base Oscuro */}
+
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0a0f12' }]} />
-      
-      {/* Destellos de color (Glow effects) */}
       <View style={[styles.glow, styles.redGlow]} />
       <View style={[styles.glow, styles.blueGlow]} />
 
@@ -97,32 +140,32 @@ export default function RegisterScreen({ navigation }) {
 
           <View style={styles.card}>
             <InputField
-              label="NOMBRE"
+              label="NOMBRE DE USUARIO"
               icon="account-outline"
+              placeholder="identificador único"
+              value={formData.nombre_usuario}
+              onChangeText={(text) => updateForm('nombre_usuario', text)}
+            />
+            <InputField
+              label="NOMBRE"
+              icon="identifier"
               placeholder="Tu nombre"
-              value={formData.nombre}
+              value={formData.bombero.nombre}
               onChangeText={(text) => updateForm('nombre', text)}
             />
             <InputField
               label="APELLIDO"
               icon="identifier"
               placeholder="Tu apellido"
-              value={formData.apellido}
+              value={formData.bombero.apellido}
               onChangeText={(text) => updateForm('apellido', text)}
             />
             <InputField
-              label="CORREO ELECTRÓNICO"
-              icon="at"
-              placeholder="usuario@axonfire.com"
-              value={formData.email}
-              onChangeText={(text) => updateForm('email', text)}
-            />
-            <InputField
-              label="TELÉFONO"
-              icon="phone-outline"
-              placeholder="+34 000 000 000"
-              value={formData.telefono}
-              onChangeText={(text) => updateForm('telefono', text)}
+              label="RANGO"
+              icon="badge-account-outline"
+              placeholder="Tu rango"
+              value={formData.bombero.rango}
+              onChangeText={(text) => updateForm('rango', text)}
             />
             <InputField
               label="CONTRASEÑA"
@@ -141,8 +184,8 @@ export default function RegisterScreen({ navigation }) {
               onPress={handleRegister}
               disabled={isLoading}
             >
-              <LinearGradient 
-                colors={['#dc2626', '#991b1b']} 
+              <LinearGradient
+                colors={['#dc2626', '#991b1b']}
                 style={styles.buttonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -168,7 +211,7 @@ export default function RegisterScreen({ navigation }) {
             </View>
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.footerLink}
             onPress={() => navigation.navigate('Login')}
           >

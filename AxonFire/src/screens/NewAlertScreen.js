@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  ScrollView, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ActivityIndicator, 
+import {
+  ScrollView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
   Alert,
   SafeAreaView,
   KeyboardAvoidingView,
@@ -15,6 +15,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 const InputField = ({ label, placeholder, value, onChangeText, multiline = false }) => (
   <View style={styles.inputGroup}>
@@ -33,10 +35,10 @@ const InputField = ({ label, placeholder, value, onChangeText, multiline = false
   </View>
 );
 
-const DropdownField = ({ label, value }) => (
+const DropdownField = ({ label, value, onPress }) => (
   <View style={styles.inputGroup}>
     <Text style={styles.label}>{label}</Text>
-    <TouchableOpacity style={styles.dropdownWrapper}>
+    <TouchableOpacity style={styles.dropdownWrapper} onPress={onPress}>
       <Text style={styles.dropdownValue}>{value}</Text>
       <MaterialCommunityIcons name="chevron-down" size={20} color="#a1a1aa" />
     </TouchableOpacity>
@@ -45,40 +47,92 @@ const DropdownField = ({ label, value }) => (
 
 export default function NewAlertScreen({ navigation }) {
   const [formData, setFormData] = useState({
-    type: 'INCENDIO ESTRUCTURAL',
+    type: 'Incendio Estructural',
     severity: 'NIVEL 4 - CRÍTICO',
     location: '',
     description: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [showSeverityPicker, setShowSeverityPicker] = useState(false);
   const insets = useSafeAreaInsets();
+  const { token, user } = useAuth();
+
+  const tiposIncidente = [
+    'Incendio Estructural',
+    'Incendio Forestal',
+    'Rescate Vehicular',
+    'Emergencia Médica',
+    'Fuga de Gas',
+    'Accidente Industrial'
+  ];
+
+  const nivelesSeveridad = [
+    'NIVEL 1 - MENOR',
+    'NIVEL 2 - MODERADO',
+    'NIVEL 3 - ALTO',
+    'NIVEL 4 - CRÍTICO',
+    'NIVEL 5 - EXTREMO'
+  ];
 
   const updateForm = (key, value) => {
     setFormData({ ...formData, [key]: value });
   };
 
-  const submitAlertData = () => {
+  const submitAlertData = async () => {
+    if (!formData.location) {
+      Alert.alert('Error', 'Por favor completa la ubicación de la emergencia.');
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/alerta/crear-con-notificacion`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          sub_categoria_alerta_id: '1',
+          ubicacion: formData.location,
+          observaciones: formData.description || 'Sin descripción',
+          usuario_alta_alerta: user?.id || 'abc1'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al crear la alerta');
+      }
+
       Alert.alert('Despacho Confirmado', 'Las unidades de emergencia han sido notificadas.');
       setFormData({
-        type: 'INCENDIO ESTRUCTURAL', severity: 'NIVEL 4 - CRÍTICO', location: '', description: ''
+        type: 'Incendio Estructural',
+        severity: 'NIVEL 4 - CRÍTICO',
+        location: '',
+        description: '',
       });
-    }, 1500);
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', error.message || 'No se pudo crear la alerta.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" backgroundColor="#1a1c23" />
-      
-      {/* Top Bar */}
+
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatarPlaceholder}>
-             <MaterialCommunityIcons name="home" size={20} color="#fff" />
+          <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.avatarPlaceholder}>
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.topBarTitle}>COMANDO VANGUARDIA</Text>
+          <Text style={styles.topBarTitle}>ALERTA</Text>
         </View>
         <TouchableOpacity onPress={() => navigation?.goBack()}>
           <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
@@ -91,25 +145,56 @@ export default function NewAlertScreen({ navigation }) {
           style={{ flex: 1 }}
         >
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Header Title Section */}
             <View style={styles.headerTitleBox}>
               <View style={styles.redBorder} />
-              <View>
-                <Text style={styles.mainTitle}>DESPACHO DE EMERGENCIA</Text>
-                <Text style={styles.subtitle}>CENTRO DE OPERACIONES TÁCTICAS // {'\n'}AXON FIRE</Text>
-              </View>
             </View>
 
             <View style={styles.formContainer}>
-              <DropdownField 
+              <DropdownField
                 label="TIPO DE INCIDENTE"
                 value={formData.type}
+                onPress={() => setShowTypePicker(!showTypePicker)}
               />
 
-              <DropdownField 
+              {showTypePicker && (
+                <View style={styles.pickerContainer}>
+                  {tiposIncidente.map((tipo) => (
+                    <TouchableOpacity
+                      key={tipo}
+                      style={styles.pickerOption}
+                      onPress={() => {
+                        updateForm('type', tipo);
+                        setShowTypePicker(false);
+                      }}
+                    >
+                      <Text style={styles.pickerOptionText}>{tipo}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <DropdownField
                 label="NIVEL DE SEVERIDAD"
                 value={formData.severity}
+                onPress={() => setShowSeverityPicker(!showSeverityPicker)}
               />
+
+              {showSeverityPicker && (
+                <View style={styles.pickerContainer}>
+                  {nivelesSeveridad.map((nivel) => (
+                    <TouchableOpacity
+                      key={nivel}
+                      style={styles.pickerOption}
+                      onPress={() => {
+                        updateForm('severity', nivel);
+                        setShowSeverityPicker(false);
+                      }}
+                    >
+                      <Text style={styles.pickerOptionText}>{nivel}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
               <InputField
                 label="UBICACIÓN EXACTA"
@@ -142,19 +227,18 @@ export default function NewAlertScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Bottom Actions */}
             <View style={styles.bottomActions}>
-               <TouchableOpacity style={styles.actionBtn}>
-                 <MaterialCommunityIcons name="map-marker-radius" size={16} color="#e2e8f0" />
-                 <Text style={styles.actionBtnText}>GEO-LOCATE</Text>
-               </TouchableOpacity>
-               <View style={styles.divider} />
-               <TouchableOpacity style={styles.actionBtn}>
-                 <MaterialCommunityIcons name="radio-handheld" size={16} color="#e2e8f0" />
-                 <Text style={styles.actionBtnText}>RADIO COMMS</Text>
-               </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn}>
+                <MaterialCommunityIcons name="map-marker-radius" size={16} color="#e2e8f0" />
+                <Text style={styles.actionBtnText}>GEO-LOCATE</Text>
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.actionBtn}>
+                <MaterialCommunityIcons name="radio-handheld" size={16} color="#e2e8f0" />
+                <Text style={styles.actionBtnText}>RADIO COMMS</Text>
+              </TouchableOpacity>
             </View>
-            
+
             <View style={{ height: 100 }} />
           </ScrollView>
         </KeyboardAvoidingView>
@@ -307,5 +391,21 @@ const styles = StyleSheet.create({
     width: 1,
     height: 16,
     backgroundColor: '#334155',
+  },
+  pickerContainer: {
+    backgroundColor: '#26282f',
+    borderRadius: 4,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  pickerOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1b1d24',
+  },
+  pickerOptionText: {
+    color: '#e2e8f0',
+    fontSize: 14,
   }
 });

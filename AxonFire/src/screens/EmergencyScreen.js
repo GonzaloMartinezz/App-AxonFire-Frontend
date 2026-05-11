@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
@@ -142,11 +143,14 @@ export default function EmergencyScreen({ route }) {
     setError(null);
 
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(
         `${API_BASE_URL}/respuestas_alertas/responder/${alertaId}/${usuarioId}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             estado_respuesta: estadoRespuesta,
             fecha_hora: new Date().toISOString(),
@@ -243,12 +247,12 @@ export default function EmergencyScreen({ route }) {
   return (
     <View style={styles.container}>
       <SafeAreaView style={{ flex: 1 }}>
-
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={styles.time}>{currentTime}</Text>
-          <Text style={styles.date}>{currentDate}</Text>
-        </View>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          {/* HEADER */}
+          <View style={styles.header}>
+            <Text style={styles.time}>{currentTime}</Text>
+            <Text style={styles.date}>{currentDate}</Text>
+          </View>
 
         {/* ALERTA */}
         <View style={styles.alertBox}>
@@ -329,6 +333,7 @@ export default function EmergencyScreen({ route }) {
         {/* FOOTER */}
         <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
 
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -426,8 +431,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actions: {
-    marginTop: 'auto',
+    marginTop: 30,
     gap: 10,
+    paddingBottom: 20,
   },
   confirmButton: {
     backgroundColor: '#dc2626',

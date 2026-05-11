@@ -71,6 +71,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
           else if (route.name === 'Alertas') iconName = isFocused ? 'bell' : 'bell-outline';
           else if (route.name === 'Cuarteles') iconName = isFocused ? 'office-building' : 'office-building-outline';
           else if (route.name === 'Perfil') iconName = isFocused ? 'account' : 'account-outline';
+          else if (route.name === 'Emergencia') iconName = isFocused ? 'shield-alert' : 'shield-alert-outline';
+          else if (route.name === 'Asistencia') iconName = isFocused ? 'clipboard-check' : 'clipboard-check-outline';
 
           return (
             <TouchableOpacity
@@ -104,7 +106,9 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Mapa" component={MapScreen} />
       <Tab.Screen name="Alertas" component={AlertsScreen} />
+      <Tab.Screen name="Emergencia" component={EmergencyScreen} />
       <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'ALERTA' }} />
+      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
       <Tab.Screen name="Cuarteles" component={ResourcesScreen} />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
@@ -194,7 +198,7 @@ function AdminTabNavigator() {
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="AttendanceBoard" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="MainApp" component={MainTabNavigator} />
