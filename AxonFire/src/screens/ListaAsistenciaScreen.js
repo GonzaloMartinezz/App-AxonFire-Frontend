@@ -17,7 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 
-const BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 // Configuración visual por estado de respuesta
 const CONFIG_ESTADO = {
@@ -36,17 +38,12 @@ function tiempoTranscurrido(fechaISO) {
 
 export default function ListaAsistenciaScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { token, user } = useAuth();
+  const usuarioId = user?.id || '';
 
   // Estos params llegan cuando navegás desde AlertsScreen o desde el menú
   // pasándole el id de la alerta que querés ver
   const alertaId = route?.params?.alertaId;
-  const token = route?.params?.token || '';
-  const usuarioId = route?.params?.usuarioId || '';
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
 
   const [alerta, setAlerta] = useState(null);
   const [respuestas, setRespuestas] = useState([]);
@@ -60,19 +57,10 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
   async function cargarAlerta() {
     if (!alertaId) return;
     try {
-      const res = await fetch(`${BASE_URL}/alerta/${alertaId}`, { headers });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-      
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = { 
-        id: alertaId || '1', 
-        tipo: 'Incendio Estructural', 
-        ubicacion: 'Calle Falsa 123', 
-        observaciones: 'Se reporta humo saliendo por la ventana trasera.' 
-      };
-      */
-      setAlerta(data);
+      const res = await axios.get(`${API_BASE_URL}/alerta/${alertaId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAlerta(res.data);
     } catch (err) {
       console.error('Error cargando alerta:', err);
     }
@@ -85,30 +73,16 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
     else setCargando(true);
 
     try {
-      // Traemos TODAS las respuestas y filtramos por esta alerta.
-      // El backend actual no tiene un endpoint filtrado por alerta_id,
-      // así que lo hacemos del lado del cliente.
-      const res = await fetch(`${BASE_URL}/respuestas_alertas/`, { headers });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
+      // Traemos las respuestas específicas de esta alerta
+      const res = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = res.data || [];
 
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        { alerta_id: alertaId, usuario_id: '101', estado_respuesta: 'ACEPTADO', fecha_hora: new Date(Date.now() - 600000).toISOString(), usuario: { bombero: { nombre: 'Juan', apellido: 'Pérez' } } },
-        { alerta_id: alertaId, usuario_id: '102', estado_respuesta: 'RECHAZADO', fecha_hora: new Date(Date.now() - 300000).toISOString(), usuario: { bombero: { nombre: 'María', apellido: 'Gómez' } } },
-        { alerta_id: alertaId, usuario_id: '103', estado_respuesta: 'PENDIENTE', fecha_hora: new Date(Date.now() - 100000).toISOString(), usuario: { bombero: { nombre: 'Carlos', apellido: 'López' } } },
-        { alerta_id: alertaId, usuario_id: usuarioId, estado_respuesta: 'PENDIENTE', fecha_hora: new Date(Date.now() - 50000).toISOString(), usuario: { nombre_usuario: 'Yo' } }
-      ];
-      */
-
-      const deEstaAlerta = (Array.isArray(data) ? data : []).filter(
-        (r) => r.alerta_id === alertaId || r.alertaId === alertaId || !alertaId
-      );
-
-      setRespuestas(deEstaAlerta);
+      setRespuestas(data);
 
       // Verificamos si el usuario actual ya respondió
-      const yaRespondi = deEstaAlerta.find(
+      const yaRespondi = data.find(
         (r) => r.usuario_id === usuarioId || r.usuarioId === usuarioId
       );
       if (yaRespondi) setMiRespuesta(yaRespondi.estado_respuesta);
@@ -135,19 +109,14 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
 
     setRespondiendo(true);
     try {
-      const res = await fetch(
-        `${BASE_URL}/respuestas_alertas/responder/${alertaId}/${usuarioId}`,
+      await axios.post(
+        `${API_BASE_URL}/respuestas_alertas/responder/${alertaId}/${usuarioId}`,
         {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            estado_respuesta: estado,
-            fecha_hora: new Date().toISOString(),
-          }),
-        }
+          estado_respuesta: estado,
+          fecha_hora: new Date().toISOString(),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      if (!res.ok) throw new Error(`Error ${res.status}`);
 
       setMiRespuesta(estado);
       cargarRespuestas(true);

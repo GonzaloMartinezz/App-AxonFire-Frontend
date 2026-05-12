@@ -105,13 +105,15 @@ export default function AlertsScreen({ navigation }) {
   const fetchAlerts = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
-        headers: { Authorization: `Bearer ${token}` },
-        data: {
+      const res = await axios.post(`${API_BASE_URL}/alerta/rango`, 
+        {
           fecha_desde: "2020-01-01",
           fecha_hasta: "2030-01-01"
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
         }
-      });
+      );
       if (res.data && res.data.alertas) {
         // Map backend alerts to frontend format
         const mappedAlerts = res.data.alertas.map(a => ({

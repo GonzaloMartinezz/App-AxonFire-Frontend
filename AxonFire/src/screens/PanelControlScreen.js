@@ -16,7 +16,9 @@ import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
 
-const BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -50,9 +52,9 @@ function tiempoTranscurrido(fechaISO) {
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
-export default function PanelControlScreen({ navigation, route }) {
+export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const token = route?.params?.token || '';
+  const { token } = useAuth();
 
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -68,28 +70,12 @@ export default function PanelControlScreen({ navigation, route }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await fetch(`${BASE_URL}/alerta/rango`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        // El backend espera el rango en el body aunque sea GET (está documentado así)
-        body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
-      });
-
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
+      const res = await axios.post(`${API_BASE_URL}/alerta/rango`, 
+        { fecha_desde: desde, fecha_hasta: hasta },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        { tipo: 'Incendio Estructural', estado: 'activa', prioridad: 'critica', fecha_hora: new Date().toISOString() },
-        { tipo: 'Rescate Vehicular', estado: 'despachada', prioridad: 'alta', fecha_hora: new Date(Date.now() - 3600000).toISOString() },
-        { tipo: 'Fuga de Gas', estado: 'resuelta', prioridad: 'media', fecha_hora: new Date(Date.now() - 86400000).toISOString() },
-        { tipo: 'Asistencia Médica', estado: 'activa', prioridad: 'alta', fecha_hora: new Date(Date.now() - 500000).toISOString() }
-      ];
-      */
-
+      const data = res.data.alertas || [];
       setAlertas(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error cargando datos del panel:', err);

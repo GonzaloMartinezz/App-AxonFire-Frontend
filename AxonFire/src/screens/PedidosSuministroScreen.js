@@ -19,7 +19,9 @@ import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
 
-const BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 // Los tipos de refuerzo que el bombero puede solicitar
 const TIPOS_REFUERZO = [
@@ -37,16 +39,10 @@ function tiempoTranscurrido(fechaISO) {
   return `Hace ${Math.floor(min / 60)} hs`;
 }
 
-export default function PedidosSuministroScreen({ navigation, route }) {
+export default function PedidosSuministroScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-
-  const token = route?.params?.token || '';
-  const usuarioId = route?.params?.usuarioId || '';
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  const { token, user } = useAuth();
+  const usuarioId = user?.id || '';
 
   // ── Estado ────────────────────────────────────────────────────────────────
   const [solicitudes, setSolicitudes] = useState([]);
@@ -64,24 +60,11 @@ export default function PedidosSuministroScreen({ navigation, route }) {
   async function cargarSolicitudes() {
     setCargando(true);
     try {
-      // Usamos el endpoint de respuestas como proxy temporal de solicitudes.
-      // En un futuro el backend debería tener un módulo propio de "solicitudes de recursos".
-      const res = await fetch(`${BASE_URL}/respuestas_alertas/`, { headers });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        { id: '1', usuario_id: usuarioId || '123', estado_respuesta: 'PENDIENTE', fecha_hora: new Date(Date.now() - 500000).toISOString() },
-        { id: '2', usuario_id: usuarioId || '123', estado_respuesta: 'ACEPTADO', fecha_hora: new Date(Date.now() - 3600000).toISOString() }
-      ];
-      */
-
-      // Filtramos las que creó este usuario
-      const mias = (Array.isArray(data) ? data : []).filter(
-        (r) => r.usuario_id === usuarioId || r.usuarioId === usuarioId || !usuarioId
-      );
-      setSolicitudes(mias);
+      // Usamos el historial de alertas creadas por este usuario como "solicitudes"
+      const res = await axios.get(`${API_BASE_URL}/alerta/usuario/${usuarioId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSolicitudes(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error cargando solicitudes:', err);
     } finally {
@@ -90,8 +73,8 @@ export default function PedidosSuministroScreen({ navigation, route }) {
   }
 
   useEffect(() => {
-    cargarSolicitudes();
-  }, []);
+    if (usuarioId) cargarSolicitudes();
+  }, [usuarioId]);
 
   // ── Enviar solicitud de refuerzo ────────────────────────────────────────
   function pedirRefuerzo(refuerzo) {
@@ -112,13 +95,9 @@ export default function PedidosSuministroScreen({ navigation, route }) {
                 destinatariosIds: [],
               };
 
-              const res = await fetch(`${BASE_URL}/alerta/crear-con-notificacion`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(body),
+              await axios.post(`${API_BASE_URL}/alerta/crear-con-notificacion`, body, {
+                headers: { Authorization: `Bearer ${token}` }
               });
-
-              if (!res.ok) throw new Error(`Error ${res.status}`);
 
               Alert.alert('✅ Enviado', `Pedido de ${refuerzo.nombre} enviado al comando.`);
               cargarSolicitudes();
@@ -150,13 +129,9 @@ export default function PedidosSuministroScreen({ navigation, route }) {
         destinatariosIds: [],
       };
 
-      const res = await fetch(`${BASE_URL}/alerta/crear-con-notificacion`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
+      await axios.post(`${API_BASE_URL}/alerta/crear-con-notificacion`, body, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      if (!res.ok) throw new Error(`Error ${res.status}`);
 
       setModalVisible(false);
       setCantidadPersonal(1);

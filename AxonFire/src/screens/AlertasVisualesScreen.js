@@ -16,7 +16,9 @@ import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
 
-const BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 // ── Helpers para convertir datos del backend ────────────────────────────────
 
@@ -66,10 +68,10 @@ function tiempoTranscurrido(fechaISO) {
 
 const FILTROS = ['Activas', 'Todas', 'Resueltas'];
 
-export default function AlertasVisualesScreen({ navigation, route }) {
+export default function AlertasVisualesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const token = route?.params?.token || '';
-  const usuarioId = route?.params?.usuarioId || '';
+  const { token, user } = useAuth();
+  const usuarioId = user?.id || '';
 
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -86,54 +88,15 @@ export default function AlertasVisualesScreen({ navigation, route }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await fetch(`${BASE_URL}/alerta/rango`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
-      });
-
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        {
-          id: '1',
-          tipo: 'Incendio Estructural',
-          estado: 'activa',
-          prioridad: 'critica',
-          ubicacion: 'Av. Siempre Viva 742',
-          observaciones: 'Fuego reportado en la planta baja.',
-          fecha_hora: new Date().toISOString()
-        },
-        {
-          id: '2',
-          tipo: 'Rescate Vehicular',
-          estado: 'despachada',
-          prioridad: 'alta',
-          ubicacion: 'Ruta 9, Km 45',
-          observaciones: 'Choque entre dos vehículos.',
-          fecha_hora: new Date(Date.now() - 3600000).toISOString()
-        },
-        {
-          id: '3',
-          tipo: 'Fuga de Gas',
-          estado: 'resuelta',
-          prioridad: 'media',
-          ubicacion: 'Centro comercial',
-          observaciones: 'Situación controlada por el equipo.',
-          fecha_hora: new Date(Date.now() - 86400000).toISOString()
-        }
-      ];
-      */
-
-      const lista = Array.isArray(data) ? data : [];
+      const res = await axios.post(`${API_BASE_URL}/alerta/rango`, 
+        { fecha_desde: desde, fecha_hasta: hasta },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      const lista = res.data.alertas || [];
 
       const normalizadas = lista.map((item) => {
-        const nombre = item.subCategoriaAlerta?.nombre || item.tipo || 'Emergencia';
+        const nombre = item.subCategoriaAlerta?.nombre || item.tipo || item.observaciones || 'Emergencia';
         const estado = item.estadoAlerta?.nombre || item.estado || '';
         const prioridad = item.prioridad || item.subCategoriaAlerta?.prioridad || '';
 
