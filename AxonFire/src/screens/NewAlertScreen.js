@@ -59,12 +59,12 @@ export default function NewAlertScreen({ navigation }) {
   const { token, user } = useAuth();
 
   const tiposIncidente = [
-    'Incendio Estructural',
-    'Incendio Forestal',
-    'Rescate Vehicular',
-    'Emergencia Médica',
-    'Fuga de Gas',
-    'Accidente Industrial'
+    { label: 'Incendio Estructural', id: '1' },
+    { label: 'Incendio Forestal', id: '1' },
+    { label: 'Rescate Vehicular', id: '2' },
+    { label: 'Emergencia Médica', id: '3' },
+    { label: 'Fuga de Gas', id: '3' },
+    { label: 'Accidente Industrial', id: '1' }
   ];
 
   const nivelesSeveridad = [
@@ -79,6 +79,26 @@ export default function NewAlertScreen({ navigation }) {
     setFormData({ ...formData, [key]: value });
   };
 
+  const handleGeoLocate = async () => {
+    setIsLocating(true);
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'Necesitamos acceso a la ubicación para geolocalizar la alerta.');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const coords = `${location.coords.latitude}, ${location.coords.longitude}`;
+      updateForm('location', coords);
+    } catch (error) {
+      console.error('Error obteniendo ubicación:', error);
+      Alert.alert('Error', 'No se pudo obtener la ubicación actual.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
   const submitAlertData = async () => {
     if (!formData.location) {
       Alert.alert('Error', 'Por favor completa la ubicación de la emergencia.');
@@ -88,6 +108,9 @@ export default function NewAlertScreen({ navigation }) {
     setIsLoading(true);
 
     try {
+      const selectedType = tiposIncidente.find(t => t.label === formData.type);
+      const subCategoriaId = selectedType ? selectedType.id : '1';
+
       const response = await fetch(`${API_BASE_URL}/alerta/crear-con-notificacion`, {
         method: 'POST',
         headers: {
@@ -95,9 +118,9 @@ export default function NewAlertScreen({ navigation }) {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          sub_categoria_alerta_id: '1',
+          sub_categoria_alerta_id: subCategoriaId,
           ubicacion: formData.location,
-          observaciones: formData.description || 'Sin descripción',
+          observaciones: `[${formData.severity}] - ${formData.description || 'Sin descripción'}`,
           usuario_alta_alerta: user?.id || 'abc1'
         }),
       });
@@ -160,14 +183,14 @@ export default function NewAlertScreen({ navigation }) {
                 <View style={styles.pickerContainer}>
                   {tiposIncidente.map((tipo) => (
                     <TouchableOpacity
-                      key={tipo}
+                      key={tipo.label}
                       style={styles.pickerOption}
                       onPress={() => {
-                        updateForm('type', tipo);
+                        updateForm('type', tipo.label);
                         setShowTypePicker(false);
                       }}
                     >
-                      <Text style={styles.pickerOptionText}>{tipo}</Text>
+                      <Text style={styles.pickerOptionText}>{tipo.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -228,11 +251,6 @@ export default function NewAlertScreen({ navigation }) {
             </View>
 
             <View style={styles.bottomActions}>
-              <TouchableOpacity style={styles.actionBtn}>
-                <MaterialCommunityIcons name="map-marker-radius" size={16} color="#e2e8f0" />
-                <Text style={styles.actionBtnText}>GEO-LOCATE</Text>
-              </TouchableOpacity>
-              <View style={styles.divider} />
               <TouchableOpacity style={styles.actionBtn}>
                 <MaterialCommunityIcons name="radio-handheld" size={16} color="#e2e8f0" />
                 <Text style={styles.actionBtnText}>RADIO COMMS</Text>

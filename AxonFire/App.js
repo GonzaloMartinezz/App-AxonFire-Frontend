@@ -5,6 +5,7 @@ import { Platform, View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { API_BASE_URL } from './src/config/api';
+import { NavigationContainer } from '@react-navigation/native';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -62,7 +63,11 @@ function AppContent() {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <NavigationContainer>
+      <AppNavigator />
+    </NavigationContainer>
+  );
 }
 
 export default function App() {

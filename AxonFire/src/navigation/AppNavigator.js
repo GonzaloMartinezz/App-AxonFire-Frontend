@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { NavigationContainer } from '@react-navigation/native';
+// import { NavigationContainer } from '@react-navigation/native'; // Movido a App.js
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
  
 // Pantallas existentes
 import LoginScreen from '../screens/LoginScreen';
@@ -174,30 +175,42 @@ function AdminTabNavigator() {
 }
  
 export default function AppNavigator() {
+  const { token, user } = useAuth();
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-        {/* Pantallas existentes */}
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="MainApp" component={MainTabNavigator} />
-        <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
-        <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
-        <Stack.Screen name="NewAlert" component={NewAlertScreen} />
-        <Stack.Screen name="Checklist" component={ChecklistScreen} />
-        <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
-        <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
-        <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
-        <Stack.Screen name="Emergency" component={EmergencyScreen} />
-        <Stack.Screen name="Reports" component={ReportsScreen} />
- 
-        {/* ── PANTALLAS NUEVAS (4 tareas del ClickUp) ──────────────────────── */}
-        <Stack.Screen name="PanelControl" component={PanelControlScreen} />
-        <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
-        <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
-        <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!token ? (
+        // Pantallas de Auth
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+        </>
+      ) : (
+        // Pantallas de la App (Logueado)
+        <>
+          {user?.rol === 'ADMIN' && (
+            <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
+          )}
+          <Stack.Screen name="MainApp" component={MainTabNavigator} />
+          
+          {/* Pantallas comunes/modales */}
+          <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="NewAlert" component={NewAlertScreen} />
+          <Stack.Screen name="Checklist" component={ChecklistScreen} />
+          <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
+          <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
+          <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
+          <Stack.Screen name="Emergency" component={EmergencyScreen} />
+          <Stack.Screen name="Reports" component={ReportsScreen} />
+          
+          {/* Pantallas nuevas */}
+          <Stack.Screen name="PanelControl" component={PanelControlScreen} />
+          <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
+          <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
+          <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
+        </>
+      )}
+    </Stack.Navigator>
   );
 }
  

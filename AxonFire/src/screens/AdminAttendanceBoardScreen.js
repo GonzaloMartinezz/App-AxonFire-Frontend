@@ -44,8 +44,7 @@ const STATUS_CONFIG = {
 
 export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
-  const token = user?.token ?? null;
+  const { user, token, logout } = useAuth();
 
   // Alerta ID recibido por parámetros
   const alertaId = route?.params?.alerta_id ?? null;
@@ -65,29 +64,51 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     return h;
   }, [token]);
 
-  // ── Fetch de datos ───────────────────────────────────────────
+  // Fetch de datos ───────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setErrorMsg(null);
     try {
-      // 1. Obtener todos los bomberos
+      let activeAlertaId = alertaId;
+
+      // 1. Si no hay alertaId, buscamos la más reciente
+      if (!activeAlertaId) {
+        const hasta = new Date().toISOString();
+        const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const resAlertas = await fetch(`${API_BASE_URL}/alerta/rango`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta })
+        });
+        if (resAlertas.ok) {
+          const data = await resAlertas.json();
+          const alertas = data.alertas || [];
+          if (alertas.length > 0) {
+            const ultima = alertas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+            activeAlertaId = ultima.id;
+          }
+        }
+      }
+
+      // 2. Obtener todos los bomberos
       const bomberosRes = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
         headers: authHeaders(),
       });
       if (!bomberosRes.ok) throw new Error('Error al cargar bomberos');
       const bomberosData = await bomberosRes.json();
 
-      // 2. Si hay alerta, obtener respuestas y count
+      // 3. Si tenemos una alerta activa, obtener respuestas
       let respuestasMap = {};
-      if (alertaId) {
+      if (activeAlertaId) {
         const [respuestasRes, countRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, { headers: authHeaders() }),
-          fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}/asistencias/count`, { headers: authHeaders() }),
+          fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, { headers: authHeaders() }),
+          fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}/asistencias/count`, { headers: authHeaders() }),
         ]);
 
         if (respuestasRes.ok) {
           const respuestas = await respuestasRes.json();
           respuestas.forEach((r) => {
-            respuestasMap[r.usuario_id] = r;
+            const uid = r.usuario_id || r.usuarioId?.id;
+            if (uid) respuestasMap[uid] = r;
           });
         }
         if (countRes.ok) {
@@ -96,19 +117,19 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         }
       }
 
-      // 3. Mapear bomberos a la estructura de la pantalla
+      // 4. Mapear bomberos a la estructura de la pantalla
       const mapped = bomberosData.map((b) => {
         const usuarioId = b.usuario_id || b.usuarioId?.id;
         const respuesta = respuestasMap[usuarioId];
         const estadoRespuesta = respuesta?.estado_respuesta || 'ABSENT';
-        const rangoNombre = b.rangoBombero?.nombre_rol || '';
+        const rangoNombre = b.rangoBombero?.nombre_rol || b.rango || '';
 
         return {
           id: b.id,
           usuario_id: usuarioId,
           name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase(),
           rank: rangoNombre.toUpperCase(),
-          unit: b.usuarioId?.nombre_usuario || '—',
+          unit: b.usuario?.nombre_usuario || b.usuarioId?.nombre_usuario || '—',
           classification: classifyRank(rangoNombre),
           status: estadoRespuesta,
           eta: respuesta

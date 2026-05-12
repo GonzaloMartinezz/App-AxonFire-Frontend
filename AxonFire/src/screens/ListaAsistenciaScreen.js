@@ -300,12 +300,13 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
               const cfg = CONFIG_ESTADO[estado] || CONFIG_ESTADO.PENDIENTE;
 
               // Construimos el nombre con lo que venga del backend
+              const userObj = r.usuario || r.usuarioId;
               const nombre =
-                r.usuario?.bombero?.nombre
-                  ? `${r.usuario.bombero.nombre} ${r.usuario.bombero.apellido || ''}`.trim()
-                  : r.usuario?.nombre_usuario || `Bombero ${String(r.usuario_id || '').slice(0, 6)}`;
+                userObj?.bombero?.nombre
+                  ? `${userObj.bombero.nombre} ${userObj.bombero.apellido || ''}`.trim()
+                  : userObj?.nombre_usuario || `Bombero ${String(r.usuario_id || '').slice(0, 6)}`;
 
-              const rango = r.usuario?.bombero?.rangoBombero?.nombre_rol || '';
+              const rango = userObj?.bombero?.rangoBombero?.nombre_rol || userObj?.bombero?.rango || '';
 
               return (
                 <View key={r.id || idx}>
