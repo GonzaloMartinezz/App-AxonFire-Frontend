@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 import {
   View,
   Text,
@@ -90,6 +93,47 @@ export default function AlertsScreen({ navigation }) {
   const [activeFilter, setActiveFilter] = useState('Activas');
   const [showMenu, setShowMenu] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const { token } = useAuth();
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          fecha_desde: "2020-01-01",
+          fecha_hasta: "2030-01-01"
+        }
+      });
+      if (res.data && res.data.alertas) {
+        // Map backend alerts to frontend format
+        const mappedAlerts = res.data.alertas.map(a => ({
+          id: a.id,
+          type: a.observaciones || 'Incidente General',
+          severity: 'alta', // default or mapped based on subcat
+          status: a.estado_alerta_id === '3' ? 'resueltas' : 'activa',
+          address: a.ubicacion || 'Ubicación no especificada',
+          timeAgo: new Date(a.fecha_hora).toLocaleDateString(),
+          icon: 'fire',
+          iconColor: '#dc2626',
+          iconBg: '#fee2e2'
+        }));
+        setAlerts(mappedAlerts);
+      }
+    } catch (e) {
+      console.log('Error fetching alerts', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <View style={styles.container}>
@@ -195,7 +239,7 @@ export default function AlertsScreen({ navigation }) {
 
           {/* Alert List */}
           <View style={styles.alertList}>
-            {ALERTS.map((alert) => (
+            {alerts.map((alert) => (
               <TouchableOpacity 
                 key={alert.id} 
                 style={styles.alertCard} 

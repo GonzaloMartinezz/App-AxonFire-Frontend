@@ -24,7 +24,7 @@ export default function MapScreen({ navigation }) {
       '¿Estás seguro que deseas cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: () => logout().then(() => navigation.replace('Login')), style: 'destructive' }
+        { text: 'Confirmar', onPress: () => logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })), style: 'destructive' }
       ]
     );
   };

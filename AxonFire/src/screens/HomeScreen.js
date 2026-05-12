@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 import {
   View,
   Text,
@@ -14,6 +17,28 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
 export default function HomeScreen({ navigation }) {
+
+  const { user, token } = useAuth();
+  const [latestAlert, setLatestAlert] = useState(null);
+
+  useEffect(() => {
+    const fetchLatestAlert = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          headers: { Authorization: `Bearer ${token}` },
+          data: { fecha_desde: "2020-01-01", fecha_hasta: "2030-01-01" }
+        });
+        if (res.data && res.data.alertas && res.data.alertas.length > 0) {
+          const sorted = res.data.alertas.sort((a,b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+          setLatestAlert(sorted[0]);
+        }
+      } catch (e) {
+        console.log('Error fetching home alert:', e.message);
+      }
+    };
+    fetchLatestAlert();
+  }, [token]);
+
   const QuickAction = ({ icon, label, onPress, color = '#af101a' }) => (
     <TouchableOpacity style={styles.actionCard} onPress={onPress}>
       <View style={[styles.actionIcon, { backgroundColor: `${color}15` }]}>
@@ -55,7 +80,7 @@ export default function HomeScreen({ navigation }) {
               <MaterialCommunityIcons name="alert-decagram" size={24} color="#fff" />
               <Text style={styles.bannerTitle}>ALERTA ACTIVA</Text>
             </View>
-            <Text style={styles.bannerDesc}>Incendio Forestal - Sector Alpha 4</Text>
+            <Text style={styles.bannerDesc}>{latestAlert ? (latestAlert.observaciones || 'Incidente no especificado') + ' - ' + (latestAlert.ubicacion || '') : 'Sin alertas recientes'}</Text>
             <TouchableOpacity style={styles.bannerBtn}>
               <Text style={styles.bannerBtnText}>VER MAPA</Text>
             </TouchableOpacity>

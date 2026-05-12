@@ -44,7 +44,7 @@ const STATUS_CONFIG = {
 
 export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const token = user?.token ?? null;
 
   // Alerta ID recibido por parámetros
@@ -157,7 +157,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const confirmLogout = () => {
     Alert.alert('Cerrar Sesión', '¿Estás seguro que deseas cerrar sesión?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Confirmar', onPress: () => navigation.replace('Login'), style: 'destructive' },
+      { text: 'Confirmar', onPress: () => { if(logout) { logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })) } else { navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) } }, style: 'destructive' },
     ]);
   };
 
