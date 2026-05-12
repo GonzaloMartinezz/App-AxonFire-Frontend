@@ -6,9 +6,8 @@ import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { API_BASE_URL } from './src/config/api';
 
-import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
-import { AuthProvider } from './src/context/AuthContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
