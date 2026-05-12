@@ -199,6 +199,39 @@ export default function AlertsScreen({ navigation }) {
                   <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#263238" />
                   <Text style={styles.dropdownItemText}>Cargar Inventario</Text>
                 </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('PanelControl');
+                  }}
+                >
+                  <MaterialCommunityIcons name="view-dashboard-outline" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Panel de Control</Text>
+                </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('PedidosSuministro');
+                  }}
+                >
+                  <MaterialCommunityIcons name="truck-outline" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Pedidos de Suministro</Text>
+                </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('AlertasVisuales');
+                  }}
+                >
+                  <MaterialCommunityIcons name="bell-ring-outline" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Alertas Visuales</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
