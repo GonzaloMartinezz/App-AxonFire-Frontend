@@ -23,6 +23,8 @@ import AlertDetailScreen from '../screens/AlertDetailScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
 import ChecklistScreen from '../screens/ChecklistScreen';
 import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
+import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
+import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
  
 // ── PANTALLAS NUEVAS ────────────────────────────────────────────────────────
@@ -73,7 +75,9 @@ function CustomTabBar({ state, descriptors, navigation }) {
           else if (route.name === 'Alertas') iconName = isFocused ? 'bell' : 'bell-outline';
           else if (route.name === 'Cuarteles') iconName = isFocused ? 'office-building' : 'office-building-outline';
           else if (route.name === 'Perfil') iconName = isFocused ? 'account' : 'account-outline';
- 
+          else if (route.name === 'Emergencia') iconName = isFocused ? 'shield-alert' : 'shield-alert-outline';
+          else if (route.name === 'Asistencia') iconName = isFocused ? 'clipboard-check' : 'clipboard-check-outline';
+
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
               <MaterialCommunityIcons name={iconName} size={26} color={isFocused ? '#fff' : '#90a4ae'} />
@@ -92,7 +96,9 @@ function MainTabNavigator() {
     <Tab.Navigator tabBar={props => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Mapa" component={MapScreen} />
       <Tab.Screen name="Alertas" component={AlertsScreen} />
-      <Tab.Screen name="SOS" component={AddFirefighterScreen} options={{ title: 'ALERTA' }} />
+      <Tab.Screen name="Emergencia" component={EmergencyScreen} />
+      <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'ALERTA' }} />
+      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
       <Tab.Screen name="Cuarteles" component={ResourcesScreen} />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
@@ -126,7 +132,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
             return (
               <TouchableOpacity key={route.key} onPress={onPress} style={styles.fabContainerAdmin} activeOpacity={0.8}>
                 <View style={styles.fabAdmin}>
-                  <MaterialCommunityIcons name="asterisk" size={32} color="#fff" />
+                  <MaterialCommunityIcons name="alarm-light" size={32} color="#fff" />
                 </View>
                 <Text style={styles.tabLabelAdminRed}>SOS</Text>
               </TouchableOpacity>
@@ -181,6 +187,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Checklist" component={ChecklistScreen} />
         <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
         <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
+        <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
+        <Stack.Screen name="Emergency" component={EmergencyScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
  
         {/* ── PANTALLAS NUEVAS (4 tareas del ClickUp) ──────────────────────── */}
