@@ -23,6 +23,8 @@ import AlertDetailScreen from '../screens/AlertDetailScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
 import ChecklistScreen from '../screens/ChecklistScreen';
 import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
+import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
+import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createStackNavigator();
@@ -69,6 +71,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
           else if (route.name === 'Alertas') iconName = isFocused ? 'bell' : 'bell-outline';
           else if (route.name === 'Cuarteles') iconName = isFocused ? 'office-building' : 'office-building-outline';
           else if (route.name === 'Perfil') iconName = isFocused ? 'account' : 'account-outline';
+          else if (route.name === 'Emergencia') iconName = isFocused ? 'shield-alert' : 'shield-alert-outline';
+          else if (route.name === 'Asistencia') iconName = isFocused ? 'clipboard-check' : 'clipboard-check-outline';
 
           return (
             <TouchableOpacity
@@ -102,7 +106,9 @@ function MainTabNavigator() {
     >
       <Tab.Screen name="Mapa" component={MapScreen} />
       <Tab.Screen name="Alertas" component={AlertsScreen} />
+      <Tab.Screen name="Emergencia" component={EmergencyScreen} />
       <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'ALERTA' }} />
+      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
       <Tab.Screen name="Cuarteles" component={ResourcesScreen} />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
     </Tab.Navigator>
@@ -202,6 +208,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Checklist" component={ChecklistScreen} />
         <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
         <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
+        <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
+        <Stack.Screen name="Emergency" component={EmergencyScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
       </Stack.Navigator>
     </NavigationContainer>

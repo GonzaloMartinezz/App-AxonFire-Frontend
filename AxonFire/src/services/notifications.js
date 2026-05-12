@@ -5,10 +5,11 @@ export async function sendEmergencyAlert() {
     content: {
       title: "ALERTA DE EMERGENCIA",
       body: "Incendio estructural - Av. Corrientes 1234",
-      sound: 'default',
+      sound: 'siren.mp3',
       priority: Notifications.AndroidNotificationPriority.MAX,
     },
     trigger: null,
+    channelId: 'emergency',
   });
 }
 

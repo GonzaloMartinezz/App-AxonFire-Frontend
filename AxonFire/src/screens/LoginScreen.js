@@ -70,6 +70,7 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />

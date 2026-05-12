@@ -8,6 +8,7 @@ import { API_BASE_URL } from './src/config/api';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import { AuthProvider } from './src/context/AuthContext';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -103,7 +104,7 @@ async function registerForPushNotifications() {
       name: 'Emergencias',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 1000, 500, 1000],
-      sound: 'default',
+      sound: 'siren.mp3',
     });
   }
 }
