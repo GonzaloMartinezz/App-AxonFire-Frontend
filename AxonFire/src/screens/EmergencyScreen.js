@@ -16,7 +16,7 @@ import { Vibration } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
-export default function EmergencyScreen({ route }) {
+export default function EmergencyScreen({ route, navigation }) {
   // Obtener alerta_id desde los parámetros de navegación (fallback para dev)
   const navAlertaId = route?.params?.alerta_id ?? null;
 
@@ -78,13 +78,6 @@ export default function EmergencyScreen({ route }) {
     }
     Vibration.cancel();
   };
-
-  useEffect(() => {
-    startEmergencyAlert();
-    return () => {
-      stopEmergencyAlert();
-    };
-  }, []);
 
   // ── Cargar detalles de la alerta y respuestas ───────────────────────────
   const fetchEmergencyData = useCallback(async () => {
@@ -148,6 +141,7 @@ export default function EmergencyScreen({ route }) {
         } else {
           // Si no hemos respondido o es PENDIENTE, reseteamos para que aparezcan los botones
           setRespuesta(null);
+          startEmergencyAlert();
         }
 
         // Lista de los que aceptaron
@@ -172,12 +166,8 @@ export default function EmergencyScreen({ route }) {
   useFocusEffect(
     useCallback(() => {
       fetchEmergencyData();
-      // Si ya hay respuesta, no sonar. Si no hay, sonar.
-      if (!respuesta) {
-        startEmergencyAlert();
-      }
       return () => stopEmergencyAlert();
-    }, [fetchEmergencyData, respuesta])
+    }, [fetchEmergencyData])
   );
 
   // ── Animación al confirmar/rechazar ─────────────────────────────────────
@@ -235,12 +225,15 @@ export default function EmergencyScreen({ route }) {
       );
 
       if (!res.ok) {
-        throw new Error(`Error ${res.status}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${res.status}`);
       }
 
       await stopEmergencyAlert();
       setRespuesta(estadoRespuesta);
       animateIn();
+      // Actualizar la lista de asistentes después de responder
+      fetchEmergencyData();
     } catch (err) {
       console.error('Error al enviar respuesta:', err);
       setError('No se pudo registrar la respuesta. Intenta nuevamente.');
@@ -327,6 +320,11 @@ export default function EmergencyScreen({ route }) {
             <Text style={styles.changeButtonText}>Cambiar mi respuesta</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate('MainApp')}>
+            <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+            <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+          </TouchableOpacity>
+
           <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
         </SafeAreaView>
       </View>
@@ -341,6 +339,9 @@ export default function EmergencyScreen({ route }) {
           {/* HEADER */}
           <View style={styles.header}>
             <View style={styles.headerTopRow}>
+              <TouchableOpacity onPress={() => navigation.navigate('MainApp')} style={{ marginRight: 12, padding: 4 }}>
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
+              </TouchableOpacity>
               <Text style={styles.time}>{currentTime}</Text>
               <TouchableOpacity style={styles.refreshIcon} onPress={fetchEmergencyData}>
                 <MaterialCommunityIcons name="refresh" size={24} color="#90a4ae" />

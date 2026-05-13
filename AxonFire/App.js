@@ -50,12 +50,26 @@ async function playSiren() {
 
 function AppContent() {
   const { isLoading, user, token } = useAuth();
+  const useLastNotificationResponse = Notifications.useLastNotificationResponse || (() => null);
+  const lastNotificationResponse = useLastNotificationResponse();
 
   useEffect(() => {
     if (user && token) {
       registrarTokenPush(user, token);
     }
   }, [user, token]);
+
+  useEffect(() => {
+    if (
+      lastNotificationResponse &&
+      lastNotificationResponse.notification?.request?.content?.data?.alertaId &&
+      navigationRef.isReady()
+    ) {
+      navigationRef.navigate('Emergency', {
+        alerta_id: lastNotificationResponse.notification.request.content.data.alertaId,
+      });
+    }
+  }, [lastNotificationResponse]);
 
   if (isLoading) {
     return (

@@ -58,6 +58,8 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const [confirmedCountAPI, setConfirmedCountAPI] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
   const [currentAlertaId, setCurrentAlertaId] = useState(alertaId);
+  const [activeAlerta, setActiveAlerta] = useState(null);
+  const [timerText, setTimerText] = useState('00:00:00');
   const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
   // ── Construir headers con token ──────────────────────────────
@@ -86,8 +88,13 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           const data = await resAlertas.json();
           const alertas = data.alertas || [];
           if (alertas.length > 0) {
-            const ultima = alertas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
-            activeAlertaId = ultima.id;
+            const activas = alertas.filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
+            if (activas.length > 0) {
+              const ultima = activas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+              activeAlertaId = ultima.id;
+            } else {
+              activeAlertaId = null;
+            }
           }
         }
       }
@@ -122,6 +129,14 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           const countData = await countRes.json();
           setConfirmedCountAPI(countData.cantidad || 0);
         }
+
+        // Obtener detalle de la alerta para el timer y estado
+        const detailRes = await fetch(`${API_BASE_URL}/alerta/${activeAlertaId}`, { headers: authHeaders() });
+        if (detailRes.ok) {
+          setActiveAlerta(await detailRes.json());
+        }
+      } else {
+        setActiveAlerta(null);
       }
 
       // 4. Mapear bomberos a la estructura de la pantalla
@@ -163,6 +178,33 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       fetchData();
     }, [fetchData])
   );
+
+  // ── Timer Effect ─────────────────────────────────────────────
+  useEffect(() => {
+    let interval;
+    if (activeAlerta && activeAlerta.fecha_hora && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
+      const startTime = new Date(activeAlerta.fecha_hora).getTime();
+      
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        const diff = Math.max(0, now - startTime);
+        
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        
+        setTimerText(
+          `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        );
+      };
+
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
+    } else {
+      setTimerText('00:00:00');
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [activeAlerta]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -282,13 +324,33 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
               <Text style={styles.mainTitle}>TABLERO DE{'\n'}ASISTENCIA</Text>
             </View>
           </View>
-          <View style={styles.rateBox}>
-            <Text style={styles.rateLabel}>CONFIRMACIÓN</Text>
-            <Text style={styles.rateValue}>{confirmRate}%</Text>
-          </View>
+          {activeAlerta ? (
+            <View style={styles.rateBox}>
+              <Text style={styles.rateLabel}>TIEMPO TRANSCURRIDO</Text>
+              <Text style={[styles.rateValue, { color: '#ef4444' }]}>{timerText}</Text>
+            </View>
+          ) : null}
         </View>
 
-        {currentAlertaId && (
+        {!activeAlerta ? (
+          <View style={[styles.alertInfoBox, { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }]}>
+            <MaterialCommunityIcons name="shield-check" size={48} color="#388e3c" style={{ marginBottom: 12 }} />
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>No hay ninguna emergencia en curso</Text>
+            <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>El personal se encuentra inactivo o en guardia.</Text>
+          </View>
+        ) : (
+          <View style={styles.alertInfoBox}>
+             <View style={styles.alertInfoTop}>
+                <Text style={styles.alertInfoTitle}>{activeAlerta.observaciones || 'INCIDENTE'}</Text>
+                <View style={[styles.statusTag, { backgroundColor: activeAlerta.estadoAlerta?.nombre_estado === 'FINALIZADO' ? '#1e293b' : '#451a1a' }]}>
+                   <Text style={styles.statusTagText}>{activeAlerta.estadoAlerta?.nombre_estado || activeAlerta.estado_alerta_id}</Text>
+                </View>
+             </View>
+             <Text style={styles.alertInfoSub}>{activeAlerta.ubicacion}</Text>
+          </View>
+        )}
+
+        {currentAlertaId && activeAlerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
           <TouchableOpacity style={styles.finalizeBtn} onPress={finalizarEmergencia}>
             <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
             <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
@@ -557,4 +619,11 @@ const styles = StyleSheet.create({
   // Finalize Button
   finalizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e11d48', paddingVertical: 14, borderRadius: 8, marginBottom: 20, gap: 8 },
   finalizeBtnText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  // Alert Info
+  alertInfoBox: { backgroundColor: '#1b1d24', borderRadius: 8, padding: 16, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: '#dc2626' },
+  alertInfoTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  alertInfoTitle: { color: '#f8fafc', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+  alertInfoSub: { color: '#94a3b8', fontSize: 11 },
+  statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  statusTagText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 });

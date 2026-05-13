@@ -62,6 +62,7 @@ export default function AlertDetailScreen({ route, navigation }) {
   const [alerta, setAlerta] = useState(null);
   const [responders, setResponders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [timerText, setTimerText] = useState('00:00:00');
 
   const fetchDetail = useCallback(async () => {
     if (!alertaId) {
@@ -112,6 +113,33 @@ export default function AlertDetailScreen({ route, navigation }) {
       fetchDetail();
     }, [fetchDetail])
   );
+
+  // ── Timer Effect ─────────────────────────────────────────────
+  useEffect(() => {
+    let interval;
+    if (alerta && alerta.fecha_hora && alerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
+      const startTime = new Date(alerta.fecha_hora).getTime();
+      
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        const diff = Math.max(0, now - startTime);
+        
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        
+        setTimerText(
+          `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        );
+      };
+
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
+    } else {
+      setTimerText('00:00:00');
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [alerta]);
 
   if (loading) {
     return (
@@ -166,7 +194,7 @@ export default function AlertDetailScreen({ route, navigation }) {
             <View style={styles.titleRow}>
               <Text style={styles.mainTitle}>{alerta?.observaciones || 'Incidente'}</Text>
               <View style={styles.levelBadge}>
-                <Text style={styles.levelText}>{alerta?.estado_alerta_id === 'FINALIZADO' ? 'FINALIZADO' : 'ACTIVA'}</Text>
+                <Text style={styles.levelText}>{alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' ? 'FINALIZADO' : 'ACTIVA'}</Text>
               </View>
             </View>
             
@@ -184,7 +212,7 @@ export default function AlertDetailScreen({ route, navigation }) {
               </View>
               <View style={styles.timeStatItemRight}>
                 <Text style={styles.timeLabel}>TRANSCURRIDO</Text>
-                <Text style={styles.timeValueWhite}>--:--</Text>
+                <Text style={styles.timeValueWhite}>{timerText}</Text>
               </View>
             </View>
           </View>

@@ -141,11 +141,11 @@ function AdminTabBar({ state, descriptors, navigation }) {
           }
  
           let iconName;
-          if (route.name === 'Personal') iconName = 'account-group';
-          else if (route.name === 'Equipos') iconName = 'fire-truck';
-          else if (route.name === 'Rutas') iconName = 'map';
+          if (route.name === 'Panel') iconName = 'monitor-dashboard';
+          else if (route.name === 'Mapa') iconName = 'map';
           else if (route.name === 'Alertas') iconName = 'alert';
           else if (route.name === 'Asistencia') iconName = 'clipboard-check';
+          else if (route.name === 'Personal') iconName = 'account-group';
  
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
@@ -166,12 +166,12 @@ function AdminTabBar({ state, descriptors, navigation }) {
 function AdminTabNavigator() {
   return (
     <Tab.Navigator tabBar={props => <AdminTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Panel" component={PanelControlScreen} />
+      <Tab.Screen name="Mapa" component={MapScreen} />
+      <Tab.Screen name="SOS" component={NewAlertScreen} />
+      <Tab.Screen name="Alertas" component={AlertsScreen} />
       <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
       <Tab.Screen name="Personal" component={AdminPersonnelScreen} />
-      <Tab.Screen name="Equipos" component={AdminEquipmentScreen} />
-      <Tab.Screen name="SOS" component={NewAlertScreen} />
-      <Tab.Screen name="Rutas" component={AdminRoutesScreen} />
-      <Tab.Screen name="Alertas" component={AdminAlertsScreen} />
     </Tab.Navigator>
   );
 }
@@ -204,6 +204,7 @@ export default function AppNavigator() {
           <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
           <Stack.Screen name="Emergency" component={EmergencyScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
+          <Stack.Screen name="Personal" component={AdminPersonnelScreen} />
           
           {/* Pantallas nuevas */}
           <Stack.Screen name="PanelControl" component={PanelControlScreen} />

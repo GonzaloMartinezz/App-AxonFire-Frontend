@@ -59,7 +59,7 @@ export default function AlertsScreen({ navigation }) {
   const [showMenu, setShowMenu] = useState(false);
   const insets = useSafeAreaInsets();
 
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -87,7 +87,7 @@ export default function AlertsScreen({ navigation }) {
           id: a.id,
           type: a.observaciones || 'Incidente General',
           severity: 'alta', // default or mapped based on subcat
-          status: a.estado_alerta_id === 'FINALIZADO' ? 'resueltas' : 'activa', // Assuming state name or handle properly
+          status: a.estadoAlerta?.nombre_estado === 'FINALIZADO' ? 'resueltas' : 'activa', // Assuming state name or handle properly
           address: a.ubicacion || 'Ubicación no especificada',
           timeAgo: new Date(a.fecha_hora).toLocaleDateString(),
           fecha_hora: a.fecha_hora,
@@ -130,12 +130,14 @@ export default function AlertsScreen({ navigation }) {
           {/* Header Bar */}
           <View style={{ zIndex: 100, position: 'relative' }}>
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity 
-                style={styles.menuButton}
-                onPress={() => setShowMenu(!showMenu)}
-              >
-                <MaterialCommunityIcons name="menu" size={24} color="#fff" />
-              </TouchableOpacity>
+              {user?.rol === 'ADMIN' && (
+                <TouchableOpacity 
+                  style={styles.menuButton}
+                  onPress={() => setShowMenu(!showMenu)}
+                >
+                  <MaterialCommunityIcons name="menu" size={24} color="#fff" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity 
                 style={styles.menuButton}
                 onPress={() => navigation?.navigate('Mapa')}

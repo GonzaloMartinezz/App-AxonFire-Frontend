@@ -122,11 +122,15 @@ export default function PanelControlScreen({ navigation }) {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#263238" />
-        </TouchableOpacity>
-        <Text style={styles.tituloHeader}>Panel de Control</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.tituloHeader}>AXON FIRE - DASHBOARD</Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.navigate('Personal')}>
+            <MaterialCommunityIcons name="account-group" size={22} color="#263238" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.navigate('MainApp')}>
+            <MaterialCommunityIcons name="fire-truck" size={22} color="#263238" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
