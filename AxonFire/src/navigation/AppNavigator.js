@@ -145,6 +145,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
           else if (route.name === 'Equipos') iconName = 'fire-truck';
           else if (route.name === 'Rutas') iconName = 'map';
           else if (route.name === 'Alertas') iconName = 'alert';
+          else if (route.name === 'Asistencia') iconName = 'clipboard-check';
  
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
@@ -165,6 +166,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
 function AdminTabNavigator() {
   return (
     <Tab.Navigator tabBar={props => <AdminTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
       <Tab.Screen name="Personal" component={AdminPersonnelScreen} />
       <Tab.Screen name="Equipos" component={AdminEquipmentScreen} />
       <Tab.Screen name="SOS" component={NewAlertScreen} />

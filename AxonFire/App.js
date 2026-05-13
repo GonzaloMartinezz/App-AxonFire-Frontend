@@ -5,10 +5,12 @@ import { Platform, View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { API_BASE_URL } from './src/config/api';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+
+export const navigationRef = createNavigationContainerRef();
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -64,7 +66,7 @@ function AppContent() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <AppNavigator />
     </NavigationContainer>
   );
@@ -77,11 +79,16 @@ export default function App() {
   useEffect(() => {
     registerForPushNotifications();
 
-    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
       playSiren();
     });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {});
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const { alertaId } = response.notification.request.content.data;
+      if (alertaId && navigationRef.isReady()) {
+        navigationRef.navigate('Emergency', { alerta_id: alertaId });
+      }
+    });
 
     return () => {
       if (notificationListener.current) {

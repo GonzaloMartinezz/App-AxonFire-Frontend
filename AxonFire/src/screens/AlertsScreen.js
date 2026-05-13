@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -20,47 +21,11 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 
-// Mock data according to the screenshot
-const ALERTS = [
-  {
-    id: '1',
-    type: 'Incendio Estructural - Edificio ...',
-    severity: 'critica',
-    status: 'activa',
-    address: 'Av. Corrientes 1500, CABA',
-    timeAgo: 'Hace 17 horas',
-    icon: 'fire',
-    iconColor: '#dc2626',
-    iconBg: '#fee2e2',
-  },
-  {
-    id: '2',
-    type: 'Rescate Vehicular - Autopista',
-    severity: 'alta',
-    status: 'despachada',
-    address: 'Autopista 25 de Mayo, Km 3',
-    timeAgo: 'Hace 17 horas',
-    icon: 'car-wrench',
-    iconColor: '#d97706',
-    iconBg: '#fef3c7',
-  },
-  {
-    id: '3',
-    type: 'Fuga de Gas - Zona Comercial',
-    severity: 'alta',
-    status: 'progreso',
-    address: 'Calle Juramento 2800, Belgrano',
-    timeAgo: 'Hace 17 horas',
-    icon: 'biohazard',
-    iconColor: '#b91c1c',
-    iconBg: '#fff7ed',
-  },
-];
-
-const FILTERS = [
-  { label: 'Activas', count: 3 },
-  { label: 'Todas', count: null },
-  { label: 'Resueltas', count: null },
+// Removed mock data
+const FILTERS_CONFIG = [
+  { label: 'Activas', filterFn: (a) => a.status !== 'resueltas' },
+  { label: 'Todas', filterFn: (a) => true },
+  { label: 'Resueltas', filterFn: (a) => a.status === 'resueltas' },
 ];
 
 const StatusBadge = ({ severity, type = 'severity' }) => {
@@ -98,17 +63,19 @@ export default function AlertsScreen({ navigation }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAlerts();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAlerts();
+    }, [token])
+  );
 
   const fetchAlerts = async () => {
     try {
       setLoading(true);
       const res = await axios.post(`${API_BASE_URL}/alerta/rango`, 
         {
-          fecha_desde: "2020-01-01",
-          fecha_hasta: "2030-01-01"
+          fecha_desde: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          fecha_hasta: new Date().toISOString()
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -120,13 +87,18 @@ export default function AlertsScreen({ navigation }) {
           id: a.id,
           type: a.observaciones || 'Incidente General',
           severity: 'alta', // default or mapped based on subcat
-          status: a.estado_alerta_id === '3' ? 'resueltas' : 'activa',
+          status: a.estado_alerta_id === 'FINALIZADO' ? 'resueltas' : 'activa', // Assuming state name or handle properly
           address: a.ubicacion || 'Ubicación no especificada',
           timeAgo: new Date(a.fecha_hora).toLocaleDateString(),
+          fecha_hora: a.fecha_hora,
           icon: 'fire',
           iconColor: '#dc2626',
           iconBg: '#fee2e2'
         }));
+        
+        // Ordenar descendente (más nuevas primero)
+        mappedAlerts.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+        
         setAlerts(mappedAlerts);
       }
     } catch (e) {
@@ -135,6 +107,11 @@ export default function AlertsScreen({ navigation }) {
       setLoading(false);
     }
   };
+
+  const filteredAlerts = alerts.filter(a => {
+    const config = FILTERS_CONFIG.find(f => f.label === activeFilter);
+    return config ? config.filterFn(a) : true;
+  });
 
 
   return (
@@ -246,40 +223,43 @@ export default function AlertsScreen({ navigation }) {
 
           {/* Filter Section */}
           <View style={styles.filterSection}>
-            {FILTERS.map((f) => (
-              <TouchableOpacity
-                key={f.label}
-                onPress={() => setActiveFilter(f.label)}
-                style={[
-                  styles.filterChip,
-                  activeFilter === f.label ? styles.filterChipActive : styles.filterChipInactive
-                ]}
-              >
-                <View style={styles.filterRow}>
-                  <Text style={[
-                    styles.filterText,
-                    activeFilter === f.label ? styles.filterTextActive : styles.filterTextInactive
-                  ]}>
-                    {f.label}
-                  </Text>
-                  {f.count && (
-                    <View style={styles.countBadge}>
-                      <Text style={styles.countText}>{f.count}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+            {FILTERS_CONFIG.map((f) => {
+              const count = alerts.filter(f.filterFn).length;
+              return (
+                <TouchableOpacity
+                  key={f.label}
+                  onPress={() => setActiveFilter(f.label)}
+                  style={[
+                    styles.filterChip,
+                    activeFilter === f.label ? styles.filterChipActive : styles.filterChipInactive
+                  ]}
+                >
+                  <View style={styles.filterRow}>
+                    <Text style={[
+                      styles.filterText,
+                      activeFilter === f.label ? styles.filterTextActive : styles.filterTextInactive
+                    ]}>
+                      {f.label}
+                    </Text>
+                    {count > 0 && (
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countText}>{count}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Alert List */}
           <View style={styles.alertList}>
-            {alerts.map((alert) => (
+            {filteredAlerts.map((alert) => (
               <TouchableOpacity 
                 key={alert.id} 
                 style={styles.alertCard} 
                 activeOpacity={0.7}
-                onPress={() => navigation?.navigate('AlertDetail')}
+                onPress={() => navigation?.navigate('AlertDetail', { alerta_id: alert.id })}
               >
                 <View style={[styles.iconBox, { backgroundColor: alert.iconBg }]}>
                   <MaterialCommunityIcons name={alert.icon} size={28} color={alert.iconColor} />

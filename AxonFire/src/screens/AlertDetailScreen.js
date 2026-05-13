@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -8,10 +9,13 @@ import {
   ScrollView,
   Platform,
   Image,
-  Dimensions
+  Dimensions,
+  ActivityIndicator
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 const { width } = Dimensions.get('window');
 
@@ -50,8 +54,83 @@ const PERSONNEL = [
   },
 ];
 
-export default function AlertDetailScreen({ navigation }) {
+export default function AlertDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
+  const alertaId = route?.params?.alerta_id ?? null;
+  const { token } = useAuth();
+
+  const [alerta, setAlerta] = useState(null);
+  const [responders, setResponders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDetail = useCallback(async () => {
+    if (!alertaId) {
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      const [alertaRes, respuestasRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/alerta/${alertaId}`, { headers }),
+        fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, { headers })
+      ]);
+
+      if (alertaRes.ok) {
+        setAlerta(await alertaRes.json());
+      }
+      
+      if (respuestasRes.ok) {
+        const respuestas = await respuestasRes.json();
+        const aceptados = respuestas
+          .filter(r => r.estado_respuesta === 'ACEPTADO')
+          .map((r, i) => ({
+            id: r.id || String(i),
+            name: `${r.usuarioId?.bombero?.nombre || 'B.'} ${r.usuarioId?.bombero?.apellido || ''}`.trim(),
+            role: r.usuarioId?.bombero?.rangoBombero?.nombre_rol || 'Bombero',
+            status: 'EN CAMINO',
+            statusColor: '#0f766e',
+            icon: 'account',
+            hora: new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }));
+        setResponders(aceptados);
+      }
+    } catch (err) {
+      console.log('Error fetching alert details', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [alertaId, token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+    }, [fetchDetail])
+  );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#e11d48" />
+      </View>
+    );
+  }
+
+  if (!alerta) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: '#fff' }}>Alerta no encontrada</Text>
+        <TouchableOpacity style={{ marginTop: 20 }} onPress={() => navigation.goBack()}>
+          <Text style={{ color: '#e11d48' }}>Volver</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -85,25 +164,27 @@ export default function AlertDetailScreen({ navigation }) {
           <View style={styles.cardLeftBorder} />
           <View style={styles.mainCardContent}>
             <View style={styles.titleRow}>
-              <Text style={styles.mainTitle}>Incendio Estructural</Text>
+              <Text style={styles.mainTitle}>{alerta?.observaciones || 'Incidente'}</Text>
               <View style={styles.levelBadge}>
-                <Text style={styles.levelText}>NIVEL 4</Text>
+                <Text style={styles.levelText}>{alerta?.estado_alerta_id === 'FINALIZADO' ? 'FINALIZADO' : 'ACTIVA'}</Text>
               </View>
             </View>
             
             <View style={styles.locationRow}>
               <MaterialIcons name="location-on" size={16} color="#94a3b8" />
-              <Text style={styles.locationText}>Av. Corrientes 1500</Text>
+              <Text style={styles.locationText}>{alerta?.ubicacion || 'Ubicación no especificada'}</Text>
             </View>
 
             <View style={styles.timeStatsBox}>
               <View style={styles.timeStatItem}>
                 <Text style={styles.timeLabel}>LLAMADO</Text>
-                <Text style={styles.timeValueRed}>14:30 HS</Text>
+                <Text style={styles.timeValueRed}>
+                  {alerta?.fecha_hora ? new Date(alerta.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'} HS
+                </Text>
               </View>
               <View style={styles.timeStatItemRight}>
                 <Text style={styles.timeLabel}>TRANSCURRIDO</Text>
-                <Text style={styles.timeValueWhite}>00:42:15</Text>
+                <Text style={styles.timeValueWhite}>--:--</Text>
               </View>
             </View>
           </View>
@@ -173,7 +254,7 @@ export default function AlertDetailScreen({ navigation }) {
             <Text style={styles.sectionTitle}>PERSONAL EN RESPUESTA</Text>
           </View>
 
-          {PERSONNEL.map((person) => (
+          {responders.map((person) => (
             <View key={person.id} style={styles.personnelCard}>
               <View style={styles.personTopRow}>
                 <Text style={styles.personName}>{person.name}</Text>
@@ -183,10 +264,13 @@ export default function AlertDetailScreen({ navigation }) {
               </View>
               <View style={styles.personRoleRow}>
                 <MaterialCommunityIcons name={person.icon} size={16} color="#94a3b8" />
-                <Text style={styles.personRoleText}>{person.role}</Text>
+                <Text style={styles.personRoleText}>{person.role} ({person.hora})</Text>
               </View>
             </View>
           ))}
+          {responders.length === 0 && (
+             <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 10 }}>No hay personal en respuesta aún.</Text>
+          )}
         </View>
 
         <View style={{ height: 40 }} />

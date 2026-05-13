@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '../config/api';
 
 // ─── Classification Tabs ─────────────────────────────────────
@@ -56,6 +57,8 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [confirmedCountAPI, setConfirmedCountAPI] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [currentAlertaId, setCurrentAlertaId] = useState(alertaId);
+  const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
   // ── Construir headers con token ──────────────────────────────
   const authHeaders = useCallback(() => {
@@ -88,12 +91,16 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           }
         }
       }
+      setCurrentAlertaId(activeAlertaId);
 
       // 2. Obtener todos los bomberos
       const bomberosRes = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
         headers: authHeaders(),
       });
-      if (!bomberosRes.ok) throw new Error('Error al cargar bomberos');
+      if (!bomberosRes.ok) {
+        const errorData = await bomberosRes.json().catch(() => ({}));
+        throw new Error(`Error al cargar bomberos (Status: ${bomberosRes.status}). ${errorData.message || ''}`);
+      }
       const bomberosData = await bomberosRes.json();
 
       // 3. Si tenemos una alerta activa, obtener respuestas
@@ -118,30 +125,32 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       }
 
       // 4. Mapear bomberos a la estructura de la pantalla
-      const mapped = bomberosData.map((b) => {
+      const mapped = (bomberosData || []).map((b) => {
+        if (!b) return null;
         const usuarioId = b.usuario_id || b.usuarioId?.id;
-        const respuesta = respuestasMap[usuarioId];
+        const respuesta = usuarioId ? respuestasMap[usuarioId] : null;
         const estadoRespuesta = respuesta?.estado_respuesta || 'ABSENT';
         const rangoNombre = b.rangoBombero?.nombre_rol || b.rango || '';
 
         return {
-          id: b.id,
+          id: b.id || Math.random().toString(),
           usuario_id: usuarioId,
-          name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase(),
-          rank: rangoNombre.toUpperCase(),
+          name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase() || 'BOMBERO SIN NOMBRE',
+          rank: (rangoNombre || 'BOMBERO').toUpperCase(),
           unit: b.usuario?.nombre_usuario || b.usuarioId?.nombre_usuario || '—',
           classification: classifyRank(rangoNombre),
           status: estadoRespuesta,
-          eta: respuesta
+          eta: respuesta && respuesta.fecha_hora
             ? new Date(respuesta.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
             : '—',
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(b.nombre || 'X')}&background=1b1d24&color=f8fafc&size=96`,
         };
-      });
+      }).filter(Boolean);
 
       setPersonnel(mapped);
+      setLastRefresh(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
-      console.error('Error fetchData AttendanceBoard:', err);
+      console.warn('Error fetchData AttendanceBoard:', err);
       setErrorMsg(err.message || 'Error al cargar datos');
     } finally {
       setLoading(false);
@@ -149,14 +158,48 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     }
   }, [alertaId, authHeaders]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
   }, [fetchData]);
+
+  const finalizarEmergencia = async () => {
+    if (!currentAlertaId) return;
+
+    Alert.alert(
+      "Finalizar Emergencia",
+      "¿Estás seguro de que deseas finalizar esta emergencia? Ya no se podrán recibir respuestas.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Finalizar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const res = await fetch(`${API_BASE_URL}/alerta/${currentAlertaId}/finalizar`, {
+                method: 'PATCH',
+                headers: authHeaders()
+              });
+              if (!res.ok) throw new Error("Error al finalizar emergencia");
+              Alert.alert("Éxito", "La emergencia ha sido finalizada.");
+              fetchData();
+            } catch (e) {
+              Alert.alert("Error", e.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // ── Filtrado ─────────────────────────────────────────────────
   const filtered = personnel.filter((p) => {
@@ -235,7 +278,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           <View style={styles.titleLeftGroup}>
             <View style={styles.redAccent} />
             <View>
-              <Text style={styles.headerLabel}>ATTENDANCE BOARD</Text>
+              <Text style={styles.headerLabel}>ATTENDANCE BOARD • {lastRefresh}</Text>
               <Text style={styles.mainTitle}>TABLERO DE{'\n'}ASISTENCIA</Text>
             </View>
           </View>
@@ -244,6 +287,13 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
             <Text style={styles.rateValue}>{confirmRate}%</Text>
           </View>
         </View>
+
+        {currentAlertaId && (
+          <TouchableOpacity style={styles.finalizeBtn} onPress={finalizarEmergencia}>
+            <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
+            <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Error Banner */}
         {errorMsg && (
@@ -504,4 +554,7 @@ const styles = StyleSheet.create({
   bottomSummaryItem: { backgroundColor: '#16181d', padding: 16, borderRadius: 4, flex: 1 },
   bottomSummaryLabel: { color: '#e2e8f0', fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
   bottomSummaryValue: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  // Finalize Button
+  finalizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e11d48', paddingVertical: 14, borderRadius: 8, marginBottom: 20, gap: 8 },
+  finalizeBtnText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
 });

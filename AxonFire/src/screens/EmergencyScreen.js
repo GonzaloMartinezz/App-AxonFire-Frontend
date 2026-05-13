@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -17,11 +18,12 @@ import { API_BASE_URL } from '../config/api';
 
 export default function EmergencyScreen({ route }) {
   // Obtener alerta_id desde los parámetros de navegación (fallback para dev)
-  const alertaId = route?.params?.alerta_id ?? null;
+  const navAlertaId = route?.params?.alerta_id ?? null;
 
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const usuarioId = user?.id ?? null;
-  const token = user?.token ?? null;
+
+  const [resolvedAlertaId, setResolvedAlertaId] = useState(navAlertaId);
 
   // Estado de respuesta: null | 'ACEPTADO' | 'RECHAZADO'
   const [respuesta, setRespuesta] = useState(null);
@@ -31,6 +33,7 @@ export default function EmergencyScreen({ route }) {
   // Datos de la alerta cargados desde el backend
   const [alertaData, setAlertaData] = useState(null);
   const [loadingAlerta, setLoadingAlerta] = useState(false);
+  const [responders, setResponders] = useState([]);
 
   // Animación de confirmación
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -48,7 +51,7 @@ export default function EmergencyScreen({ route }) {
       });
 
       const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/siren.mp3'),
+        require('../../assets/siren.wav'),
         { isLooping: true, volume: 1.0 }
       );
 
@@ -83,26 +86,99 @@ export default function EmergencyScreen({ route }) {
     };
   }, []);
 
-  // ── Cargar detalles de la alerta desde el backend ────────────────────────
-  useEffect(() => {
-    if (!alertaId) return;
-    const fetchAlerta = async () => {
-      setLoadingAlerta(true);
-      try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE_URL}/alerta/${alertaId}`, { headers });
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
-        setAlertaData(data);
-      } catch (err) {
-        console.error('Error al cargar alerta:', err);
-      } finally {
-        setLoadingAlerta(false);
+  // ── Cargar detalles de la alerta y respuestas ───────────────────────────
+  const fetchEmergencyData = useCallback(async () => {
+    let activeAlertaId = navAlertaId;
+
+    setLoadingAlerta(true);
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // 1. Si no hay alertaId, buscar la más reciente activa
+      if (!activeAlertaId) {
+        const resAlertas = await fetch(`${API_BASE_URL}/alerta/rango`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            fecha_hasta: new Date().toISOString()
+          })
+        });
+        if (resAlertas.ok) {
+          const data = await resAlertas.json();
+          const alertas = data.alertas || [];
+          if (alertas.length > 0) {
+            const ultima = alertas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+            activeAlertaId = ultima.id;
+          }
+        }
       }
-    };
-    fetchAlerta();
-  }, [alertaId, token]);
+
+      if (!activeAlertaId) {
+        setLoadingAlerta(false);
+        setError("No hay emergencias activas en este momento.");
+        stopEmergencyAlert();
+        return;
+      }
+      
+      setResolvedAlertaId(activeAlertaId);
+
+      // 2. Cargar alerta y respuestas en paralelo
+      const [alertaRes, respuestasRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/alerta/${activeAlertaId}`, { headers }),
+        fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, { headers })
+      ]);
+
+      if (alertaRes.ok) {
+        const data = await alertaRes.json();
+        setAlertaData(data);
+      }
+
+      if (respuestasRes.ok) {
+        const respuestas = await respuestasRes.json();
+        
+        // Ver si YO ya respondí
+        const miRespuesta = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
+        
+        if (miRespuesta && miRespuesta.estado_respuesta !== 'PENDIENTE') {
+          setRespuesta(miRespuesta.estado_respuesta);
+          stopEmergencyAlert();
+          animateIn();
+        } else {
+          // Si no hemos respondido o es PENDIENTE, reseteamos para que aparezcan los botones
+          setRespuesta(null);
+        }
+
+        // Lista de los que aceptaron
+        const aceptados = respuestas
+          .filter(r => r.estado_respuesta === 'ACEPTADO')
+          .map(r => ({
+            id: r.id,
+            nombre: r.usuarioId?.bombero?.nombre || 'Bombero',
+            apellido: r.usuarioId?.bombero?.apellido || '',
+            hora: new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }));
+        setResponders(aceptados);
+      }
+    } catch (err) {
+      console.error('Error al cargar datos de emergencia:', err);
+      setError("Ocurrió un error al cargar la alerta.");
+    } finally {
+      setLoadingAlerta(false);
+    }
+  }, [navAlertaId, token, usuarioId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEmergencyData();
+      // Si ya hay respuesta, no sonar. Si no hay, sonar.
+      if (!respuesta) {
+        startEmergencyAlert();
+      }
+      return () => stopEmergencyAlert();
+    }, [fetchEmergencyData, respuesta])
+  );
 
   // ── Animación al confirmar/rechazar ─────────────────────────────────────
   const animateIn = () => {
@@ -131,7 +207,7 @@ export default function EmergencyScreen({ route }) {
 
   // ── Llamada al API ───────────────────────────────────────────────────────
   const enviarRespuesta = async (estadoRespuesta) => {
-    if (!alertaId || !usuarioId) {
+    if (!resolvedAlertaId || !usuarioId) {
       // Sin IDs reales simplemente actualizamos el estado local (modo demo)
       await stopEmergencyAlert();
       setRespuesta(estadoRespuesta);
@@ -147,7 +223,7 @@ export default function EmergencyScreen({ route }) {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const res = await fetch(
-        `${API_BASE_URL}/respuestas_alertas/responder/${alertaId}/${usuarioId}`,
+        `${API_BASE_URL}/respuestas_alertas/responder/${resolvedAlertaId}/${usuarioId}`,
         {
           method: 'POST',
           headers,
@@ -229,6 +305,20 @@ export default function EmergencyScreen({ route }) {
               <MaterialCommunityIcons name="clock-outline" size={14} color="#90a4ae" />
               <Text style={styles.confirmationTime}>{currentTime} HS</Text>
             </View>
+
+            {esAceptado && responders.length > 0 && (
+              <View style={styles.respondersSmallList}>
+                <Text style={styles.respondersSmallTitle}>OTROS EFECTIVOS EN CAMINO:</Text>
+                {responders.slice(0, 3).map((r, idx) => (
+                  <Text key={idx} style={styles.responderRowMini}>
+                    • {r.nombre} {r.apellido} ({r.hora})
+                  </Text>
+                ))}
+                {responders.length > 3 && (
+                  <Text style={styles.responderMoreText}>+ {responders.length - 3} más...</Text>
+                )}
+              </View>
+            )}
           </Animated.View>
 
           {/* Botón cambiar respuesta */}
@@ -250,7 +340,12 @@ export default function EmergencyScreen({ route }) {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           {/* HEADER */}
           <View style={styles.header}>
-            <Text style={styles.time}>{currentTime}</Text>
+            <View style={styles.headerTopRow}>
+              <Text style={styles.time}>{currentTime}</Text>
+              <TouchableOpacity style={styles.refreshIcon} onPress={fetchEmergencyData}>
+                <MaterialCommunityIcons name="refresh" size={24} color="#90a4ae" />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.date}>{currentDate}</Text>
           </View>
 
@@ -298,6 +393,23 @@ export default function EmergencyScreen({ route }) {
           <View style={styles.errorBox}>
             <MaterialCommunityIcons name="alert-circle" size={16} color="#ef4444" />
             <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {/* RESPONDERS LIST (Pre-confirmation) */}
+        {responders.length > 0 && (
+          <View style={styles.respondersPreview}>
+            <View style={styles.respondersHeader}>
+              <MaterialCommunityIcons name="account-group" size={18} color="#3b82f6" />
+              <Text style={styles.respondersTitle}>PERSONAL RESPONDIENDO ({responders.length})</Text>
+            </View>
+            <View style={styles.respondersGrid}>
+              {responders.map((r, idx) => (
+                <View key={idx} style={styles.responderChip}>
+                  <Text style={styles.responderChipText}>{r.nombre[0]}. {r.apellido}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
@@ -353,6 +465,19 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 20,
+    width: '100%',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    position: 'relative',
+  },
+  refreshIcon: {
+    position: 'absolute',
+    right: 0,
+    padding: 10,
   },
   time: {
     fontSize: 48,
@@ -524,4 +649,68 @@ const styles = StyleSheet.create({
     color: '#90a4ae',
     fontSize: 14,
   },
+  // Responders List
+  respondersPreview: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  respondersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  respondersTitle: {
+    color: '#3b82f6',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  respondersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  responderChip: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  responderChipText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  respondersSmallList: {
+    marginTop: 20,
+    width: '100%',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  respondersSmallTitle: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '900',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  responderRowMini: {
+    color: '#cfd8dc',
+    fontSize: 11,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  responderMoreText: {
+    color: '#90a4ae',
+    fontSize: 9,
+    textAlign: 'center',
+    marginTop: 4,
+    fontStyle: 'italic',
+  }
 });
