@@ -12,13 +12,15 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 
 export const navigationRef = createNavigationContainerRef();
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 const sirenSound = require('./assets/siren.wav');
 
@@ -90,6 +92,8 @@ export default function App() {
   const responseListener = useRef();
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
+
     registerForPushNotifications();
 
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
@@ -134,6 +138,7 @@ async function registerForPushNotifications() {
 }
 
 async function registrarTokenPush(user, authToken) {
+  if (Platform.OS === 'web') return;
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
