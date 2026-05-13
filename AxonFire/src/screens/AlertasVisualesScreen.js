@@ -38,11 +38,15 @@ function getIconoAlerta(nombre = '') {
 }
 
 function estadoAKey(estado = '') {
-  const e = estado.toLowerCase();
-  if (e.includes('activ')) return 'activa';
-  if (e.includes('despach')) return 'despachada';
-  if (e.includes('progreso') || e.includes('curso')) return 'progreso';
-  if (e.includes('resuel') || e.includes('cerrad')) return 'resuelta';
+  const e = estado.toUpperCase();
+  if (e === 'PENDIENTE') return 'activa';
+  if (e === 'EN CURSO') return 'progreso';
+  if (e === 'FINALIZADO') return 'resuelta';
+  // Fallback para otros sistemas de nombres
+  if (e.includes('ACTIV')) return 'activa';
+  if (e.includes('DESPACH')) return 'despachada';
+  if (e.includes('PROGRESO') || e.includes('CURSO')) return 'progreso';
+  if (e.includes('RESUEL') || e.includes('CERRAD')) return 'resuelta';
   return 'activa';
 }
 
@@ -96,8 +100,8 @@ export default function AlertasVisualesScreen({ navigation }) {
       const lista = res.data.alertas || [];
 
       const normalizadas = lista.map((item) => {
-        const nombre = item.subCategoriaAlerta?.nombre || item.tipo || item.observaciones || 'Emergencia';
-        const estado = item.estadoAlerta?.nombre || item.estado || '';
+        const nombre = item.subCategoriaAlerta?.nombre_sub_categoria || item.tipo || item.observaciones || 'Emergencia';
+        const estado = item.estadoAlerta?.nombre_estado || item.estado || '';
         const prioridad = item.prioridad || item.subCategoriaAlerta?.prioridad || '';
 
         return {

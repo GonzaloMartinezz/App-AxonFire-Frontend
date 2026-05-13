@@ -25,10 +25,10 @@ import { useAuth } from '../context/AuthContext';
 
 // Los tipos de refuerzo que el bombero puede solicitar
 const TIPOS_REFUERZO = [
-  { icono: 'water',         nombre: 'CISTERNA',    color: Colors.alertBlue,     tipo: 'cisterna'    },
-  { icono: 'gas-station',   nombre: 'COMBUSTIBLE', color: Colors.warningOrange, tipo: 'combustible' },
-  { icono: 'ambulance',     nombre: 'AMBULANCIA',  color: Colors.primary,       tipo: 'ambulancia'  },
-  { icono: 'hammer-wrench', nombre: 'RESCATE',     color: Colors.secondary,     tipo: 'rescate'     },
+  { icono: 'water',         nombre: 'CISTERNA',    color: Colors.alertBlue,     tipo: 'cisterna',    subcat: '4' },
+  { icono: 'gas-station',   nombre: 'COMBUSTIBLE', color: Colors.warningOrange, tipo: 'combustible', subcat: '4' },
+  { icono: 'ambulance',     nombre: 'AMBULANCIA',  color: Colors.primary,       tipo: 'ambulancia',  subcat: '4' },
+  { icono: 'hammer-wrench', nombre: 'RESCATE',     color: Colors.secondary,     tipo: 'rescate',     subcat: '2' },
 ];
 
 function tiempoTranscurrido(fechaISO) {
@@ -89,6 +89,7 @@ export default function PedidosSuministroScreen({ navigation }) {
             setEnviandoTipo(refuerzo.tipo);
             try {
               const body = {
+                sub_categoria_alerta_id: refuerzo.subcat, // Categoría específica o pedido de suministro
                 ubicacion: `Solicitud de ${refuerzo.nombre}`,
                 observaciones: `Pedido de refuerzo: ${refuerzo.nombre}. Enviado desde la app.`,
                 usuario_alta_alerta: usuarioId,
@@ -123,6 +124,7 @@ export default function PedidosSuministroScreen({ navigation }) {
     setEnviandoPersonal(true);
     try {
       const body = {
+        sub_categoria_alerta_id: '5', // PEDIDO DE PERSONAL
         ubicacion: 'Solicitud de personal adicional',
         observaciones: `Se solicitan ${cantidadPersonal} bombero(s). Motivo: ${motivoPersonal}`,
         usuario_alta_alerta: usuarioId,
@@ -231,12 +233,14 @@ export default function PedidosSuministroScreen({ navigation }) {
                   <MaterialCommunityIcons name="send-check" size={20} color={Colors.alertBlue} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.tituloSolicitud} numberOfLines={1}>Solicitud enviada</Text>
+                  <Text style={styles.tituloSolicitud} numberOfLines={1}>
+                    {sol.ubicacion.replace('Solicitud de ', '')}
+                  </Text>
                   <Text style={styles.subtituloSolicitud}>
-                    {sol.estado_respuesta || 'PENDIENTE'} · {tiempoTranscurrido(sol.fecha_hora)}
+                    {sol.estadoAlerta?.nombre_estado || 'PENDIENTE'} · {tiempoTranscurrido(sol.fecha_hora)}
                   </Text>
                 </View>
-                {sol.estado_respuesta === 'ACEPTADO' ? (
+                {sol.estadoAlerta?.nombre_estado === 'FINALIZADO' ? (
                   <MaterialIcons name="check-circle" size={22} color={Colors.success} />
                 ) : (
                   <MaterialCommunityIcons name="sync" size={18} color={Colors.onSurfaceVariant} />

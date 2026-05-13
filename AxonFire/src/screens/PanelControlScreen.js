@@ -24,11 +24,15 @@ import { useAuth } from '../context/AuthContext';
 
 // Convierte el estado que viene del backend a un key que yo pueda contar
 function clasificarEstado(nombreEstado = '') {
-  const e = nombreEstado.toLowerCase();
-  if (e.includes('activ')) return 'activa';
-  if (e.includes('despach')) return 'despachada';
-  if (e.includes('progreso') || e.includes('curso')) return 'progreso';
-  if (e.includes('resuel') || e.includes('cerrad')) return 'resuelta';
+  const e = nombreEstado.toUpperCase();
+  if (e === 'PENDIENTE') return 'activa';
+  if (e === 'EN CURSO') return 'progreso';
+  if (e === 'FINALIZADO') return 'resuelta';
+  
+  if (e.includes('ACTIV')) return 'activa';
+  if (e.includes('DESPACH')) return 'despachada';
+  if (e.includes('PROGRESO') || e.includes('CURSO')) return 'progreso';
+  if (e.includes('RESUEL') || e.includes('CERRAD')) return 'resuelta';
   return 'activa';
 }
 
@@ -57,6 +61,7 @@ export default function PanelControlScreen({ navigation }) {
   const { token } = useAuth();
 
   const [alertas, setAlertas] = useState([]);
+  const [totalBomberos, setTotalBomberos] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState(null);
@@ -70,13 +75,19 @@ export default function PanelControlScreen({ navigation }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await axios.post(`${API_BASE_URL}/alerta/rango`, 
-        { fecha_desde: desde, fecha_hasta: hasta },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const [resAlertas, resBomberos] = await Promise.all([
+        axios.post(`${API_BASE_URL}/alerta/rango`, 
+          { fecha_desde: desde, fecha_hasta: hasta },
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+        axios.get(`${API_BASE_URL}/usuarios/bomberos`, 
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+      ]);
       
-      const data = res.data.alertas || [];
+      const data = resAlertas.data.alertas || [];
       setAlertas(Array.isArray(data) ? data : []);
+      setTotalBomberos(resBomberos.data?.length || 0);
     } catch (err) {
       console.error('Error cargando datos del panel:', err);
       setError('No se pudo conectar al servidor.');
@@ -94,9 +105,9 @@ export default function PanelControlScreen({ navigation }) {
 
   // Clasificamos cada alerta para poder contarlas
   const clasificadas = alertas.map((a) => ({
-    estado: clasificarEstado(a.estadoAlerta?.nombre || a.estado || ''),
+    estado: clasificarEstado(a.estadoAlerta?.nombre_estado || a.estado || ''),
     prioridad: clasificarPrioridad(a.prioridad || a.subCategoriaAlerta?.prioridad || ''),
-    tipo: a.subCategoriaAlerta?.nombre || a.tipo || 'Sin tipo',
+    tipo: a.subCategoriaAlerta?.nombre_sub_categoria || a.tipo || 'Sin tipo',
     fecha: a.fecha_hora,
   }));
 
@@ -113,6 +124,13 @@ export default function PanelControlScreen({ navigation }) {
   const ultimasAlertas = clasificadas
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
     .slice(0, 5);
+
+  // Distribución por tipo (ej: Incendio vs Rescate)
+  const countIncendios = clasificadas.filter(a => a.tipo.toLowerCase().includes('incendio') || a.tipo.toLowerCase().includes('fuego')).length;
+  const countRescates = clasificadas.filter(a => a.tipo.toLowerCase().includes('rescate') || a.tipo.toLowerCase().includes('vehicular')).length;
+  
+  const pctIncendios = totalAlertas > 0 ? Math.round((countIncendios / totalAlertas) * 100) : 0;
+  const pctRescates = totalAlertas > 0 ? Math.round((countRescates / totalAlertas) * 100) : 0;
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -161,11 +179,21 @@ export default function PanelControlScreen({ navigation }) {
           </View>
         ) : (
           <>
-            {/* ── Stat grande: total de alertas ───────────────────────────── */}
-            <TacticalCard elevated>
-              <Text style={styles.labelStat}>ALERTAS ÚLTIMOS 30 DÍAS</Text>
-              <Text style={styles.numeroGrande}>{totalAlertas}</Text>
-            </TacticalCard>
+            {/* ── Stats principales ───────────────────────────── */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <TacticalCard elevated>
+                  <Text style={styles.labelStat}>ALERTAS (30D)</Text>
+                  <Text style={styles.numeroGrande}>{totalAlertas}</Text>
+                </TacticalCard>
+              </View>
+              <View style={{ flex: 1 }}>
+                <TacticalCard elevated>
+                  <Text style={styles.labelStat}>PERSONAL</Text>
+                  <Text style={styles.numeroGrande}>{totalBomberos}</Text>
+                </TacticalCard>
+              </View>
+            </View>
 
             {/* ── Stats por estado ──────────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>POR ESTADO</Text>
@@ -191,6 +219,30 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.statLabel}>Total</Text>
               </View>
             </View>
+
+            {/* ── Distribución por tipo ──────────────────────────────────── */}
+            <Text style={styles.tituloSeccion}>DISTRIBUCIÓN DE EMERGENCIAS</Text>
+            <TacticalCard elevated>
+              <View style={styles.barItem}>
+                <View style={styles.barHeader}>
+                  <Text style={styles.barTitle}>INCENDIOS</Text>
+                  <Text style={[styles.barPercent, { color: '#af101a' }]}>{pctIncendios}%</Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${pctIncendios}%`, backgroundColor: '#af101a' }]} />
+                </View>
+              </View>
+
+              <View style={[styles.barItem, { marginTop: 16 }]}>
+                <View style={styles.barHeader}>
+                  <Text style={styles.barTitle}>RESCATES / OTROS</Text>
+                  <Text style={[styles.barPercent, { color: '#1976d2' }]}>{pctRescates}%</Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View style={[styles.barFill, { width: `${pctRescates}%`, backgroundColor: '#1976d2' }]} />
+                </View>
+              </View>
+            </TacticalCard>
 
             {/* ── Stats por severidad ──────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>POR SEVERIDAD</Text>
@@ -314,4 +366,12 @@ const styles = StyleSheet.create({
   textoActividad: { fontSize: 13, fontWeight: '700', color: Colors.onSurface },
   tiempoActividad: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
   textoVacio: { fontSize: 13, color: '#94a3b8', fontWeight: '600', textAlign: 'center', paddingVertical: 20 },
+
+  // Barras de progreso
+  barItem: { width: '100%' },
+  barHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  barTitle: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 0.5 },
+  barPercent: { fontSize: 11, fontWeight: '900' },
+  barTrack: { height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 4 },
 });

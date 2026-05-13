@@ -32,7 +32,8 @@ export default function EmergencyScreen({ route, navigation }) {
 
   // Datos de la alerta cargados desde el backend
   const [alertaData, setAlertaData] = useState(null);
-  const [loadingAlerta, setLoadingAlerta] = useState(false);
+  const [respuestaSummary, setRespuestaSummary] = useState({ confirmaron: 0, rechazaron: 0, pendientes: 0 });
+  const [loadingAlerta, setLoadingAlerta] = useState(true);
   const [responders, setResponders] = useState([]);
 
   // Animación de confirmación
@@ -123,9 +124,11 @@ export default function EmergencyScreen({ route, navigation }) {
         fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, { headers })
       ]);
 
+      let isFinalizada = false;
       if (alertaRes.ok) {
         const data = await alertaRes.json();
         setAlertaData(data);
+        isFinalizada = data.estadoAlerta?.nombre_estado === 'FINALIZADO';
       }
 
       if (respuestasRes.ok) {
@@ -134,7 +137,11 @@ export default function EmergencyScreen({ route, navigation }) {
         // Ver si YO ya respondí
         const miRespuesta = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
         
-        if (miRespuesta && miRespuesta.estado_respuesta !== 'PENDIENTE') {
+        if (isFinalizada) {
+          setRespuesta('FINALIZADA');
+          stopEmergencyAlert();
+          animateIn();
+        } else if (miRespuesta && miRespuesta.estado_respuesta !== 'PENDIENTE') {
           setRespuesta(miRespuesta.estado_respuesta);
           stopEmergencyAlert();
           animateIn();
@@ -143,6 +150,14 @@ export default function EmergencyScreen({ route, navigation }) {
           setRespuesta(null);
           startEmergencyAlert();
         }
+
+        // Resumen de respuestas
+        const counts = {
+          confirmaron: respuestas.filter(r => r.estado_respuesta === 'ACEPTADO').length,
+          rechazaron: respuestas.filter(r => r.estado_respuesta === 'RECHAZADO').length,
+          pendientes: respuestas.filter(r => !r.estado_respuesta || r.estado_respuesta === 'PENDIENTE').length
+        };
+        setRespuestaSummary(counts);
 
         // Lista de los que aceptaron
         const aceptados = respuestas
@@ -268,6 +283,32 @@ export default function EmergencyScreen({ route, navigation }) {
 
   // ── Render: pantalla de confirmación ────────────────────────────────────
   if (respuesta !== null) {
+    if (respuesta === 'FINALIZADA') {
+      return (
+        <View style={styles.container}>
+          <SafeAreaView style={styles.centeredFlex}>
+            <Animated.View
+              style={[
+                styles.confirmationCard,
+                { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+                styles.confirmationCardFinalized,
+              ]}
+            >
+              <MaterialCommunityIcons name="flag-checkered" size={72} color="#94a3b8" />
+              <Text style={styles.confirmationTitle}>Emergencia Finalizada</Text>
+              <Text style={styles.confirmationSubtitle}>
+                El administrador ya ha dado por finalizada esta alerta.
+              </Text>
+            </Animated.View>
+            <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
+              <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+              <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+        </View>
+      );
+    }
+
     const esAceptado = respuesta === 'ACEPTADO';
 
     return (
@@ -299,28 +340,54 @@ export default function EmergencyScreen({ route, navigation }) {
               <Text style={styles.confirmationTime}>{currentTime} HS</Text>
             </View>
 
+            {esAceptado && (
+              <View style={styles.respondersSummaryBox}>
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#22c55e' }]}>{respuestaSummary.confirmaron}</Text>
+                   <Text style={styles.summaryLabel}>VAN</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#94a3b8' }]}>{respuestaSummary.pendientes}</Text>
+                   <Text style={styles.summaryLabel}>PEND.</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#ef4444' }]}>{respuestaSummary.rechazaron}</Text>
+                   <Text style={styles.summaryLabel}>NO</Text>
+                </View>
+              </View>
+            )}
+
             {esAceptado && responders.length > 0 && (
               <View style={styles.respondersSmallList}>
-                <Text style={styles.respondersSmallTitle}>OTROS EFECTIVOS EN CAMINO:</Text>
-                {responders.slice(0, 3).map((r, idx) => (
-                  <Text key={idx} style={styles.responderRowMini}>
-                    • {r.nombre} {r.apellido} ({r.hora})
-                  </Text>
-                ))}
-                {responders.length > 3 && (
-                  <Text style={styles.responderMoreText}>+ {responders.length - 3} más...</Text>
-                )}
+                <Text style={styles.respondersSmallTitle}>EFECTIVOS EN CAMINO:</Text>
+                <View style={styles.miniRespondersScroll}>
+                  {responders.slice(0, 5).map((r, idx) => (
+                    <View key={idx} style={styles.miniResponderItem}>
+                       <MaterialCommunityIcons name="account-check" size={12} color="#22c55e" />
+                       <Text style={styles.responderRowMini}>
+                         {r.nombre} {r.apellido} ({r.hora})
+                       </Text>
+                    </View>
+                  ))}
+                  {responders.length > 5 && (
+                    <Text style={styles.responderMoreText}>+ {responders.length - 5} más...</Text>
+                  )}
+                </View>
               </View>
             )}
           </Animated.View>
 
           {/* Botón cambiar respuesta */}
-          <TouchableOpacity style={styles.changeButton} onPress={cambiarRespuesta}>
-            <MaterialCommunityIcons name="refresh" size={16} color="#90a4ae" />
-            <Text style={styles.changeButtonText}>Cambiar mi respuesta</Text>
-          </TouchableOpacity>
+          {respuesta !== 'FINALIZADA' && !alertaData?.estadoAlerta?.nombre_estado?.includes('FINALIZADO') && (
+            <TouchableOpacity style={styles.changeButton} onPress={cambiarRespuesta}>
+              <MaterialCommunityIcons name="refresh" size={16} color="#90a4ae" />
+              <Text style={styles.changeButtonText}>Cambiar mi respuesta</Text>
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate('MainApp')}>
+          <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
             <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
             <Text style={styles.changeButtonText}>Volver al panel principal</Text>
           </TouchableOpacity>
@@ -339,7 +406,7 @@ export default function EmergencyScreen({ route, navigation }) {
           {/* HEADER */}
           <View style={styles.header}>
             <View style={styles.headerTopRow}>
-              <TouchableOpacity onPress={() => navigation.navigate('MainApp')} style={{ marginRight: 12, padding: 4 }}>
+              <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ marginRight: 12, padding: 4 }}>
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
               </TouchableOpacity>
               <Text style={styles.time}>{currentTime}</Text>
@@ -609,6 +676,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.1)',
     borderColor: 'rgba(239,68,68,0.3)',
   },
+  confirmationCardFinalized: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
   confirmationTitle: {
     color: '#fff',
     fontSize: 22,
@@ -704,14 +775,58 @@ const styles = StyleSheet.create({
   responderRowMini: {
     color: '#cfd8dc',
     fontSize: 11,
-    marginBottom: 4,
-    textAlign: 'center',
+    flex: 1,
   },
   responderMoreText: {
-    color: '#90a4ae',
-    fontSize: 9,
+    color: '#3b82f6',
+    fontSize: 11,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginTop: 4,
-    fontStyle: 'italic',
-  }
+  },
+  // Resumen de respuestas en confirmación
+  respondersSummaryBox: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 16,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  summaryNum: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  summaryLabel: {
+    fontSize: 9,
+    color: '#90a4ae',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  miniRespondersScroll: {
+    width: '100%',
+    marginTop: 8,
+    gap: 4,
+  },
+  miniResponderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
 });

@@ -9,8 +9,9 @@ import {
   ScrollView,
   Platform,
   Image,
-  Dimensions,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal,
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -61,8 +62,13 @@ export default function AlertDetailScreen({ route, navigation }) {
 
   const [alerta, setAlerta] = useState(null);
   const [responders, setResponders] = useState([]);
+  const [logistics, setLogistics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timerText, setTimerText] = useState('00:00:00');
+  
+  // Modal Solicitar Recursos
+  const [modalVisible, setModalVisible] = useState(false);
+  const [requesting, setRequesting] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     if (!alertaId) {
@@ -101,12 +107,57 @@ export default function AlertDetailScreen({ route, navigation }) {
           }));
         setResponders(aceptados);
       }
+
+      // Fetch Logistics (registros_comunicacion)
+      const logisticsRes = await fetch(`${API_BASE_URL}/registros_comunicacion/alerta/${alertaId}`, { headers });
+      if (logisticsRes.ok) {
+        setLogistics(await logisticsRes.json());
+      }
     } catch (err) {
       console.log('Error fetching alert details', err);
     } finally {
       setLoading(false);
     }
   }, [alertaId, token]);
+
+  const requestResource = async (resourceName, type = 'SUMINISTROS') => {
+    Alert.alert(
+      "Confirmar Pedido",
+      `¿Solicitar ${resourceName} para esta emergencia?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Confirmar", 
+          onPress: async () => {
+            setRequesting(true);
+            try {
+              const res = await fetch(`${API_BASE_URL}/registros_comunicacion/crear`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  alerta_id: alertaId,
+                  usuario_id: user?.id,
+                  mensaje: `[${resourceName}] Solicitado para la emergencia.`,
+                  tipo_comunicacion: type,
+                  fecha_hora: new Date().toISOString()
+                })
+              });
+              if (!res.ok) throw new Error("Error al solicitar recurso");
+              setModalVisible(false);
+              fetchDetail();
+            } catch (err) {
+              Alert.alert("Error", err.message);
+            } finally {
+              setRequesting(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -225,27 +276,44 @@ export default function AlertDetailScreen({ route, navigation }) {
             <Text style={styles.sectionTitle}>LOGÍSTICA Y SUMINISTROS</Text>
           </View>
 
-          <View style={styles.logisticsItem}>
-            <View style={[styles.logisticsIcon, { backgroundColor: '#1e3a8a' }]}>
-              <MaterialCommunityIcons name="water" size={18} color="#60a5fa" />
-            </View>
-            <View>
-              <Text style={styles.logisticsTitle}>Abastecimiento Hídrico</Text>
-              <Text style={styles.logisticsSubtitle}>Móvil 08 - En ruta</Text>
-            </View>
-          </View>
+          {logistics.map((item) => {
+            const isWater = item.mensaje.includes('Hídrico') || item.mensaje.includes('CISTERNA');
+            const isPersonnel = item.mensaje.includes('Personal') || item.mensaje.includes('BOMBEROS');
+            const isFuel = item.mensaje.includes('COMBUSTIBLE');
+            const isAmbulance = item.mensaje.includes('AMBULANCIA');
 
-          <View style={styles.logisticsItem}>
-            <View style={[styles.logisticsIcon, { backgroundColor: '#451a1a' }]}>
-              <MaterialCommunityIcons name="account-group" size={18} color="#fca5a5" />
-            </View>
-            <View>
-              <Text style={styles.logisticsTitle}>Refuerzo de Personal</Text>
-              <Text style={styles.logisticsSubtitle}>Dotación B - Solicitado</Text>
-            </View>
-          </View>
+            let icon = 'archive';
+            let color = '#334155';
+            let bgColor = 'rgba(51, 65, 85, 0.2)';
 
-          <TouchableOpacity style={styles.requestButton}>
+            if (isWater) { icon = 'water'; color = '#60a5fa'; bgColor = '#1e3a8a'; }
+            if (isPersonnel) { icon = 'account-group'; color = '#fca5a5'; bgColor = '#451a1a'; }
+            if (isFuel) { icon = 'gas-station'; color = '#fcd34d'; bgColor = '#78350f'; }
+            if (isAmbulance) { icon = 'ambulance'; color = '#f87171'; bgColor = '#7f1d1d'; }
+
+            return (
+              <View key={item.id} style={styles.logisticsItem}>
+                <View style={[styles.logisticsIcon, { backgroundColor: bgColor }]}>
+                  <MaterialCommunityIcons name={icon} size={18} color={color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.logisticsTitle}>{item.mensaje.replace(/[\[\]]/g, '')}</Text>
+                  <Text style={styles.logisticsSubtitle}>
+                    {item.tipo_comunicacion} • {new Date(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
+                  </Text>
+                </View>
+                <View style={styles.logisticsStatus}>
+                  <Text style={styles.statusMiniText}>PEDIDO</Text>
+                </View>
+              </View>
+            );
+          })}
+
+          {logistics.length === 0 && (
+             <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>No hay suministros solicitados para esta emergencia.</Text>
+          )}
+
+          <TouchableOpacity style={styles.requestButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.requestButtonText}>+ SOLICITAR RECURSOS</Text>
           </TouchableOpacity>
         </View>
@@ -339,6 +407,54 @@ export default function AlertDetailScreen({ route, navigation }) {
           <Text style={styles.navLabel}>MAP</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Modal Solicitar Recursos */}
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>SOLICITAR RECURSOS</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSub}>Selecciona el recurso que necesitas en el lugar de la emergencia.</Text>
+
+            <View style={styles.resourceGrid}>
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('ABASTECIMIENTO HÍDRICO', 'SUMINISTROS')}>
+                <View style={[styles.resIcon, { backgroundColor: '#1e3a8a' }]}>
+                  <MaterialCommunityIcons name="water" size={24} color="#60a5fa" />
+                </View>
+                <Text style={styles.resName}>AGUA / CISTERNA</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('REFUERZO DE PERSONAL', 'APOYO')}>
+                <View style={[styles.resIcon, { backgroundColor: '#451a1a' }]}>
+                  <MaterialCommunityIcons name="account-plus" size={24} color="#fca5a5" />
+                </View>
+                <Text style={styles.resName}>BOMBEROS</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('COMBUSTIBLE', 'SUMINISTROS')}>
+                <View style={[styles.resIcon, { backgroundColor: '#78350f' }]}>
+                  <MaterialCommunityIcons name="gas-station" size={24} color="#fcd34d" />
+                </View>
+                <Text style={styles.resName}>COMBUSTIBLE</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('AMBULANCIA / SEM', 'APOYO')}>
+                <View style={[styles.resIcon, { backgroundColor: '#7f1d1d' }]}>
+                  <MaterialCommunityIcons name="ambulance" size={24} color="#f87171" />
+                </View>
+                <Text style={styles.resName}>AMBULANCIA</Text>
+              </TouchableOpacity>
+            </View>
+
+            {requesting && <ActivityIndicator color="#e11d48" style={{ marginTop: 20 }} />}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -679,5 +795,79 @@ const styles = StyleSheet.create({
     color: '#e11d48',
     fontSize: 10,
     fontWeight: '800',
-  }
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#1b1d24',
+    borderRadius: 12,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    color: '#f8fafc',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  modalSub: {
+    color: '#94a3b8',
+    fontSize: 13,
+    marginBottom: 24,
+    lineHeight: 18,
+  },
+  resourceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  resourceCard: {
+    width: '48%',
+    backgroundColor: '#13141a',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  resIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resName: {
+    color: '#f8fafc',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  logisticsStatus: {
+    backgroundColor: '#064e3b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusMiniText: {
+    color: '#10b981',
+    fontSize: 8,
+    fontWeight: '900',
+  },
 });
