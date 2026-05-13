@@ -50,8 +50,7 @@ async function playSiren() {
 
 function AppContent() {
   const { isLoading, user, token } = useAuth();
-  const useLastNotificationResponse = Notifications.useLastNotificationResponse || (() => null);
-  const lastNotificationResponse = useLastNotificationResponse();
+  const lastNotificationResponse = Platform.OS === 'web' ? null : Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     if (user && token) {
