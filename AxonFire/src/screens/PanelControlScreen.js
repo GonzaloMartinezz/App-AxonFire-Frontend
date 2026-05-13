@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -97,6 +98,35 @@ export default function PanelControlScreen({ navigation }) {
     }
   }
 
+  async function limpiarBaseDeDatos() {
+    Alert.alert(
+      "BORRÓN PARA TEST",
+      "¿Deseas eliminar todo el historial de pruebas para iniciar un test limpio? Esta acción borrará todas las alertas y registros de comunicación.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "BORRAR TODO", 
+          style: "destructive",
+          onPress: async () => {
+            setCargando(true);
+            try {
+              await axios.delete(`${API_BASE_URL}/alerta/limpiar`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              Alert.alert("Éxito", "La base de datos ha sido limpiada.");
+              cargarDatos();
+            } catch (err) {
+              console.error('Error limpiando base de datos:', err);
+              Alert.alert("Error", "No se pudo limpiar la base de datos.");
+            } finally {
+              setCargando(false);
+            }
+          }
+        }
+      ]
+    );
+  }
+
   useEffect(() => {
     cargarDatos();
   }, []);
@@ -105,10 +135,13 @@ export default function PanelControlScreen({ navigation }) {
 
   // Clasificamos cada alerta para poder contarlas
   const clasificadas = alertas.map((a) => ({
+    id: a.id,
     estado: clasificarEstado(a.estadoAlerta?.nombre_estado || a.estado || ''),
     prioridad: clasificarPrioridad(a.prioridad || a.subCategoriaAlerta?.prioridad || ''),
     tipo: a.subCategoriaAlerta?.nombre_sub_categoria || a.tipo || 'Sin tipo',
     fecha: a.fecha_hora,
+    ubicacion: a.ubicacion || 'Sin ubicación',
+    observaciones: a.observaciones || '',
   }));
 
   const totalAlertas = clasificadas.length;
@@ -275,23 +308,35 @@ export default function PanelControlScreen({ navigation }) {
             </TacticalCard>
 
             {/* ── Últimas alertas ──────────────────────────────────────── */}
-            <Text style={styles.tituloSeccion}>ACTIVIDAD RECIENTE</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.lg, marginBottom: Spacing.md }}>
+              <Text style={[styles.tituloSeccion, { marginTop: 0, marginBottom: 0 }]}>ACTIVIDAD RECIENTE</Text>
+              <TouchableOpacity onPress={limpiarBaseDeDatos} style={styles.botonTest}>
+                <MaterialCommunityIcons name="delete-sweep" size={14} color="#fff" />
+                <Text style={{ fontSize: 9, color: '#fff', fontWeight: '900', letterSpacing: 0.5 }}>BORRÓN PARA TEST</Text>
+              </TouchableOpacity>
+            </View>
             {ultimasAlertas.length === 0 ? (
               <Text style={styles.textoVacio}>Sin actividad registrada</Text>
             ) : (
               ultimasAlertas.map((a, idx) => (
-                <TacticalCard key={idx}>
-                  <View style={styles.filaActividad}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
-                        <StatusBadge severity={a.prioridad} />
-                        <StatusBadge severity={a.estado} />
+                <TouchableOpacity key={a.id || idx} onPress={() => navigation.navigate('AlertDetail', { alerta_id: a.id })}>
+                  <TacticalCard>
+                    <View style={styles.filaActividad}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8, alignItems: 'center' }}>
+                           <View style={[styles.miniPunto, { backgroundColor: a.prioridad === 'critica' ? '#af101a' : '#f97316' }]} />
+                           <Text style={styles.tipoActividad}>{a.tipo}</Text>
+                        </View>
+                        <Text style={styles.ubicacionActividad} numberOfLines={1}>{a.ubicacion}</Text>
+                        <Text style={styles.obsActividad} numberOfLines={1}>{a.observaciones}</Text>
                       </View>
-                      <Text style={styles.textoActividad} numberOfLines={1}>{a.tipo}</Text>
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <StatusBadge severity={a.estado} />
+                        <Text style={styles.tiempoActividad}>{tiempoTranscurrido(a.fecha)}</Text>
+                      </View>
                     </View>
-                    <Text style={styles.tiempoActividad}>{tiempoTranscurrido(a.fecha)}</Text>
-                  </View>
-                </TacticalCard>
+                  </TacticalCard>
+                </TouchableOpacity>
               ))
             )}
           </>
@@ -362,10 +407,22 @@ const styles = StyleSheet.create({
   },
   separador: { width: 1, height: 36, backgroundColor: Colors.surfaceContainerLow },
 
-  filaActividad: { flexDirection: 'row', alignItems: 'center' },
-  textoActividad: { fontSize: 13, fontWeight: '700', color: Colors.onSurface },
-  tiempoActividad: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
+  filaActividad: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  tipoActividad: { fontSize: 14, fontWeight: '800', color: Colors.onSurface, textTransform: 'uppercase' },
+  ubicacionActividad: { fontSize: 12, fontWeight: '600', color: '#64748b', marginBottom: 2 },
+  obsActividad: { fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
+  miniPunto: { width: 6, height: 6, borderRadius: 3 },
+  tiempoActividad: { fontSize: 10, color: '#94a3b8', fontWeight: '800', textTransform: 'uppercase' },
   textoVacio: { fontSize: 13, color: '#94a3b8', fontWeight: '600', textAlign: 'center', paddingVertical: 20 },
+  botonTest: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
 
   // Barras de progreso
   barItem: { width: '100%' },

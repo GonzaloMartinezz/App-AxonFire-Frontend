@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   Image,
+  Dimensions,
   ActivityIndicator,
   Modal,
   Alert
@@ -58,7 +59,7 @@ const PERSONNEL = [
 export default function AlertDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const alertaId = route?.params?.alerta_id ?? null;
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   const [alerta, setAlerta] = useState(null);
   const [responders, setResponders] = useState([]);
@@ -299,7 +300,7 @@ export default function AlertDetailScreen({ route, navigation }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.logisticsTitle}>{item.mensaje.replace(/[\[\]]/g, '')}</Text>
                   <Text style={styles.logisticsSubtitle}>
-                    {item.tipo_comunicacion} • {new Date(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
+                    {item.usuarioId?.bombero ? `${item.usuarioId.bombero.nombre} ${item.usuarioId.bombero.apellido}` : 'Sistema'} • {new Date(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
                   </Text>
                 </View>
                 <View style={styles.logisticsStatus}>
@@ -371,42 +372,6 @@ export default function AlertDetailScreen({ route, navigation }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.fakeBottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation?.navigate('PersonnelStatus')}
-        >
-          <MaterialCommunityIcons name="view-grid" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>STATUS</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation?.navigate('PersonnelStatus')}
-        >
-          <MaterialCommunityIcons name="account-group" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>UNITS</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sosContainer}
-          onPress={() => navigation?.navigate('NewAlert')}
-        >
-           <MaterialCommunityIcons name="asterisk" size={28} color="#e11d48" />
-           <Text style={styles.sosLabel}>SOS</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MaterialCommunityIcons name="archive" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>LOGISTICS</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation?.navigate('Mapa')}
-        >
-          <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>MAP</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Modal Solicitar Recursos */}
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
@@ -755,46 +720,6 @@ const styles = StyleSheet.create({
   personRoleText: {
     color: '#94a3b8',
     fontSize: 13,
-  },
-  fakeBottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
-    backgroundColor: '#1b1d24',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#26282f',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  navLabel: {
-    color: '#64748b',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  sosContainer: {
-    backgroundColor: '#2d333b',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    gap: 2,
-    flex: 1.2,
-  },
-  sosLabel: {
-    color: '#e11d48',
-    fontSize: 10,
-    fontWeight: '800',
   },
   // Modal Styles
   modalOverlay: {

@@ -97,7 +97,11 @@ export default function App() {
     registerForPushNotifications();
 
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      playSiren();
+      // Solo reproducir sirena si NO es una notificación silenciosa
+      const isSilent = notification.request.content.data?.silent;
+      if (!isSilent) {
+        playSiren();
+      }
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
