@@ -5,17 +5,22 @@ import { Platform, View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { API_BASE_URL } from './src/config/api';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 
-import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+export const navigationRef = createNavigationContainerRef();
+
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 const sirenSound = require('./assets/siren.wav');
 
@@ -47,12 +52,25 @@ async function playSiren() {
 
 function AppContent() {
   const { isLoading, user, token } = useAuth();
+  const lastNotificationResponse = Platform.OS === 'web' ? null : Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     if (user && token) {
       registrarTokenPush(user, token);
     }
   }, [user, token]);
+
+  useEffect(() => {
+    if (
+      lastNotificationResponse &&
+      lastNotificationResponse.notification?.request?.content?.data?.alertaId &&
+      navigationRef.isReady()
+    ) {
+      navigationRef.navigate('Emergency', {
+        alerta_id: lastNotificationResponse.notification.request.content.data.alertaId,
+      });
+    }
+  }, [lastNotificationResponse]);
 
   if (isLoading) {
     return (
@@ -62,7 +80,11 @@ function AppContent() {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <NavigationContainer ref={navigationRef}>
+      <AppNavigator />
+    </NavigationContainer>
+  );
 }
 
 export default function App() {
@@ -70,13 +92,24 @@ export default function App() {
   const responseListener = useRef();
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
+
     registerForPushNotifications();
 
-    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
-      playSiren();
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+      // Solo reproducir sirena si NO es una notificación silenciosa
+      const isSilent = notification.request.content.data?.silent;
+      if (!isSilent) {
+        playSiren();
+      }
     });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {});
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const { alertaId } = response.notification.request.content.data;
+      if (alertaId && navigationRef.isReady()) {
+        navigationRef.navigate('Emergency', { alerta_id: alertaId });
+      }
+    });
 
     return () => {
       if (notificationListener.current) {
@@ -103,12 +136,13 @@ async function registerForPushNotifications() {
       name: 'Emergencias',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 1000, 500, 1000],
-      sound: 'default',
+      sound: 'siren.mp3',
     });
   }
 }
 
 async function registrarTokenPush(user, authToken) {
+  if (Platform.OS === 'web') return;
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;

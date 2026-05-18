@@ -57,10 +57,8 @@ export default function LoginScreen({ navigation }) {
       await login({ id: data.id, rol: data.rol }, data.token);
 
       if (data.rol === 'ADMIN') {
-        navigation.replace('AdminApp');
         Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');
       } else {
-        navigation.replace('MainApp');
         Alert.alert('Acceso Autorizado', 'Bienvenido a la red táctica Axon Fire');
       }
     } catch (error) {
@@ -69,6 +67,7 @@ export default function LoginScreen({ navigation }) {
       setIsLoading(false);
     }
   };
+
 
   return (
     <View style={styles.container}>

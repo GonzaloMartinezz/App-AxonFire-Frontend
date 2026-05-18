@@ -1,77 +1,421 @@
-import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, SafeAreaView} from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  Animated,
+  ScrollView,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { Vibration } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
-export default function EmergencyScreen() {
-  const currentTime = new Date().toLocaleTimeString('es-ES', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+export default function EmergencyScreen({ route, navigation }) {
+  // Obtener alerta_id desde los parámetros de navegación (fallback para dev)
+  const navAlertaId = route?.params?.alerta_id ?? null;
 
-// sonido aca vvv
+  const { user, token } = useAuth();
+  const usuarioId = user?.id ?? null;
+
+  const [resolvedAlertaId, setResolvedAlertaId] = useState(navAlertaId);
+
+  // Estado de respuesta: null | 'ACEPTADO' | 'RECHAZADO'
+  const [respuesta, setRespuesta] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Datos de la alerta cargados desde el backend
+  const [alertaData, setAlertaData] = useState(null);
+  const [respuestaSummary, setRespuestaSummary] = useState({ confirmaron: 0, rechazaron: 0, pendientes: 0 });
+  const [loadingAlerta, setLoadingAlerta] = useState(true);
+  const [responders, setResponders] = useState([]);
+
+  // Animación de confirmación
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+
+  // ── Sonido y vibración ───────────────────────────────────────────────────
   const soundRef = useRef(null);
-const vibrationRef = useRef(null);
+  const vibrationRef = useRef(null);
 
-const startEmergencyAlert = async () => {
-  await Audio.setAudioModeAsync({playsInSilentModeIOS: true, staysActiveInBackground: true,}); //<<<<
+  const startEmergencyAlert = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
 
-  const { sound } = await Audio.Sound.createAsync(
-    require('../../assets/siren.mp3'), // <<archivo de sonido
-    { isLooping: true, volume: 1.0 }
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/siren.wav'),
+        { isLooping: true, volume: 1.0 }
+      );
+
+      soundRef.current = sound;
+      await sound.playAsync();
+
+      vibrationRef.current = setInterval(() => {
+        Vibration.vibrate(1000);
+      }, 1500);
+    } catch (e) {
+      console.log('Error playing sound:', e);
+    }
+  };
+
+  const stopEmergencyAlert = async () => {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    if (vibrationRef.current) {
+      clearInterval(vibrationRef.current);
+      vibrationRef.current = null;
+    }
+    Vibration.cancel();
+  };
+
+  // ── Cargar detalles de la alerta y respuestas ───────────────────────────
+  const fetchEmergencyData = useCallback(async () => {
+    let activeAlertaId = navAlertaId;
+
+    setLoadingAlerta(true);
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // 1. Si no hay alertaId, buscar la más reciente activa
+      if (!activeAlertaId) {
+        const resAlertas = await fetch(`${API_BASE_URL}/alerta/rango`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            fecha_hasta: new Date().toISOString()
+          })
+        });
+        if (resAlertas.ok) {
+          const data = await resAlertas.json();
+          const alertas = data.alertas || [];
+          if (alertas.length > 0) {
+            const ultima = alertas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+            activeAlertaId = ultima.id;
+          }
+        }
+      }
+
+      if (!activeAlertaId) {
+        setLoadingAlerta(false);
+        setError("No hay emergencias activas en este momento.");
+        stopEmergencyAlert();
+        return;
+      }
+      
+      setResolvedAlertaId(activeAlertaId);
+
+      // 2. Cargar alerta y respuestas en paralelo
+      const [alertaRes, respuestasRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/alerta/${activeAlertaId}`, { headers }),
+        fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, { headers })
+      ]);
+
+      let isFinalizada = false;
+      if (alertaRes.ok) {
+        const data = await alertaRes.json();
+        setAlertaData(data);
+        isFinalizada = data.estadoAlerta?.nombre_estado === 'FINALIZADO';
+      }
+
+      if (respuestasRes.ok) {
+        const respuestas = await respuestasRes.json();
+        
+        // Ver si YO ya respondí
+        const miRespuesta = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
+        
+        if (isFinalizada) {
+          setRespuesta('FINALIZADA');
+          stopEmergencyAlert();
+          animateIn();
+        } else if (miRespuesta && miRespuesta.estado_respuesta !== 'PENDIENTE') {
+          setRespuesta(miRespuesta.estado_respuesta);
+          stopEmergencyAlert();
+          animateIn();
+        } else {
+          // Si no hemos respondido o es PENDIENTE, reseteamos para que aparezcan los botones
+          setRespuesta(null);
+          startEmergencyAlert();
+        }
+
+        // Resumen de respuestas
+        const counts = {
+          confirmaron: respuestas.filter(r => r.estado_respuesta === 'ACEPTADO').length,
+          rechazaron: respuestas.filter(r => r.estado_respuesta === 'RECHAZADO').length,
+          pendientes: respuestas.filter(r => !r.estado_respuesta || r.estado_respuesta === 'PENDIENTE').length
+        };
+        setRespuestaSummary(counts);
+
+        // Lista de los que aceptaron
+        const aceptados = respuestas
+          .filter(r => r.estado_respuesta === 'ACEPTADO')
+          .map(r => ({
+            id: r.id,
+            nombre: r.usuarioId?.bombero?.nombre || 'Bombero',
+            apellido: r.usuarioId?.bombero?.apellido || '',
+            hora: new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }));
+        setResponders(aceptados);
+      }
+    } catch (err) {
+      console.error('Error al cargar datos de emergencia:', err);
+      setError("Ocurrió un error al cargar la alerta.");
+    } finally {
+      setLoadingAlerta(false);
+    }
+  }, [navAlertaId, token, usuarioId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEmergencyData();
+      return () => stopEmergencyAlert();
+    }, [fetchEmergencyData])
   );
 
-  soundRef.current = sound;
-  await sound.playAsync();
-
-  // vibración constante
-  vibrationRef.current = setInterval(() => {
-    Vibration.vibrate(1000);
-  }, 1500);
-};
-
-const stopEmergencyAlert = async () => {
-  if (soundRef.current) {
-    await soundRef.current.stopAsync();
-    await soundRef.current.unloadAsync();
-    soundRef.current = null;
-  }
-
-  if (vibrationRef.current) {
-    clearInterval(vibrationRef.current);
-    vibrationRef.current = null;
-  }
-
-  Vibration.cancel();
-};
-
-useEffect(() => {
-  startEmergencyAlert();
-
-  return () => {
-    stopEmergencyAlert(); // limpieza al salir
+  // ── Animación al confirmar/rechazar ─────────────────────────────────────
+  const animateIn = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 5,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
-}, []);
 
-  // sonido aca^^^
+  const animateOut = (callback) => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(callback);
+    scaleAnim.setValue(0.8);
+  };
 
-  const currentDate = new Date().toLocaleDateString('es-ES', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long'
-  }).toUpperCase();
+  // ── Llamada al API ───────────────────────────────────────────────────────
+  const enviarRespuesta = async (estadoRespuesta) => {
+    if (!resolvedAlertaId || !usuarioId) {
+      // Sin IDs reales simplemente actualizamos el estado local (modo demo)
+      await stopEmergencyAlert();
+      setRespuesta(estadoRespuesta);
+      animateIn();
+      return;
+    }
 
+    setLoading(true);
+    setError(null);
+
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(
+        `${API_BASE_URL}/respuestas_alertas/responder/${resolvedAlertaId}/${usuarioId}`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            estado_respuesta: estadoRespuesta,
+            fecha_hora: new Date().toISOString(),
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${res.status}`);
+      }
+
+      await stopEmergencyAlert();
+      setRespuesta(estadoRespuesta);
+      animateIn();
+      // Actualizar la lista de asistentes después de responder
+      fetchEmergencyData();
+    } catch (err) {
+      console.error('Error al enviar respuesta:', err);
+      setError('No se pudo registrar la respuesta. Intenta nuevamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Cambiar respuesta ────────────────────────────────────────────────────
+  const cambiarRespuesta = () => {
+    animateOut(() => {
+      setRespuesta(null);
+      setError(null);
+      // Opcionalmente reiniciar el sonido si el usuario vuelve a la pantalla de alerta
+      startEmergencyAlert();
+    });
+  };
+
+  // ── Fecha / hora ─────────────────────────────────────────────────────────
+  const currentTime = new Date().toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const currentDate = new Date()
+    .toLocaleDateString('es-ES', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    })
+    .toUpperCase();
+
+  // ── Render: pantalla de confirmación ────────────────────────────────────
+  if (respuesta !== null) {
+    if (respuesta === 'FINALIZADA') {
+      return (
+        <View style={styles.container}>
+          <SafeAreaView style={styles.centeredFlex}>
+            <Animated.View
+              style={[
+                styles.confirmationCard,
+                { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+                styles.confirmationCardFinalized,
+              ]}
+            >
+              <MaterialCommunityIcons name="flag-checkered" size={72} color="#94a3b8" />
+              <Text style={styles.confirmationTitle}>Emergencia Finalizada</Text>
+              <Text style={styles.confirmationSubtitle}>
+                El administrador ya ha dado por finalizada esta alerta.
+              </Text>
+            </Animated.View>
+            <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
+              <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+              <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+        </View>
+      );
+    }
+
+    const esAceptado = respuesta === 'ACEPTADO';
+
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.centeredFlex}>
+          <Animated.View
+            style={[
+              styles.confirmationCard,
+              { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+              esAceptado ? styles.confirmationCardAccepted : styles.confirmationCardRejected,
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={esAceptado ? 'check-circle' : 'close-circle'}
+              size={72}
+              color={esAceptado ? '#22c55e' : '#ef4444'}
+            />
+            <Text style={styles.confirmationTitle}>
+              {esAceptado ? 'Asistencia Registrada' : 'Rechazo Registrado'}
+            </Text>
+            <Text style={styles.confirmationSubtitle}>
+              {esAceptado
+                ? 'Tu respuesta ha sido enviada. ¡Prepárate!'
+                : 'Tu negativa ha sido registrada correctamente.'}
+            </Text>
+
+            <View style={styles.confirmationBadge}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#90a4ae" />
+              <Text style={styles.confirmationTime}>{currentTime} HS</Text>
+            </View>
+
+            {esAceptado && (
+              <View style={styles.respondersSummaryBox}>
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#22c55e' }]}>{respuestaSummary.confirmaron}</Text>
+                   <Text style={styles.summaryLabel}>VAN</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#94a3b8' }]}>{respuestaSummary.pendientes}</Text>
+                   <Text style={styles.summaryLabel}>PEND.</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#ef4444' }]}>{respuestaSummary.rechazaron}</Text>
+                   <Text style={styles.summaryLabel}>NO</Text>
+                </View>
+              </View>
+            )}
+
+            {esAceptado && responders.length > 0 && (
+              <View style={styles.respondersSmallList}>
+                <Text style={styles.respondersSmallTitle}>EFECTIVOS EN CAMINO:</Text>
+                <View style={styles.miniRespondersScroll}>
+                  {responders.slice(0, 5).map((r, idx) => (
+                    <View key={idx} style={styles.miniResponderItem}>
+                       <MaterialCommunityIcons name="account-check" size={12} color="#22c55e" />
+                       <Text style={styles.responderRowMini}>
+                         {r.nombre} {r.apellido} ({r.hora})
+                       </Text>
+                    </View>
+                  ))}
+                  {responders.length > 5 && (
+                    <Text style={styles.responderMoreText}>+ {responders.length - 5} más...</Text>
+                  )}
+                </View>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* Botón cambiar respuesta */}
+          {respuesta !== 'FINALIZADA' && !alertaData?.estadoAlerta?.nombre_estado?.includes('FINALIZADO') && (
+            <TouchableOpacity style={styles.changeButton} onPress={cambiarRespuesta}>
+              <MaterialCommunityIcons name="refresh" size={16} color="#90a4ae" />
+              <Text style={styles.changeButtonText}>Cambiar mi respuesta</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
+            <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+            <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // ── Render: pantalla de emergencia (por defecto) ─────────────────────────
   return (
     <View style={styles.container}>
       <SafeAreaView style={{ flex: 1 }}>
-        
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={styles.time}>{currentTime}</Text>
-          <Text style={styles.date}>{currentDate}</Text>
-        </View>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          {/* HEADER */}
+          <View style={styles.header}>
+            <View style={styles.headerTopRow}>
+              <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ marginRight: 12, padding: 4 }}>
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
+              </TouchableOpacity>
+              <Text style={styles.time}>{currentTime}</Text>
+              <TouchableOpacity style={styles.refreshIcon} onPress={fetchEmergencyData}>
+                <MaterialCommunityIcons name="refresh" size={24} color="#90a4ae" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.date}>{currentDate}</Text>
+          </View>
 
         {/* ALERTA */}
         <View style={styles.alertBox}>
@@ -85,13 +429,17 @@ useEffect(() => {
         {/* DETALLES */}
         <View style={styles.card}>
           <Text style={styles.label}>TIPO DE INCIDENTE</Text>
-          <Text style={styles.text}>Incendio Estructural - Edificio</Text>
-          <Text style={styles.text}>Av. Corrientes</Text>
+          <Text style={styles.text}>{alertaData?.observaciones || 'Incendio Estructural - Edificio'}</Text>
+          <Text style={styles.text}>{alertaData?.ubicacion || 'Ubicación no disponible'}</Text>
 
           <View style={styles.row}>
             <View>
               <Text style={styles.label}>HORA</Text>
-              <Text style={styles.text}>{currentTime} HS</Text>
+              <Text style={styles.text}>
+                {alertaData?.fecha_hora
+                  ? new Date(alertaData.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+                  : currentTime} HS
+              </Text>
             </View>
             <View>
               <Text style={styles.label}>PRIORIDAD</Text>
@@ -102,20 +450,62 @@ useEffect(() => {
           <View style={styles.location}>
             <MaterialCommunityIcons name="map-marker" size={20} color="#3b82f6" />
             <Text style={styles.locationText}>
-              Av. Corrientes 1234, CABA. Múltiples focos en piso 4 y 5.
+              {alertaData?.ubicacion || 'Av. Corrientes 1234, CABA. Múltiples focos en piso 4 y 5.'}
             </Text>
           </View>
         </View>
 
+
+        {/* ERROR */}
+        {error && (
+          <View style={styles.errorBox}>
+            <MaterialCommunityIcons name="alert-circle" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {/* RESPONDERS LIST (Pre-confirmation) */}
+        {responders.length > 0 && (
+          <View style={styles.respondersPreview}>
+            <View style={styles.respondersHeader}>
+              <MaterialCommunityIcons name="account-group" size={18} color="#3b82f6" />
+              <Text style={styles.respondersTitle}>PERSONAL RESPONDIENDO ({responders.length})</Text>
+            </View>
+            <View style={styles.respondersGrid}>
+              {responders.map((r, idx) => (
+                <View key={idx} style={styles.responderChip}>
+                  <Text style={styles.responderChipText}>{r.nombre[0]}. {r.apellido}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* BOTONES */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.confirmButton} onPress={stopEmergencyAlert}>
-            <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
+          <TouchableOpacity
+            style={[styles.confirmButton, loading && styles.buttonDisabled]}
+            onPress={() => enviarRespuesta('ACEPTADO')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
+            )}
             <Text style={styles.buttonText}>CONFIRMAR ASISTENCIA</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.rejectButton} onPress={stopEmergencyAlert}>
-            <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
+          <TouchableOpacity
+            style={[styles.rejectButton, loading && styles.buttonDisabled]}
+            onPress={() => enviarRespuesta('RECHAZADO')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
+            )}
             <Text style={styles.buttonText}>RECHAZAR</Text>
           </TouchableOpacity>
         </View>
@@ -123,6 +513,7 @@ useEffect(() => {
         {/* FOOTER */}
         <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
 
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -134,9 +525,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0f12',
     padding: 20,
   },
+  centeredFlex: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     alignItems: 'center',
     marginBottom: 20,
+    width: '100%',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    position: 'relative',
+  },
+  refreshIcon: {
+    position: 'absolute',
+    right: 0,
+    padding: 10,
   },
   time: {
     fontSize: 48,
@@ -198,9 +607,26 @@ const styles = StyleSheet.create({
     color: '#cfd8dc',
     flex: 1,
   },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 13,
+    flex: 1,
+  },
   actions: {
-    marginTop: 'auto',
+    marginTop: 30,
     gap: 10,
+    paddingBottom: 20,
   },
   confirmButton: {
     backgroundColor: '#dc2626',
@@ -218,6 +644,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
@@ -227,5 +656,177 @@ const styles = StyleSheet.create({
     color: '#455a64',
     marginTop: 20,
     fontSize: 10,
+  },
+
+  // ── Pantalla de confirmación ──────────────────────────────────────────
+  confirmationCard: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 36,
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  confirmationCardAccepted: {
+    backgroundColor: 'rgba(34,197,94,0.1)',
+    borderColor: 'rgba(34,197,94,0.3)',
+  },
+  confirmationCardRejected: {
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderColor: 'rgba(239,68,68,0.3)',
+  },
+  confirmationCardFinalized: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  confirmationTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  confirmationSubtitle: {
+    color: '#90a4ae',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  confirmationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  confirmationTime: {
+    color: '#90a4ae',
+    fontSize: 12,
+  },
+  changeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(144,164,174,0.3)',
+  },
+  changeButtonText: {
+    color: '#90a4ae',
+    fontSize: 14,
+  },
+  // Responders List
+  respondersPreview: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  respondersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  respondersTitle: {
+    color: '#3b82f6',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  respondersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  responderChip: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  responderChipText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  respondersSmallList: {
+    marginTop: 20,
+    width: '100%',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  respondersSmallTitle: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '900',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  responderRowMini: {
+    color: '#cfd8dc',
+    fontSize: 11,
+    flex: 1,
+  },
+  responderMoreText: {
+    color: '#3b82f6',
+    fontSize: 11,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  // Resumen de respuestas en confirmación
+  respondersSummaryBox: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 16,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  summaryNum: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  summaryLabel: {
+    fontSize: 9,
+    color: '#90a4ae',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  miniRespondersScroll: {
+    width: '100%',
+    marginTop: 8,
+    gap: 4,
+  },
+  miniResponderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
   },
 });
