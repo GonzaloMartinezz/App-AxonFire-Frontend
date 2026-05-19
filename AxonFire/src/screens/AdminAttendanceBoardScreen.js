@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '../config/api';
 
 // ─── Classification Tabs ─────────────────────────────────────
@@ -44,8 +45,7 @@ const STATUS_CONFIG = {
 
 export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const token = user?.token ?? null;
+  const { user, token, logout } = useAuth();
 
   // Alerta ID recibido por parámetros
   const alertaId = route?.params?.alerta_id ?? null;
@@ -57,6 +57,10 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [confirmedCountAPI, setConfirmedCountAPI] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [currentAlertaId, setCurrentAlertaId] = useState(alertaId);
+  const [activeAlerta, setActiveAlerta] = useState(null);
+  const [timerText, setTimerText] = useState('00:00:00');
+  const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
   // ── Construir headers con token ──────────────────────────────
   const authHeaders = useCallback(() => {
@@ -65,62 +69,103 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     return h;
   }, [token]);
 
-  // ── Fetch de datos ───────────────────────────────────────────
+  // Fetch de datos ───────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setErrorMsg(null);
     try {
-      // 1. Obtener todos los bomberos
+      let activeAlertaId = alertaId;
+
+      // 1. Si no hay alertaId, buscamos la más reciente
+      if (!activeAlertaId) {
+        const hasta = new Date().toISOString();
+        const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const resAlertas = await fetch(`${API_BASE_URL}/alerta/rango`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta })
+        });
+        if (resAlertas.ok) {
+          const data = await resAlertas.json();
+          const alertas = data.alertas || [];
+          if (alertas.length > 0) {
+            const activas = alertas.filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
+            if (activas.length > 0) {
+              const ultima = activas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+              activeAlertaId = ultima.id;
+            } else {
+              activeAlertaId = null;
+            }
+          }
+        }
+      }
+      setCurrentAlertaId(activeAlertaId);
+
+      // 2. Obtener todos los bomberos
       const bomberosRes = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
         headers: authHeaders(),
       });
-      if (!bomberosRes.ok) throw new Error('Error al cargar bomberos');
+      if (!bomberosRes.ok) {
+        const errorData = await bomberosRes.json().catch(() => ({}));
+        throw new Error(`Error al cargar bomberos (Status: ${bomberosRes.status}). ${errorData.message || ''}`);
+      }
       const bomberosData = await bomberosRes.json();
 
-      // 2. Si hay alerta, obtener respuestas y count
+      // 3. Si tenemos una alerta activa, obtener respuestas
       let respuestasMap = {};
-      if (alertaId) {
+      if (activeAlertaId) {
         const [respuestasRes, countRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, { headers: authHeaders() }),
-          fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}/asistencias/count`, { headers: authHeaders() }),
+          fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, { headers: authHeaders() }),
+          fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}/asistencias/count`, { headers: authHeaders() }),
         ]);
 
         if (respuestasRes.ok) {
           const respuestas = await respuestasRes.json();
           respuestas.forEach((r) => {
-            respuestasMap[r.usuario_id] = r;
+            const uid = r.usuario_id || r.usuarioId?.id;
+            if (uid) respuestasMap[uid] = r;
           });
         }
         if (countRes.ok) {
           const countData = await countRes.json();
           setConfirmedCountAPI(countData.cantidad || 0);
         }
+
+        // Obtener detalle de la alerta para el timer y estado
+        const detailRes = await fetch(`${API_BASE_URL}/alerta/${activeAlertaId}`, { headers: authHeaders() });
+        if (detailRes.ok) {
+          setActiveAlerta(await detailRes.json());
+        }
+      } else {
+        setActiveAlerta(null);
       }
 
-      // 3. Mapear bomberos a la estructura de la pantalla
-      const mapped = bomberosData.map((b) => {
+      // 4. Mapear bomberos a la estructura de la pantalla
+      const mapped = (bomberosData || []).map((b) => {
+        if (!b) return null;
         const usuarioId = b.usuario_id || b.usuarioId?.id;
-        const respuesta = respuestasMap[usuarioId];
+        const respuesta = usuarioId ? respuestasMap[usuarioId] : null;
         const estadoRespuesta = respuesta?.estado_respuesta || 'ABSENT';
-        const rangoNombre = b.rangoBombero?.nombre_rol || '';
+        const rangoNombre = b.rangoBombero?.nombre_rol || b.rango || '';
 
         return {
-          id: b.id,
+          id: b.id || Math.random().toString(),
           usuario_id: usuarioId,
-          name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase(),
-          rank: rangoNombre.toUpperCase(),
-          unit: b.usuarioId?.nombre_usuario || '—',
+          name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase() || 'BOMBERO SIN NOMBRE',
+          rank: (rangoNombre || 'BOMBERO').toUpperCase(),
+          unit: b.usuario?.nombre_usuario || b.usuarioId?.nombre_usuario || '—',
           classification: classifyRank(rangoNombre),
           status: estadoRespuesta,
-          eta: respuesta
+          eta: respuesta && respuesta.fecha_hora
             ? new Date(respuesta.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
             : '—',
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(b.nombre || 'X')}&background=1b1d24&color=f8fafc&size=96`,
         };
-      });
+      }).filter(Boolean);
 
       setPersonnel(mapped);
+      setLastRefresh(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
-      console.error('Error fetchData AttendanceBoard:', err);
+      console.warn('Error fetchData AttendanceBoard:', err);
       setErrorMsg(err.message || 'Error al cargar datos');
     } finally {
       setLoading(false);
@@ -128,14 +173,75 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     }
   }, [alertaId, authHeaders]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
+
+  // ── Timer Effect ─────────────────────────────────────────────
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let interval;
+    if (activeAlerta && activeAlerta.fecha_hora && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
+      const startTime = new Date(activeAlerta.fecha_hora).getTime();
+      
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        const diff = Math.max(0, now - startTime);
+        
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        
+        setTimerText(
+          `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        );
+      };
+
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
+    } else {
+      setTimerText('00:00:00');
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [activeAlerta]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
   }, [fetchData]);
+
+  const finalizarEmergencia = async () => {
+    if (!currentAlertaId) return;
+
+    Alert.alert(
+      "Finalizar Emergencia",
+      "¿Estás seguro de que deseas finalizar esta emergencia? Ya no se podrán recibir respuestas.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Finalizar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const res = await fetch(`${API_BASE_URL}/alerta/${currentAlertaId}/finalizar`, {
+                method: 'PATCH',
+                headers: authHeaders()
+              });
+              if (!res.ok) throw new Error("Error al finalizar emergencia");
+              Alert.alert("Éxito", "La emergencia ha sido finalizada.");
+              fetchData();
+            } catch (e) {
+              Alert.alert("Error", e.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // ── Filtrado ─────────────────────────────────────────────────
   const filtered = personnel.filter((p) => {
@@ -157,7 +263,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const confirmLogout = () => {
     Alert.alert('Cerrar Sesión', '¿Estás seguro que deseas cerrar sesión?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Confirmar', onPress: () => navigation.replace('Login'), style: 'destructive' },
+      { text: 'Confirmar', onPress: () => { if(logout) { logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })) } else { navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) } }, style: 'destructive' },
     ]);
   };
 
@@ -214,15 +320,42 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           <View style={styles.titleLeftGroup}>
             <View style={styles.redAccent} />
             <View>
-              <Text style={styles.headerLabel}>ATTENDANCE BOARD</Text>
+              <Text style={styles.headerLabel}>ATTENDANCE BOARD • {lastRefresh}</Text>
               <Text style={styles.mainTitle}>TABLERO DE{'\n'}ASISTENCIA</Text>
             </View>
           </View>
-          <View style={styles.rateBox}>
-            <Text style={styles.rateLabel}>CONFIRMACIÓN</Text>
-            <Text style={styles.rateValue}>{confirmRate}%</Text>
-          </View>
+          {activeAlerta ? (
+            <View style={styles.rateBox}>
+              <Text style={styles.rateLabel}>TIEMPO TRANSCURRIDO</Text>
+              <Text style={[styles.rateValue, { color: '#ef4444' }]}>{timerText}</Text>
+            </View>
+          ) : null}
         </View>
+
+        {!activeAlerta ? (
+          <View style={[styles.alertInfoBox, { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }]}>
+            <MaterialCommunityIcons name="shield-check" size={48} color="#388e3c" style={{ marginBottom: 12 }} />
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>No hay ninguna emergencia en curso</Text>
+            <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>El personal se encuentra inactivo o en guardia.</Text>
+          </View>
+        ) : (
+          <View style={styles.alertInfoBox}>
+             <View style={styles.alertInfoTop}>
+                <Text style={styles.alertInfoTitle}>{activeAlerta.observaciones || 'INCIDENTE'}</Text>
+                <View style={[styles.statusTag, { backgroundColor: activeAlerta.estadoAlerta?.nombre_estado === 'FINALIZADO' ? '#1e293b' : '#451a1a' }]}>
+                   <Text style={styles.statusTagText}>{activeAlerta.estadoAlerta?.nombre_estado || activeAlerta.estado_alerta_id}</Text>
+                </View>
+             </View>
+             <Text style={styles.alertInfoSub}>{activeAlerta.ubicacion}</Text>
+          </View>
+        )}
+
+        {currentAlertaId && activeAlerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
+          <TouchableOpacity style={styles.finalizeBtn} onPress={finalizarEmergencia}>
+            <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
+            <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Error Banner */}
         {errorMsg && (
@@ -483,4 +616,14 @@ const styles = StyleSheet.create({
   bottomSummaryItem: { backgroundColor: '#16181d', padding: 16, borderRadius: 4, flex: 1 },
   bottomSummaryLabel: { color: '#e2e8f0', fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
   bottomSummaryValue: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  // Finalize Button
+  finalizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e11d48', paddingVertical: 14, borderRadius: 8, marginBottom: 20, gap: 8 },
+  finalizeBtnText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  // Alert Info
+  alertInfoBox: { backgroundColor: '#1b1d24', borderRadius: 8, padding: 16, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: '#dc2626' },
+  alertInfoTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  alertInfoTitle: { color: '#f8fafc', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+  alertInfoSub: { color: '#94a3b8', fontSize: 11 },
+  statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  statusTagText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 });

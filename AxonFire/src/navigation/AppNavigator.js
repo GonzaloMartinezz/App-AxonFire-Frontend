@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { NavigationContainer } from '@react-navigation/native';
+// import { NavigationContainer } from '@react-navigation/native'; // Movido a App.js
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../context/AuthContext';
  
 // Pantallas existentes
 import LoginScreen from '../screens/LoginScreen';
@@ -141,10 +142,11 @@ function AdminTabBar({ state, descriptors, navigation }) {
           }
  
           let iconName;
-          if (route.name === 'Personal') iconName = 'account-group';
-          else if (route.name === 'Equipos') iconName = 'fire-truck';
-          else if (route.name === 'Rutas') iconName = 'map';
+          if (route.name === 'Panel') iconName = 'monitor-dashboard';
+          else if (route.name === 'Mapa') iconName = 'map';
           else if (route.name === 'Alertas') iconName = 'alert';
+          else if (route.name === 'Asistencia') iconName = 'clipboard-check';
+          else if (route.name === 'Personal') iconName = 'account-group';
  
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
@@ -165,41 +167,55 @@ function AdminTabBar({ state, descriptors, navigation }) {
 function AdminTabNavigator() {
   return (
     <Tab.Navigator tabBar={props => <AdminTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Personal" component={AdminPersonnelScreen} />
-      <Tab.Screen name="Equipos" component={AdminEquipmentScreen} />
+      <Tab.Screen name="Panel" component={PanelControlScreen} />
+      <Tab.Screen name="Mapa" component={MapScreen} />
       <Tab.Screen name="SOS" component={NewAlertScreen} />
-      <Tab.Screen name="Rutas" component={AdminRoutesScreen} />
-      <Tab.Screen name="Alertas" component={AdminAlertsScreen} />
+      <Tab.Screen name="Alertas" component={AlertsScreen} />
+      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
+      <Tab.Screen name="Personal" component={AdminPersonnelScreen} />
     </Tab.Navigator>
   );
 }
  
 export default function AppNavigator() {
+  const { token, user } = useAuth();
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-        {/* Pantallas existentes */}
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="MainApp" component={MainTabNavigator} />
-        <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
-        <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
-        <Stack.Screen name="NewAlert" component={NewAlertScreen} />
-        <Stack.Screen name="Checklist" component={ChecklistScreen} />
-        <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
-        <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
-        <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
-        <Stack.Screen name="Emergency" component={EmergencyScreen} />
-        <Stack.Screen name="Reports" component={ReportsScreen} />
- 
-        {/* ── PANTALLAS NUEVAS (4 tareas del ClickUp) ──────────────────────── */}
-        <Stack.Screen name="PanelControl" component={PanelControlScreen} />
-        <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
-        <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
-        <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
-        <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!token ? (
+        // Pantallas de Auth
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+        </>
+      ) : (
+        // Pantallas de la App (Logueado)
+        <>
+          {user?.rol === 'ADMIN' && (
+            <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
+          )}
+          <Stack.Screen name="MainApp" component={MainTabNavigator} />
+          
+          {/* Pantallas comunes/modales */}
+          <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="NewAlert" component={NewAlertScreen} />
+          <Stack.Screen name="Checklist" component={ChecklistScreen} />
+          <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
+          <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
+          <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
+          <Stack.Screen name="Emergency" component={EmergencyScreen} />
+          <Stack.Screen name="Reports" component={ReportsScreen} />
+          <Stack.Screen name="Personal" component={AdminPersonnelScreen} />
+          
+          {/* Pantallas nuevas */}
+          <Stack.Screen name="PanelControl" component={PanelControlScreen} />
+          <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
+          <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
+          <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
+          <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
+        </>
+      )}
+    </Stack.Navigator>
   );
 }
  

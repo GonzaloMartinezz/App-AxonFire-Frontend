@@ -22,14 +22,14 @@ import { API_BASE_URL } from '../config/api';
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!username || !password) {
       Alert.alert('Error', 'Por favor completa todos los campos operativos.');
       return;
     }
@@ -37,34 +37,32 @@ export default function LoginScreen({ navigation }) {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          nombre_usuario: email,
+          nombre_usuario: username,
           password: password,
         }),
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || `Error ${res.status}`);
+      if (!response.ok) {
+        throw new Error(data.error || 'Error en el inicio de sesión');
       }
 
-      // Guardar sesión en contexto (id, rol, token)
-      login(data);
+      await login({ id: data.id, rol: data.rol }, data.token);
 
       if (data.rol === 'ADMIN') {
-        navigation.replace('AdminApp');
         Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');
       } else {
-        navigation.replace('MainApp');
         Alert.alert('Acceso Autorizado', 'Bienvenido a la red táctica Axon Fire');
       }
-    } catch (err) {
-      console.error('Login error:', err);
-      Alert.alert('Error de Acceso', err.message || 'Credenciales no reconocidas por el sistema.');
+    } catch (error) {
+      Alert.alert('Error de Acceso', error.message || 'Credenciales no reconocidas por el sistema.');
     } finally {
       setIsLoading(false);
     }
@@ -74,11 +72,8 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      {/* Fondo Base Oscuro */}
+
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0a0f12' }]} />
-      
-      {/* Destellos de color (Glow effects) */}
       <View style={[styles.glow, styles.redGlow]} />
       <View style={[styles.glow, styles.blueGlow]} />
 
@@ -98,22 +93,20 @@ export default function LoginScreen({ navigation }) {
                   <Text style={styles.logoFire}>FIRE</Text>
                 </Text>
               </View>
-              <Text style={styles.versionText}>TACTICAL COMMAND INTERFACE V4.0</Text>
             </View>
 
             <View style={styles.card}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>CORREO ELECTRÓNICO</Text>
+                <Text style={styles.label}>USUARIO</Text>
                 <View style={styles.inputWrapper}>
-                  <MaterialCommunityIcons name="at" size={20} color="#90a4ae" style={styles.inputIcon} />
+                  <MaterialCommunityIcons name="account-outline" size={20} color="#90a4ae" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="usuario@axonfire.com"
+                    placeholder="nombre de usuario"
                     placeholderTextColor="#455a64"
-                    keyboardType="email-address"
                     autoCapitalize="none"
-                    value={email}
-                    onChangeText={setEmail}
+                    value={username}
+                    onChangeText={setUsername}
                   />
                 </View>
               </View>
@@ -146,8 +139,8 @@ export default function LoginScreen({ navigation }) {
                 onPress={handleLogin}
                 disabled={isLoading}
               >
-                <LinearGradient 
-                  colors={['#dc2626', '#991b1b']} 
+                <LinearGradient
+                  colors={['#dc2626', '#991b1b']}
                   style={styles.buttonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -163,20 +156,10 @@ export default function LoginScreen({ navigation }) {
                 </LinearGradient>
               </TouchableOpacity>
 
-              <View style={styles.divider} />
 
-              <View style={styles.securityNote}>
-                <MaterialCommunityIcons name="shield-check" size={16} color="#455a64" />
-                <Text style={styles.securityText}>
-                  Acceso restringido a personal de emergencias autorizado. Todas las sesiones son monitoreadas bajo el protocolo de seguridad AXON-256.
-                </Text>
-              </View>
             </View>
 
-            <View style={styles.statusFooter}>
-              <Text style={styles.statusText}>STATUS: OPERATIONAL</Text>
-              <Text style={styles.statusText}>NODE: STATION-42</Text>
-            </View>
+
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -355,6 +338,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginLeft: 12,
     flex: 1,
+  },
+  footerLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 60,
+  },
+  footerLinkText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 2,
   },
   statusFooter: {
     flexDirection: 'row',
