@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   ScrollView, 
   View, 
@@ -7,11 +7,13 @@ import {
   StyleSheet, 
   SafeAreaView,
   Platform,
-  Switch
+  Switch,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DamageReportField, { isDamageReportComplete } from '../components/DamageReportField';
 
 export default function ChecklistScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -21,16 +23,35 @@ export default function ChecklistScreen({ navigation }) {
     manguera: null, // null, 'ok', 'fail'
     piton: 'ok'
   });
-
   const [corte, setCorte] = useState({
-    hidraulica: 'ok', // 'ok', 'repare', 'fail', null
+    hidraulica: 'ok',
     motosierra: 'repare',
     hacha: null
   });
+  const [epp, setEpp] = useState({ era: true, cascos: false });
 
-  const [epp, setEpp] = useState({
-    era: true,
-    cascos: false
+  // Damage report state: { [itemKey]: { justification, photoUri } }
+  const [damageReports, setDamageReports] = useState({});
+  const updateDamage = useCallback((key, field, value) => {
+    setDamageReports(prev => ({
+      ...prev,
+      [key]: { ...(prev[key] || { justification: '', photoUri: null }), [field]: value },
+    }));
+  }, []);
+  const getDamage = (key) => damageReports[key] || { justification: '', photoUri: null };
+
+  // Collect all fail items and check if their reports are complete
+  const failItems = [
+    hidrico.manguera === 'fail' ? 'hid_manguera' : null,
+    hidrico.piton === 'fail' ? 'hid_piton' : null,
+    corte.hidraulica === 'fail' ? 'cor_hidraulica' : null,
+    corte.motosierra === 'fail' ? 'cor_motosierra' : null,
+    corte.hacha === 'fail' ? 'cor_hacha' : null,
+  ].filter(Boolean);
+
+  const canSubmit = failItems.every(key => {
+    const d = getDamage(key);
+    return isDamageReportComplete(d.justification, d.photoUri);
   });
 
   return (
@@ -40,7 +61,7 @@ export default function ChecklistScreen({ navigation }) {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatarPlaceholder}>
+          <TouchableOpacity onPress={() => navigation?.navigate('MainApp')} style={styles.avatarPlaceholder}>
              <MaterialCommunityIcons name="home" size={20} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>TACTICAL VANGUARD</Text>
@@ -94,8 +115,9 @@ export default function ChecklistScreen({ navigation }) {
                </TouchableOpacity>
              </View>
           </View>
+          <DamageReportField visible={hidrico.manguera === 'fail'} justification={getDamage('hid_manguera').justification} onJustificationChange={(t) => updateDamage('hid_manguera', 'justification', t)} photoUri={getDamage('hid_manguera').photoUri} onPhotoSelected={(u) => updateDamage('hid_manguera', 'photoUri', u)} onPhotoRemoved={() => updateDamage('hid_manguera', 'photoUri', null)} theme="dark" />
 
-          <View style={[styles.cardItem, { borderLeftColor: '#22c55e' }]}>
+          <View style={[styles.cardItem, { borderLeftColor: hidrico.piton === 'fail' ? '#dc2626' : '#22c55e' }]}>
              <View style={styles.cardItemLeft}>
                <Text style={styles.itemTitle}>PITÓN DE CORTINA</Text>
                <Text style={styles.itemSubtitle}>Revisión de sellos y acople</Text>
@@ -115,6 +137,7 @@ export default function ChecklistScreen({ navigation }) {
                </TouchableOpacity>
              </View>
           </View>
+          <DamageReportField visible={hidrico.piton === 'fail'} justification={getDamage('hid_piton').justification} onJustificationChange={(t) => updateDamage('hid_piton', 'justification', t)} photoUri={getDamage('hid_piton').photoUri} onPhotoSelected={(u) => updateDamage('hid_piton', 'photoUri', u)} onPhotoRemoved={() => updateDamage('hid_piton', 'photoUri', null)} theme="dark" />
 
           {/* Section: CORTE */}
           <View style={styles.sectionHeader}>
@@ -145,6 +168,7 @@ export default function ChecklistScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
+          <DamageReportField visible={corte.hidraulica === 'fail'} justification={getDamage('cor_hidraulica').justification} onJustificationChange={(t) => updateDamage('cor_hidraulica', 'justification', t)} photoUri={getDamage('cor_hidraulica').photoUri} onPhotoSelected={(u) => updateDamage('cor_hidraulica', 'photoUri', u)} onPhotoRemoved={() => updateDamage('cor_hidraulica', 'photoUri', null)} theme="dark" />
 
           <View style={styles.largeCardItem}>
             <View style={styles.largeCardTop}>
@@ -169,6 +193,7 @@ export default function ChecklistScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
+          <DamageReportField visible={corte.motosierra === 'fail'} justification={getDamage('cor_motosierra').justification} onJustificationChange={(t) => updateDamage('cor_motosierra', 'justification', t)} photoUri={getDamage('cor_motosierra').photoUri} onPhotoSelected={(u) => updateDamage('cor_motosierra', 'photoUri', u)} onPhotoRemoved={() => updateDamage('cor_motosierra', 'photoUri', null)} theme="dark" />
 
           <View style={styles.largeCardItem}>
             <View style={styles.largeCardTop}>
@@ -193,6 +218,7 @@ export default function ChecklistScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
+          <DamageReportField visible={corte.hacha === 'fail'} justification={getDamage('cor_hacha').justification} onJustificationChange={(t) => updateDamage('cor_hacha', 'justification', t)} photoUri={getDamage('cor_hacha').photoUri} onPhotoSelected={(u) => updateDamage('cor_hacha', 'photoUri', u)} onPhotoRemoved={() => updateDamage('cor_hacha', 'photoUri', null)} theme="dark" />
 
           {/* Section: EPP */}
           <View style={styles.sectionHeader}>
@@ -240,9 +266,15 @@ export default function ChecklistScreen({ navigation }) {
             />
           </View>
 
-          <TouchableOpacity style={styles.saveButton}>
-            <Text style={styles.saveButtonText}>GUARDAR CHECKLIST</Text>
-          </TouchableOpacity>
+          {!canSubmit && failItems.length > 0 && (
+             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 }}>
+               <MaterialCommunityIcons name="alert-circle" size={14} color="#fca5a5" />
+               <Text style={{ color: '#fca5a5', fontSize: 11, fontWeight: '700' }}>Completar justificación y foto de los ítems marcados como FAIL para poder guardar.</Text>
+             </View>
+           )}
+           <TouchableOpacity style={[styles.saveButton, !canSubmit && { backgroundColor: '#334155', opacity: 0.6 }]} disabled={!canSubmit}>
+             <Text style={styles.saveButtonText}>GUARDAR CHECKLIST</Text>
+           </TouchableOpacity>
           
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -310,7 +342,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   scrollContent: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 120,
   },
   headerTitleBox: {
     marginBottom: 32,

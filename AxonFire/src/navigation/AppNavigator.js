@@ -32,6 +32,7 @@ import PanelControlScreen from '../screens/PanelControlScreen';
 import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
+import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
  
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -196,6 +197,7 @@ export default function AppNavigator() {
         <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
         <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
         <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
+        <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -60,7 +60,7 @@ export default function AlertDetailScreen({ navigation }) {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
-           <TouchableOpacity onPress={() => navigation?.navigate('Mapa')}>
+           <TouchableOpacity onPress={() => navigation?.navigate('MainApp')}>
               <MaterialCommunityIcons name="home" size={24} color="#e11d48" />
            </TouchableOpacity>
            <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
@@ -138,6 +138,13 @@ export default function AlertDetailScreen({ navigation }) {
 
           <TouchableOpacity style={styles.requestButton}>
             <Text style={styles.requestButtonText}>+ SOLICITAR RECURSOS</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.requestButton, { backgroundColor: '#1e3a8a', marginTop: 8 }]}
+            onPress={() => navigation?.navigate('Reports')}
+          >
+            <Text style={styles.requestButtonText}>📄 GENERAR INFORME LEGAL</Text>
           </TouchableOpacity>
         </View>
 

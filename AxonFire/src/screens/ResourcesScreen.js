@@ -47,7 +47,7 @@ export default function ResourcesScreen({ navigation }) {
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatar}>
+          <TouchableOpacity onPress={() => navigation?.navigate('MainApp')} style={styles.avatar}>
             <MaterialCommunityIcons name="home" size={18} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>AXON FIRE</Text>

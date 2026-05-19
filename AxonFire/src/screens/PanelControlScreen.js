@@ -9,18 +9,23 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Dimensions,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
-
-const BASE_URL = 'http://localhost:3000';
+import { BarChart, PieChart, LineChart } from 'react-native-chart-kit';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
+const screenWidth = Dimensions.get('window').width;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// Convierte el estado que viene del backend a un key que yo pueda contar
 function clasificarEstado(nombreEstado = '') {
   const e = nombreEstado.toLowerCase();
   if (e.includes('activ')) return 'activa';
@@ -48,16 +53,54 @@ function tiempoTranscurrido(fechaISO) {
   return `Hace ${Math.floor(hs / 24)} días`;
 }
 
-// ── Componente principal ─────────────────────────────────────────────────────
+// Group alerts by week for line chart
+function agruparPorSemana(clasificadas) {
+  const now = Date.now();
+  const weeks = [0, 0, 0, 0]; // 4 weeks: current, -1, -2, -3
+  clasificadas.forEach(a => {
+    if (!a.fecha) return;
+    const diff = now - new Date(a.fecha).getTime();
+    const weekIdx = Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+    if (weekIdx >= 0 && weekIdx < 4) weeks[weekIdx]++;
+  });
+  return weeks.reverse(); // oldest first
+}
 
-export default function PanelControlScreen({ navigation, route }) {
+// ── Chart configuration ──────────────────────────────────────────────────────
+
+const chartConfig = {
+  backgroundColor: Colors.surfaceContainerLowest || '#fafafa',
+  backgroundGradientFrom: Colors.surfaceContainerLowest || '#fafafa',
+  backgroundGradientTo: Colors.surface || '#fff',
+  decimalCount: 0,
+  color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(38, 50, 56, ${opacity})`,
+  style: { borderRadius: 12 },
+  propsForDots: {
+    r: '5',
+    strokeWidth: '2',
+    stroke: '#af101a',
+  },
+  propsForBackgroundLines: {
+    strokeDasharray: '',
+    stroke: '#e8eaed',
+    strokeWidth: 1,
+  },
+  barPercentage: 0.6,
+};
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const token = route?.params?.token || '';
+  const { user } = useAuth();
+  const token = user?.token || '';
 
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState(null);
+  const [exportando, setExportando] = useState(false);
 
   async function cargarDatos(esRefresh = false) {
     if (esRefresh) setRefrescando(true);
@@ -68,27 +111,17 @@ export default function PanelControlScreen({ navigation, route }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await fetch(`${BASE_URL}/alerta/rango`, {
-        method: 'GET',
+      const res = await fetch(`${API_BASE_URL}/alerta/rango`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        // El backend espera el rango en el body aunque sea GET (está documentado así)
         body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
       });
 
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
-      
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        { tipo: 'Incendio Estructural', estado: 'activa', prioridad: 'critica', fecha_hora: new Date().toISOString() },
-        { tipo: 'Rescate Vehicular', estado: 'despachada', prioridad: 'alta', fecha_hora: new Date(Date.now() - 3600000).toISOString() },
-        { tipo: 'Fuga de Gas', estado: 'resuelta', prioridad: 'media', fecha_hora: new Date(Date.now() - 86400000).toISOString() },
-        { tipo: 'Asistencia Médica', estado: 'activa', prioridad: 'alta', fecha_hora: new Date(Date.now() - 500000).toISOString() }
-      ];
-      */
 
       setAlertas(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -106,7 +139,6 @@ export default function PanelControlScreen({ navigation, route }) {
 
   // ── Cálculo de estadísticas ───────────────────────────────────────────────
 
-  // Clasificamos cada alerta para poder contarlas
   const clasificadas = alertas.map((a) => ({
     estado: clasificarEstado(a.estadoAlerta?.nombre || a.estado || ''),
     prioridad: clasificarPrioridad(a.prioridad || a.subCategoriaAlerta?.prioridad || ''),
@@ -123,12 +155,90 @@ export default function PanelControlScreen({ navigation, route }) {
   const cantMedias = clasificadas.filter(a => a.prioridad === 'media').length;
   const cantBajas = clasificadas.filter(a => a.prioridad === 'baja').length;
 
-  // Las últimas 5 alertas para mostrar el historial reciente
-  const ultimasAlertas = clasificadas
+  const ultimasAlertas = [...clasificadas]
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
     .slice(0, 5);
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+
+  const barData = {
+    labels: ['Activas', 'Despach.', 'Resueltas'],
+    datasets: [{
+      data: [cantActivas, cantDespachadas, cantResueltas],
+    }],
+  };
+
+  const pieData = [
+    { name: 'Críticas', population: cantCriticas || 0, color: '#af101a', legendFontColor: '#263238', legendFontSize: 11 },
+    { name: 'Altas', population: cantAltas || 0, color: '#f97316', legendFontColor: '#263238', legendFontSize: 11 },
+    { name: 'Medias', population: cantMedias || 0, color: '#eab308', legendFontColor: '#263238', legendFontSize: 11 },
+    { name: 'Bajas', population: cantBajas || 0, color: '#94a3b8', legendFontColor: '#263238', legendFontSize: 11 },
+  ];
+
+  // Filter out zero-population segments to avoid render issues
+  const filteredPieData = pieData.filter(d => d.population > 0);
+  // If all are 0, show a placeholder
+  const pieDataToRender = filteredPieData.length > 0 ? filteredPieData : [
+    { name: 'Sin datos', population: 1, color: '#e0e0e0', legendFontColor: '#94a3b8', legendFontSize: 11 },
+  ];
+
+  const weeklyTrend = agruparPorSemana(clasificadas);
+  const lineData = {
+    labels: ['Sem -3', 'Sem -2', 'Sem -1', 'Actual'],
+    datasets: [{
+      data: weeklyTrend.every(v => v === 0) ? [0, 0, 0, 0] : weeklyTrend,
+      color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
+      strokeWidth: 3,
+    }],
+  };
+
+  // ── Export CSV ─────────────────────────────────────────────────────────────
+
+  const exportarCSV = async () => {
+    setExportando(true);
+    try {
+      const header = 'Tipo,Estado,Prioridad,Fecha\n';
+      const rows = clasificadas.map(a => {
+        const fecha = a.fecha ? new Date(a.fecha).toLocaleDateString('es-AR') : '';
+        return `"${a.tipo}","${a.estado}","${a.prioridad}","${fecha}"`;
+      }).join('\n');
+      const csv = header + rows;
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `alertas_${Date.now()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const path = FileSystem.cacheDirectory + `alertas_${Date.now()}.csv`;
+        await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Exportar Alertas' });
+        } else {
+          Alert.alert('Archivo generado', `Guardado en: ${path}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+      if (Platform.OS === 'web') {
+        alert('No se pudo exportar los datos.');
+      } else {
+        Alert.alert('Error', 'No se pudo exportar los datos.');
+      }
+    } finally {
+      setExportando(false);
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
+
+  const chartWidth = screenWidth - (Spacing.lg * 2) - 32; // account for padding
 
   return (
     <View style={styles.container}>
@@ -140,7 +250,17 @@ export default function PanelControlScreen({ navigation, route }) {
           <MaterialCommunityIcons name="arrow-left" size={22} color="#263238" />
         </TouchableOpacity>
         <Text style={styles.tituloHeader}>Panel de Control</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={styles.exportBtn}
+          onPress={exportarCSV}
+          disabled={exportando || cargando}
+        >
+          {exportando ? (
+            <ActivityIndicator size="small" color="#af101a" />
+          ) : (
+            <MaterialCommunityIcons name="download" size={20} color="#af101a" />
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -202,6 +322,27 @@ export default function PanelControlScreen({ navigation, route }) {
               </View>
             </View>
 
+            {/* ── Bar Chart: por estado ────────────────────────────────── */}
+            <Text style={styles.tituloSeccion}>DISTRIBUCIÓN POR ESTADO</Text>
+            <TacticalCard elevated>
+              <BarChart
+                data={barData}
+                width={chartWidth}
+                height={200}
+                chartConfig={{
+                  ...chartConfig,
+                  color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
+                  fillShadowGradientFrom: '#af101a',
+                  fillShadowGradientTo: '#af101a',
+                  fillShadowGradientOpacity: 0.8,
+                }}
+                style={styles.chartStyle}
+                fromZero
+                showValuesOnTopOfBars
+                withInnerLines={false}
+              />
+            </TacticalCard>
+
             {/* ── Stats por severidad ──────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>POR SEVERIDAD</Text>
             <TacticalCard elevated>
@@ -231,6 +372,60 @@ export default function PanelControlScreen({ navigation, route }) {
                 </View>
               </View>
             </TacticalCard>
+
+            {/* ── Pie Chart: distribución por severidad ────────────────── */}
+            <TacticalCard elevated>
+              <Text style={styles.chartLabel}>DISTRIBUCIÓN DE SEVERIDAD</Text>
+              <PieChart
+                data={pieDataToRender}
+                width={chartWidth}
+                height={180}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="0"
+                absolute
+                style={styles.chartStyle}
+              />
+            </TacticalCard>
+
+            {/* ── Line Chart: tendencia semanal ────────────────────────── */}
+            <Text style={styles.tituloSeccion}>TENDENCIA SEMANAL</Text>
+            <TacticalCard elevated>
+              <Text style={styles.chartLabel}>ALERTAS POR SEMANA (ÚLTIMOS 30 DÍAS)</Text>
+              <LineChart
+                data={lineData}
+                width={chartWidth}
+                height={200}
+                chartConfig={{
+                  ...chartConfig,
+                  color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
+                }}
+                bezier
+                style={styles.chartStyle}
+                fromZero
+                withInnerLines
+                withDots
+                withShadow={false}
+              />
+            </TacticalCard>
+
+            {/* ── Export button ──────────────────────────────────────────── */}
+            <TouchableOpacity
+              style={styles.exportFullBtn}
+              onPress={exportarCSV}
+              disabled={exportando}
+              activeOpacity={0.7}
+            >
+              {exportando ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="download" size={18} color="#fff" />
+                  <Text style={styles.exportFullBtnText}>EXPORTAR DATOS (CSV)</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
             {/* ── Últimas alertas ──────────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>ACTIVIDAD RECIENTE</Text>
@@ -272,6 +467,11 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   tituloHeader: { fontSize: 17, fontWeight: '800', color: Colors.onSurface },
+  exportBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: Colors.surfaceContainerLow,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   contenido: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
 
@@ -324,4 +524,33 @@ const styles = StyleSheet.create({
   textoActividad: { fontSize: 13, fontWeight: '700', color: Colors.onSurface },
   tiempoActividad: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
   textoVacio: { fontSize: 13, color: '#94a3b8', fontWeight: '600', textAlign: 'center', paddingVertical: 20 },
+
+  // Charts
+  chartStyle: {
+    borderRadius: 12,
+    marginVertical: 4,
+  },
+  chartLabel: {
+    fontSize: 9, fontWeight: '800', letterSpacing: 1,
+    color: Colors.onSurfaceVariant, textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+
+  // Export button
+  exportFullBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#263238',
+    paddingVertical: 14,
+    borderRadius: Radius.xl,
+    marginTop: Spacing.lg,
+  },
+  exportFullBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
 });

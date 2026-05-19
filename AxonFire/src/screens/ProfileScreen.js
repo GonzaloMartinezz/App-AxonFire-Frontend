@@ -44,7 +44,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.headerBar}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation?.navigate('Mapa')}
+              onPress={() => navigation?.navigate('MainApp')}
             >
               <MaterialCommunityIcons name="home" size={24} color="#fff" />
             </TouchableOpacity>
