@@ -15,8 +15,6 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 
 const TIMELINE = [
   { label: 'LLAMADA RECIBIDA', time: '02:14', date: '12 Oct 2023', delta: null },
@@ -34,90 +32,9 @@ const INVENTORY_ITEMS = [
 
 export default function ReportsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [generatingLegal, setGeneratingLegal] = useState(false);
+  // Legal Draft generation removed
 
-  const generateLegalDraft = async () => {
-    setGeneratingLegal(true);
-    try {
-      const now = new Date();
-      const dateStr = now.toLocaleDateString('es-AR');
-      const timeStr = now.toLocaleTimeString('es-AR');
-      const timelineHtml = TIMELINE.map(t =>
-        '<div style="padding:8px 0;border-left:3px solid #af101a;padding-left:16px;margin:8px 0">' +
-        '<strong>' + t.label + '</strong> — ' + t.time +
-        (t.date ? ' (' + t.date + ')' : '') +
-        (t.delta ? ' [' + t.delta + ']' : '') + '</div>'
-      ).join('');
-      const invHtml = INVENTORY_ITEMS.map(i =>
-        '<tr><td style="padding:8px;border:1px solid #ddd">' + i.name +
-        '</td><td style="padding:8px;border:1px solid #ddd;color:' +
-        (i.ok ? '#388e3c' : '#af101a') + '">' + i.status + '</td></tr>'
-      ).join('');
-      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/>' +
-        '<style>body{font-family:Arial;padding:40px;color:#1a1a2e}' +
-        'h1{color:#af101a;border-bottom:3px solid #af101a;padding-bottom:10px}' +
-        'h2{color:#263238;margin-top:24px}' +
-        '.meta{background:#f4f4f4;padding:16px;border-radius:8px;margin:16px 0}' +
-        '.sig{display:inline-block;width:40%;border-top:1px solid #333;margin-top:60px;padding-top:8px;text-align:center}</style>' +
-        '</head><body>' +
-        '<h1>BORRADOR DE INFORME LEGAL</h1>' +
-        '<p><strong>Cuerpo de Bomberos - Axon Fire</strong></p>' +
-        '<p>Generado: ' + dateStr + ' ' + timeStr + '</p>' +
-        '<div class="meta"><p><strong>INCIDENTE:</strong> #4409-B</p>' +
-        '<p><strong>TIPO:</strong> Incendio Estructural - Sector Centro</p>' +
-        '<p><strong>UBICACION:</strong> Av. Corrientes 1500</p></div>' +
-        '<h2>CRONOLOGIA</h2>' + timelineHtml +
-        '<h2>NOTAS</h2><p>Al llegar a las 02:22, se observo humo denso. Motor 4 desplego dos lineas de 1.75 para ataque interior.</p>' +
-        '<p>Todo el personal contabilizado. Sin lesiones reportadas.</p>' +
-        '<h2>INVENTARIO</h2><table style="width:100%;border-collapse:collapse">' +
-        '<tr style="background:#263238;color:#fff"><th style="padding:8px">Elemento</th><th style="padding:8px">Estado</th></tr>' +
-        invHtml + '</table>' +
-        '<h2>VALIDACION DE COMANDO</h2><p>Cap. Marcus Thorne - Firmado @ 05:02</p>' +
-        '<div style="margin-top:40px;border-top:2px solid #ccc;padding-top:20px">' +
-        '<p><strong>FIRMAS</strong></p>' +
-        '<div class="sig">Oficial a Cargo</div>' +
-        '<div class="sig" style="margin-left:10%">Jefe de Cuartel</div>' +
-        '</div></body></html>';
-        
-      if (Platform.OS === 'web') {
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'borrador_legal_4409B.html';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        const path = FileSystem.cacheDirectory + 'borrador_legal_4409B.html';
-        await FileSystem.writeAsStringAsync(path, html, { encoding: FileSystem.EncodingType.UTF8 });
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(path, { mimeType: 'text/html', dialogTitle: 'Borrador Legal' });
-        } else {
-          Alert.alert('Borrador Legal', 'Archivo generado en: ' + path);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      if (Platform.OS === 'web') {
-        alert('No se pudo generar el borrador.');
-      } else {
-        Alert.alert('Error', 'No se pudo generar el borrador.');
-      }
-    } finally {
-      setGeneratingLegal(false);
-    }
-  };
-
-  const handleGeneratePDF = () => {
-    if (Platform.OS === 'web') {
-      alert('Funcionalidad de PDF nativo requiere la app móvil. Puede utilizar la impresión de navegador o descargar el Borrador Legal.');
-    } else {
-      Alert.alert('Generar PDF', 'Conectando con el servicio de generación de PDF...');
-    }
-  };
+  // PDF and Legal Draft functionality removed
 
   return (
     <View style={styles.container}>
@@ -146,19 +63,6 @@ export default function ReportsScreen({ navigation }) {
           Respuesta ante Incendio Estructural - Sector Centro
         </Text>
 
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: Spacing.xl }}>
-          <TouchableOpacity style={[styles.pdfBtn, { marginBottom: 0 }]} onPress={handleGeneratePDF}>
-            <MaterialCommunityIcons name="file-pdf-box" size={16} color="#fff" />
-            <Text style={styles.pdfBtnText}>Generar PDF</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.legalBtn} onPress={generateLegalDraft} disabled={generatingLegal}>
-            {generatingLegal
-              ? <ActivityIndicator size="small" color="#af101a" />
-              : <MaterialCommunityIcons name="file-document-outline" size={16} color="#af101a" />
-            }
-            <Text style={styles.legalBtnText}>Borrador Legal</Text>
-          </TouchableOpacity>
-        </View>
         {/* ── Timeline ── */}
         <View style={styles.timeline}>
           {TIMELINE.map((item, idx) => (
@@ -286,15 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 13, color: Colors.onSurfaceVariant,
     marginBottom: Spacing.md,
   },
-  pdfBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-    backgroundColor: Colors.alertBlue,
-    paddingVertical: 10, paddingHorizontal: 16,
-    borderRadius: Radius.xl, alignSelf: 'flex-start',
-    marginBottom: Spacing.xl,
-  },
-  pdfBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
   timeline: { marginBottom: Spacing.lg, paddingLeft: 2 },
   timelineItem: { flexDirection: 'row' },
   timelineLine: { alignItems: 'center', width: 16, marginRight: Spacing.md },
@@ -377,13 +273,5 @@ const styles = StyleSheet.create({
   inventoryStatus: {
     fontSize: 10, fontWeight: '700', textTransform: 'uppercase',
   },
-  legalBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-    backgroundColor: Colors.surfaceContainerLowest,
-    paddingVertical: 10, paddingHorizontal: 16,
-    borderRadius: Radius.xl, borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
-  legalBtnText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
+  // Removed legalBtn styles
 });

@@ -17,9 +17,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
-import { BarChart, PieChart, LineChart } from 'react-native-chart-kit';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 const screenWidth = Dimensions.get('window').width;
@@ -66,41 +63,18 @@ function agruparPorSemana(clasificadas) {
   return weeks.reverse(); // oldest first
 }
 
-// ── Chart configuration ──────────────────────────────────────────────────────
-
-const chartConfig = {
-  backgroundColor: Colors.surfaceContainerLowest || '#fafafa',
-  backgroundGradientFrom: Colors.surfaceContainerLowest || '#fafafa',
-  backgroundGradientTo: Colors.surface || '#fff',
-  decimalCount: 0,
-  color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(38, 50, 56, ${opacity})`,
-  style: { borderRadius: 12 },
-  propsForDots: {
-    r: '5',
-    strokeWidth: '2',
-    stroke: '#af101a',
-  },
-  propsForBackgroundLines: {
-    strokeDasharray: '',
-    stroke: '#e8eaed',
-    strokeWidth: 1,
-  },
-  barPercentage: 0.6,
-};
+// Removed chart config
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const token = user?.token || '';
+  const { user, token } = useAuth();
 
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState(null);
-  const [exportando, setExportando] = useState(false);
 
   async function cargarDatos(esRefresh = false) {
     if (esRefresh) setRefrescando(true);
@@ -159,82 +133,8 @@ export default function PanelControlScreen({ navigation }) {
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
     .slice(0, 5);
 
-  // ── Chart data ────────────────────────────────────────────────────────────
+  // Removed chart data prep
 
-  const barData = {
-    labels: ['Activas', 'Despach.', 'Resueltas'],
-    datasets: [{
-      data: [cantActivas, cantDespachadas, cantResueltas],
-    }],
-  };
-
-  const pieData = [
-    { name: 'Críticas', population: cantCriticas || 0, color: '#af101a', legendFontColor: '#263238', legendFontSize: 11 },
-    { name: 'Altas', population: cantAltas || 0, color: '#f97316', legendFontColor: '#263238', legendFontSize: 11 },
-    { name: 'Medias', population: cantMedias || 0, color: '#eab308', legendFontColor: '#263238', legendFontSize: 11 },
-    { name: 'Bajas', population: cantBajas || 0, color: '#94a3b8', legendFontColor: '#263238', legendFontSize: 11 },
-  ];
-
-  // Filter out zero-population segments to avoid render issues
-  const filteredPieData = pieData.filter(d => d.population > 0);
-  // If all are 0, show a placeholder
-  const pieDataToRender = filteredPieData.length > 0 ? filteredPieData : [
-    { name: 'Sin datos', population: 1, color: '#e0e0e0', legendFontColor: '#94a3b8', legendFontSize: 11 },
-  ];
-
-  const weeklyTrend = agruparPorSemana(clasificadas);
-  const lineData = {
-    labels: ['Sem -3', 'Sem -2', 'Sem -1', 'Actual'],
-    datasets: [{
-      data: weeklyTrend.every(v => v === 0) ? [0, 0, 0, 0] : weeklyTrend,
-      color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
-      strokeWidth: 3,
-    }],
-  };
-
-  // ── Export CSV ─────────────────────────────────────────────────────────────
-
-  const exportarCSV = async () => {
-    setExportando(true);
-    try {
-      const header = 'Tipo,Estado,Prioridad,Fecha\n';
-      const rows = clasificadas.map(a => {
-        const fecha = a.fecha ? new Date(a.fecha).toLocaleDateString('es-AR') : '';
-        return `"${a.tipo}","${a.estado}","${a.prioridad}","${fecha}"`;
-      }).join('\n');
-      const csv = header + rows;
-
-      if (Platform.OS === 'web') {
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `alertas_${Date.now()}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        const path = FileSystem.cacheDirectory + `alertas_${Date.now()}.csv`;
-        await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Exportar Alertas' });
-        } else {
-          Alert.alert('Archivo generado', `Guardado en: ${path}`);
-        }
-      }
-    } catch (err) {
-      console.error('Error exporting CSV:', err);
-      if (Platform.OS === 'web') {
-        alert('No se pudo exportar los datos.');
-      } else {
-        Alert.alert('Error', 'No se pudo exportar los datos.');
-      }
-    } finally {
-      setExportando(false);
-    }
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -242,24 +142,16 @@ export default function PanelControlScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#263238" />
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.botonVolver}>
+          <MaterialCommunityIcons name="monitor-dashboard" size={24} color="#dc2626" />
+        </View>
         <Text style={styles.tituloHeader}>Panel de Control</Text>
-        <TouchableOpacity
-          style={styles.exportBtn}
-          onPress={exportarCSV}
-          disabled={exportando || cargando}
-        >
-          {exportando ? (
-            <ActivityIndicator size="small" color="#af101a" />
-          ) : (
-            <MaterialCommunityIcons name="download" size={20} color="#af101a" />
-          )}
+        <TouchableOpacity style={styles.exportBtn} onPress={() => cargarDatos(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="refresh" size={20} color="#f8fafc" />
         </TouchableOpacity>
       </View>
 
@@ -292,7 +184,7 @@ export default function PanelControlScreen({ navigation }) {
         ) : (
           <>
             {/* ── Stat grande: total de alertas ───────────────────────────── */}
-            <TacticalCard elevated>
+            <TacticalCard elevated style={{ backgroundColor: '#1e293b' }}>
               <Text style={styles.labelStat}>ALERTAS ÚLTIMOS 30 DÍAS</Text>
               <Text style={styles.numeroGrande}>{totalAlertas}</Text>
             </TacticalCard>
@@ -300,132 +192,27 @@ export default function PanelControlScreen({ navigation }) {
             {/* ── Stats por estado ──────────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>POR ESTADO</Text>
             <View style={styles.grilla}>
-              <View style={[styles.cardStat, { backgroundColor: '#fce4ec' }]}>
-                <MaterialCommunityIcons name="alert-circle" size={24} color="#af101a" />
-                <Text style={[styles.statNumero, { color: '#af101a' }]}>{cantActivas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#450a0a' }]}>
+                <MaterialCommunityIcons name="alert-circle" size={24} color="#fca5a5" />
+                <Text style={[styles.statNumero, { color: '#fca5a5' }]}>{cantActivas}</Text>
                 <Text style={styles.statLabel}>Activas</Text>
               </View>
-              <View style={[styles.cardStat, { backgroundColor: '#e3f2fd' }]}>
-                <MaterialCommunityIcons name="truck-delivery" size={24} color="#1976d2" />
-                <Text style={[styles.statNumero, { color: '#1976d2' }]}>{cantDespachadas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#1e1e1e' }]}>
+                <MaterialCommunityIcons name="truck-delivery" size={24} color="#93c5fd" />
+                <Text style={[styles.statNumero, { color: '#93c5fd' }]}>{cantDespachadas}</Text>
                 <Text style={styles.statLabel}>Despachadas</Text>
               </View>
-              <View style={[styles.cardStat, { backgroundColor: '#e8f5e9' }]}>
-                <MaterialCommunityIcons name="check-circle" size={24} color="#388e3c" />
-                <Text style={[styles.statNumero, { color: '#388e3c' }]}>{cantResueltas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#052e16' }]}>
+                <MaterialCommunityIcons name="check-circle" size={24} color="#86efac" />
+                <Text style={[styles.statNumero, { color: '#86efac' }]}>{cantResueltas}</Text>
                 <Text style={styles.statLabel}>Resueltas</Text>
               </View>
-              <View style={[styles.cardStat, { backgroundColor: '#f1f5f9' }]}>
-                <MaterialCommunityIcons name="clipboard-list" size={24} color="#64748b" />
-                <Text style={[styles.statNumero, { color: '#64748b' }]}>{totalAlertas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#1e293b' }]}>
+                <MaterialCommunityIcons name="clipboard-list" size={24} color="#94a3b8" />
+                <Text style={[styles.statNumero, { color: '#94a3b8' }]}>{totalAlertas}</Text>
                 <Text style={styles.statLabel}>Total</Text>
               </View>
             </View>
-
-            {/* ── Bar Chart: por estado ────────────────────────────────── */}
-            <Text style={styles.tituloSeccion}>DISTRIBUCIÓN POR ESTADO</Text>
-            <TacticalCard elevated>
-              <BarChart
-                data={barData}
-                width={chartWidth}
-                height={200}
-                chartConfig={{
-                  ...chartConfig,
-                  color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
-                  fillShadowGradientFrom: '#af101a',
-                  fillShadowGradientTo: '#af101a',
-                  fillShadowGradientOpacity: 0.8,
-                }}
-                style={styles.chartStyle}
-                fromZero
-                showValuesOnTopOfBars
-                withInnerLines={false}
-              />
-            </TacticalCard>
-
-            {/* ── Stats por severidad ──────────────────────────────────── */}
-            <Text style={styles.tituloSeccion}>POR SEVERIDAD</Text>
-            <TacticalCard elevated>
-              <View style={styles.filaSeveridad}>
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#af101a' }]} />
-                  <Text style={styles.severidadNumero}>{cantCriticas}</Text>
-                  <Text style={styles.severidadLabel}>Críticas</Text>
-                </View>
-                <View style={styles.separador} />
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#f97316' }]} />
-                  <Text style={styles.severidadNumero}>{cantAltas}</Text>
-                  <Text style={styles.severidadLabel}>Altas</Text>
-                </View>
-                <View style={styles.separador} />
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#eab308' }]} />
-                  <Text style={styles.severidadNumero}>{cantMedias}</Text>
-                  <Text style={styles.severidadLabel}>Medias</Text>
-                </View>
-                <View style={styles.separador} />
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#94a3b8' }]} />
-                  <Text style={styles.severidadNumero}>{cantBajas}</Text>
-                  <Text style={styles.severidadLabel}>Bajas</Text>
-                </View>
-              </View>
-            </TacticalCard>
-
-            {/* ── Pie Chart: distribución por severidad ────────────────── */}
-            <TacticalCard elevated>
-              <Text style={styles.chartLabel}>DISTRIBUCIÓN DE SEVERIDAD</Text>
-              <PieChart
-                data={pieDataToRender}
-                width={chartWidth}
-                height={180}
-                chartConfig={chartConfig}
-                accessor="population"
-                backgroundColor="transparent"
-                paddingLeft="0"
-                absolute
-                style={styles.chartStyle}
-              />
-            </TacticalCard>
-
-            {/* ── Line Chart: tendencia semanal ────────────────────────── */}
-            <Text style={styles.tituloSeccion}>TENDENCIA SEMANAL</Text>
-            <TacticalCard elevated>
-              <Text style={styles.chartLabel}>ALERTAS POR SEMANA (ÚLTIMOS 30 DÍAS)</Text>
-              <LineChart
-                data={lineData}
-                width={chartWidth}
-                height={200}
-                chartConfig={{
-                  ...chartConfig,
-                  color: (opacity = 1) => `rgba(175, 16, 26, ${opacity})`,
-                }}
-                bezier
-                style={styles.chartStyle}
-                fromZero
-                withInnerLines
-                withDots
-                withShadow={false}
-              />
-            </TacticalCard>
-
-            {/* ── Export button ──────────────────────────────────────────── */}
-            <TouchableOpacity
-              style={styles.exportFullBtn}
-              onPress={exportarCSV}
-              disabled={exportando}
-              activeOpacity={0.7}
-            >
-              {exportando ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="download" size={18} color="#fff" />
-                  <Text style={styles.exportFullBtnText}>EXPORTAR DATOS (CSV)</Text>
-                </>
-              )}
-            </TouchableOpacity>
 
             {/* ── Últimas alertas ──────────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>ACTIVIDAD RECIENTE</Text>
@@ -433,7 +220,7 @@ export default function PanelControlScreen({ navigation }) {
               <Text style={styles.textoVacio}>Sin actividad registrada</Text>
             ) : (
               ultimasAlertas.map((a, idx) => (
-                <TacticalCard key={idx}>
+                <TacticalCard key={idx} style={{ backgroundColor: '#1e293b' }}>
                   <View style={styles.filaActividad}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
@@ -455,7 +242,7 @@ export default function PanelControlScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
+  container: { flex: 1, backgroundColor: '#0a0a0a' }, // Dark background
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -463,13 +250,13 @@ const styles = StyleSheet.create({
   },
   botonVolver: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: '#1e293b',
     alignItems: 'center', justifyContent: 'center',
   },
-  tituloHeader: { fontSize: 17, fontWeight: '800', color: Colors.onSurface },
+  tituloHeader: { fontSize: 17, fontWeight: '900', color: '#f8fafc', textTransform: 'uppercase', letterSpacing: 0.5 },
   exportBtn: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: '#1e293b',
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -485,15 +272,15 @@ const styles = StyleSheet.create({
 
   labelStat: {
     fontSize: 10, fontWeight: '800', letterSpacing: 1,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase', marginBottom: 4,
+    color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4,
   },
   numeroGrande: {
-    fontSize: 48, fontWeight: '900', color: Colors.onSurface, letterSpacing: -1,
+    fontSize: 48, fontWeight: '900', color: '#f8fafc', letterSpacing: -1,
   },
 
   tituloSeccion: {
-    fontSize: 11, fontWeight: '700', letterSpacing: 0.8,
-    color: Colors.onSurface, textTransform: 'uppercase',
+    fontSize: 11, fontWeight: '800', letterSpacing: 1,
+    color: '#f8fafc', textTransform: 'uppercase',
     marginTop: Spacing.lg, marginBottom: Spacing.md,
   },
 
@@ -508,49 +295,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.4,
   },
 
-  filaSeveridad: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-  },
-  itemSeveridad: { alignItems: 'center', flex: 1, gap: 4 },
-  punto: { width: 8, height: 8, borderRadius: 4, marginBottom: 2 },
-  severidadNumero: { fontSize: 22, fontWeight: '900', color: Colors.onSurface },
-  severidadLabel: {
-    fontSize: 10, fontWeight: '700', color: '#90a4ae',
-    textTransform: 'uppercase', letterSpacing: 0.4,
-  },
-  separador: { width: 1, height: 36, backgroundColor: Colors.surfaceContainerLow },
+  // Removed severidad styles
 
   filaActividad: { flexDirection: 'row', alignItems: 'center' },
-  textoActividad: { fontSize: 13, fontWeight: '700', color: Colors.onSurface },
-  tiempoActividad: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
+  textoActividad: { fontSize: 13, fontWeight: '800', color: '#f8fafc' },
+  tiempoActividad: { fontSize: 11, color: '#94a3b8', fontWeight: '700' },
   textoVacio: { fontSize: 13, color: '#94a3b8', fontWeight: '600', textAlign: 'center', paddingVertical: 20 },
 
-  // Charts
-  chartStyle: {
-    borderRadius: 12,
-    marginVertical: 4,
-  },
-  chartLabel: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 1,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-
-  // Export button
-  exportFullBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#263238',
-    paddingVertical: 14,
-    borderRadius: Radius.xl,
-    marginTop: Spacing.lg,
-  },
-  exportFullBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
 });

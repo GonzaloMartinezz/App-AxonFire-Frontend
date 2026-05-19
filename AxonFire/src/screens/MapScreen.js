@@ -11,9 +11,39 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { useAuth } from '../context/AuthContext';
+import { Alert } from 'react-native';
 
 export default function MapScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { user, logout } = useAuth();
+  
+  const handleAdminPress = () => {
+    if (user?.rol === 'ADMIN') {
+      const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
+      if (isCurrentlyAdmin) {
+        navigation.navigate('MainApp');
+      } else {
+        navigation.navigate('AdminApp');
+      }
+    } else {
+      if (Platform.OS === 'web') alert('Esta sección es exclusiva para administradores.');
+      else Alert.alert('Acceso Denegado', 'Esta sección es exclusiva para administradores.');
+    }
+  };
+
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Deseas cerrar sesión?')) {
+        logout();
+      }
+    } else {
+      Alert.alert('Cerrar Sesión', '¿Deseas cerrar sesión?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Salir', style: 'destructive', onPress: () => logout() }
+      ]);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -73,10 +103,16 @@ export default function MapScreen({ navigation }) {
             <Text style={styles.headerTitle}>AXON FIRE</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity style={styles.emergencyIcon} onPress={() => navigation.navigate('AdminApp')} title="Admin Panel">
-              <MaterialCommunityIcons name="shield-account" size={16} color={Colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.emergencyIcon}>
+            {user?.rol === 'ADMIN' && (
+              <TouchableOpacity style={styles.emergencyIcon} onPress={handleAdminPress} title="Admin Panel">
+                <MaterialCommunityIcons 
+                  name={navigation.getState()?.routeNames?.includes('Panel') ? "account-hard-hat" : "shield-account"} 
+                  size={16} 
+                  color={Colors.primary} 
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.emergencyIcon} onPress={handleLogout}>
               <MaterialCommunityIcons name="logout" size={16} color={Colors.primary} />
             </TouchableOpacity>
           </View>

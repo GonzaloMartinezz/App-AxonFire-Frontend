@@ -191,10 +191,10 @@ export default function AppNavigator() {
       ) : (
         // Pantallas de la App (Logueado)
         <>
+          <Stack.Screen name="MainApp" component={MainTabNavigator} />
           {user?.rol === 'ADMIN' && (
             <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
           )}
-          <Stack.Screen name="MainApp" component={MainTabNavigator} />
           
           {/* Pantallas comunes/modales */}
           <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />

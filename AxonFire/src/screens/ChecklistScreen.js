@@ -30,15 +30,15 @@ export default function ChecklistScreen({ navigation }) {
   });
   const [epp, setEpp] = useState({ era: true, cascos: false });
 
-  // Damage report state: { [itemKey]: { justification, photoUri } }
+  // Damage report state: { [itemKey]: { justification } }
   const [damageReports, setDamageReports] = useState({});
   const updateDamage = useCallback((key, field, value) => {
     setDamageReports(prev => ({
       ...prev,
-      [key]: { ...(prev[key] || { justification: '', photoUri: null }), [field]: value },
+      [key]: { ...(prev[key] || { justification: '' }), [field]: value },
     }));
   }, []);
-  const getDamage = (key) => damageReports[key] || { justification: '', photoUri: null };
+  const getDamage = (key) => damageReports[key] || { justification: '' };
 
   // Collect all fail items and check if their reports are complete
   const failItems = [
@@ -51,7 +51,7 @@ export default function ChecklistScreen({ navigation }) {
 
   const canSubmit = failItems.every(key => {
     const d = getDamage(key);
-    return isDamageReportComplete(d.justification, d.photoUri);
+    return isDamageReportComplete(d.justification);
   });
 
   return (
@@ -115,7 +115,7 @@ export default function ChecklistScreen({ navigation }) {
                </TouchableOpacity>
              </View>
           </View>
-          <DamageReportField visible={hidrico.manguera === 'fail'} justification={getDamage('hid_manguera').justification} onJustificationChange={(t) => updateDamage('hid_manguera', 'justification', t)} photoUri={getDamage('hid_manguera').photoUri} onPhotoSelected={(u) => updateDamage('hid_manguera', 'photoUri', u)} onPhotoRemoved={() => updateDamage('hid_manguera', 'photoUri', null)} theme="dark" />
+          <DamageReportField visible={hidrico.manguera === 'fail'} justification={getDamage('hid_manguera').justification} onJustificationChange={(t) => updateDamage('hid_manguera', 'justification', t)} theme="dark" />
 
           <View style={[styles.cardItem, { borderLeftColor: hidrico.piton === 'fail' ? '#dc2626' : '#22c55e' }]}>
              <View style={styles.cardItemLeft}>
@@ -137,7 +137,7 @@ export default function ChecklistScreen({ navigation }) {
                </TouchableOpacity>
              </View>
           </View>
-          <DamageReportField visible={hidrico.piton === 'fail'} justification={getDamage('hid_piton').justification} onJustificationChange={(t) => updateDamage('hid_piton', 'justification', t)} photoUri={getDamage('hid_piton').photoUri} onPhotoSelected={(u) => updateDamage('hid_piton', 'photoUri', u)} onPhotoRemoved={() => updateDamage('hid_piton', 'photoUri', null)} theme="dark" />
+          <DamageReportField visible={hidrico.piton === 'fail'} justification={getDamage('hid_piton').justification} onJustificationChange={(t) => updateDamage('hid_piton', 'justification', t)} theme="dark" />
 
           {/* Section: CORTE */}
           <View style={styles.sectionHeader}>
@@ -168,7 +168,7 @@ export default function ChecklistScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-          <DamageReportField visible={corte.hidraulica === 'fail'} justification={getDamage('cor_hidraulica').justification} onJustificationChange={(t) => updateDamage('cor_hidraulica', 'justification', t)} photoUri={getDamage('cor_hidraulica').photoUri} onPhotoSelected={(u) => updateDamage('cor_hidraulica', 'photoUri', u)} onPhotoRemoved={() => updateDamage('cor_hidraulica', 'photoUri', null)} theme="dark" />
+          <DamageReportField visible={corte.hidraulica === 'fail'} justification={getDamage('cor_hidraulica').justification} onJustificationChange={(t) => updateDamage('cor_hidraulica', 'justification', t)} theme="dark" />
 
           <View style={styles.largeCardItem}>
             <View style={styles.largeCardTop}>
@@ -193,7 +193,7 @@ export default function ChecklistScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-          <DamageReportField visible={corte.motosierra === 'fail'} justification={getDamage('cor_motosierra').justification} onJustificationChange={(t) => updateDamage('cor_motosierra', 'justification', t)} photoUri={getDamage('cor_motosierra').photoUri} onPhotoSelected={(u) => updateDamage('cor_motosierra', 'photoUri', u)} onPhotoRemoved={() => updateDamage('cor_motosierra', 'photoUri', null)} theme="dark" />
+          <DamageReportField visible={corte.motosierra === 'fail'} justification={getDamage('cor_motosierra').justification} onJustificationChange={(t) => updateDamage('cor_motosierra', 'justification', t)} theme="dark" />
 
           <View style={styles.largeCardItem}>
             <View style={styles.largeCardTop}>
@@ -218,7 +218,7 @@ export default function ChecklistScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-          <DamageReportField visible={corte.hacha === 'fail'} justification={getDamage('cor_hacha').justification} onJustificationChange={(t) => updateDamage('cor_hacha', 'justification', t)} photoUri={getDamage('cor_hacha').photoUri} onPhotoSelected={(u) => updateDamage('cor_hacha', 'photoUri', u)} onPhotoRemoved={() => updateDamage('cor_hacha', 'photoUri', null)} theme="dark" />
+          <DamageReportField visible={corte.hacha === 'fail'} justification={getDamage('cor_hacha').justification} onJustificationChange={(t) => updateDamage('cor_hacha', 'justification', t)} theme="dark" />
 
           {/* Section: EPP */}
           <View style={styles.sectionHeader}>

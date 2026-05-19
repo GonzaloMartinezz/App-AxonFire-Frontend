@@ -22,7 +22,7 @@ if (Platform.OS !== 'web') {
   });
 }
 
-const sirenSound = require('./assets/siren.wav');
+const sirenSound = require('./assets/siren.mp3');
 
 async function playSiren() {
   try {

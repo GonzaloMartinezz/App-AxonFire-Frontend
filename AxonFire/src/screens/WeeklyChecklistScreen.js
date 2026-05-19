@@ -47,13 +47,12 @@ function getToolIcon(name) {
 
 export default function WeeklyChecklistScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const token = user?.token || '';
+  const { user, token } = useAuth();
   const userId = user?.id || '';
 
   // State
   const [herramientas, setHerramientas] = useState([]); // tools from backend
-  const [items, setItems] = useState({}); // { [herramientaId]: { status, justification, photoUri } }
+  const [items, setItems] = useState({}); // { [herramientaId]: { status, justification } }
   const [blocked, setBlocked] = useState(false);
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [lastCheckDate, setLastCheckDate] = useState(null);
@@ -86,7 +85,7 @@ export default function WeeklyChecklistScreen({ navigation }) {
       // Initialize items state for each tool
       const initialItems = {};
       tools.forEach(tool => {
-        initialItems[tool.id] = { status: null, justification: '', photoUri: null };
+        initialItems[tool.id] = { status: null, justification: '' };
       });
       setItems(initialItems);
 
@@ -128,7 +127,7 @@ export default function WeeklyChecklistScreen({ navigation }) {
         ...prev[id],
         status,
         // Reset damage fields if switching back to OK
-        ...(status === 'ok' ? { justification: '', photoUri: null } : {}),
+        ...(status === 'ok' ? { justification: '' } : {}),
       },
     }));
   }, []);
@@ -138,7 +137,7 @@ export default function WeeklyChecklistScreen({ navigation }) {
   const allItemsChecked = Object.keys(items).length > 0 && Object.values(items).every(i => i.status !== null);
   const allDamageReportsComplete = Object.values(items).every(i => {
     if (i.status !== 'fail') return true;
-    return isDamageReportComplete(i.justification, i.photoUri);
+    return isDamageReportComplete(i.justification);
   });
   const canSubmit = allItemsChecked && allDamageReportsComplete && !blocked && !submitting;
 
@@ -340,9 +339,6 @@ export default function WeeklyChecklistScreen({ navigation }) {
                       visible={data.status === 'fail'}
                       justification={data.justification}
                       onJustificationChange={(text) => updateItem(tool.id, 'justification', text)}
-                      photoUri={data.photoUri}
-                      onPhotoSelected={(uri) => updateItem(tool.id, 'photoUri', uri)}
-                      onPhotoRemoved={() => updateItem(tool.id, 'photoUri', null)}
                       theme="dark"
                     />
                   </View>
@@ -356,7 +352,7 @@ export default function WeeklyChecklistScreen({ navigation }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 }}>
               <MaterialCommunityIcons name="alert-circle" size={14} color="#fca5a5" />
               <Text style={{ color: '#fca5a5', fontSize: 11, fontWeight: '700' }}>
-                Completar justificación y foto de los ítems marcados como FALTANTE para poder guardar.
+                Completar justificación de los ítems marcados como FALTANTE para poder guardar.
               </Text>
             </View>
           )}

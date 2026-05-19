@@ -18,8 +18,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function AdminEquipmentScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const token = user?.token || '';
+  const { user, token } = useAuth();
 
   const [activeTab, setActiveTab] = useState('moviles'); // 'moviles' | 'base'
   const [herramientas, setHerramientas] = useState([]);
