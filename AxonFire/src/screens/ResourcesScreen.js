@@ -77,9 +77,9 @@ export default function ResourcesScreen({ navigation, route }) {
   }, []);
 
   // ── Navegar al checklist del camión ──────────────────────────────────────
-  // Acá es donde se pasan los params que necesita ChecklistScreen
+  // Acá es donde se pasan los params que necesita WeeklyChecklistScreen
   function abrirChecklist(camion) {
-    navigation.navigate('Checklist', {
+    navigation.navigate('WeeklyChecklist', {
       camionId:    camion.id,
       camionNombre: camion.nombre_camion,
       token,

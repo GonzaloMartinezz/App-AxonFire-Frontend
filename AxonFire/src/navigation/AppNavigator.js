@@ -22,7 +22,6 @@ import ReportsScreen from '../screens/ReportsScreen';
 import AddFirefighterScreen from '../screens/AddFirefighterScreen';
 import AlertDetailScreen from '../screens/AlertDetailScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
-import ChecklistScreen from '../screens/ChecklistScreen';
 import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
 import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
@@ -37,7 +36,6 @@ import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
 import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
-import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen';
  
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -203,7 +201,6 @@ export default function AppNavigator() {
           {/* Pantallas comunes/modales */}
           <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="NewAlert" component={NewAlertScreen} />
-          <Stack.Screen name="Checklist" component={ChecklistScreen} />
           <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
           <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
           <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
