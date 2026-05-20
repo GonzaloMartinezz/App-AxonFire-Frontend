@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SelectorBomberos.js — COMPONENTE REUTILIZABLE
+// SelectorBomberos.js — NUEVO COMPONENTE REUTILIZABLE
 //
 // TAREA AX-13: Crear un selector múltiple (tipo tags) que consuma la lista
 //   de bomberos activos para añadir acompañantes en el control.

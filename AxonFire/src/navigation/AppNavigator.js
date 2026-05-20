@@ -27,8 +27,10 @@ import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
 import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen';
+
  
-// ── PANTALLAS NUEVAS ────────────────────────────────────────────────────────
+// ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';

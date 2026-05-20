@@ -17,6 +17,8 @@ import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
 import { API_BASE_URL } from '../config/api';
 
+const BASE_URL = 'http://localhost:3000';
+
 const REINFORCEMENTS = [
   { icon: 'water',         label: 'CISTERNA',    color: Colors.alertBlue     },
   { icon: 'gas-station',   label: 'COMBUSTIBLE', color: Colors.warningOrange },
@@ -323,7 +325,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f1315', borderRadius: Radius.lg,
     padding: Spacing.md, marginBottom: Spacing.md,
     borderLeftWidth: 3, borderLeftColor: '#dc2626',
-  },
+},
   errorText: { color: '#f87171', fontSize: 12, fontWeight: '600', flex: 1 },
   vacioCamiones: {
     alignItems: 'center', paddingVertical: 24, gap: 8,
@@ -395,7 +397,6 @@ const styles = StyleSheet.create({
   requestTitle: { fontSize: 13, fontWeight: '700', color: Colors.onSurface },
   requestSub: {
     fontSize: 9, fontWeight: '800', letterSpacing: 0.8,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase',
-    marginTop: 1,
+    color: Colors.onSurfaceVariant, textTransform: 'uppercase', marginTop: 1,
   },
 });

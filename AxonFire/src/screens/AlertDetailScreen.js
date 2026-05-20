@@ -348,8 +348,8 @@ export default function AlertDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.contentScroll}
         showsVerticalScrollIndicator={false}
       >
@@ -363,12 +363,10 @@ export default function AlertDetailScreen({ route, navigation }) {
                 <Text style={styles.levelText}>{alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' ? 'FINALIZADO' : 'ACTIVA'}</Text>
               </View>
             </View>
-            
             <View style={styles.locationRow}>
               <MaterialIcons name="location-on" size={16} color="#94a3b8" />
               <Text style={styles.locationText}>{alerta?.ubicacion || 'Ubicación no especificada'}</Text>
             </View>
-
             <View style={styles.timeStatsBox}>
               <View style={styles.timeStatItem}>
                 <Text style={styles.timeLabel}>LLAMADO</Text>
@@ -431,18 +429,30 @@ export default function AlertDetailScreen({ route, navigation }) {
           <TouchableOpacity style={styles.requestButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.requestButtonText}>+ SOLICITAR RECURSOS</Text>
           </TouchableOpacity>
+
+          {/* ── AX-16: Botón informe post-emergencia ── */}
+          <TouchableOpacity
+            style={styles.informeButton}
+            onPress={abrirInforme}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="file-document-edit-outline" size={16} color="#fff" />
+            <Text style={styles.informeButtonText}>INFORME POST-EMERGENCIA</Text>
+            {(rol === 'ADMIN' || rol === 'OFICIAL') && (
+              <View style={styles.informeBadgeRol}>
+                <Text style={styles.informeBadgeRolTexto}>{rol}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Live Tracking Map Placeholder */}
         <View style={styles.mapContainer}>
-          {/* Map Background Simulation */}
           <View style={styles.mapBackgroundOverlay} />
-          
           <View style={styles.liveBadge}>
             <View style={styles.redDot} />
             <Text style={styles.liveText}>LIVE TRACKING</Text>
           </View>
-
           <View style={styles.mapControls}>
             <TouchableOpacity style={styles.mapFab}>
               <MaterialCommunityIcons name="layers" size={22} color="#e2e8f0" />
@@ -451,7 +461,6 @@ export default function AlertDetailScreen({ route, navigation }) {
               <MaterialCommunityIcons name="crosshairs-gps" size={22} color="#e2e8f0" />
             </TouchableOpacity>
           </View>
-
           <View style={styles.impactCard}>
             <Text style={styles.impactLabel}>RADIO DE IMPACTO</Text>
             <Text style={styles.impactValue}>250 METROS</Text>
@@ -532,6 +541,30 @@ export default function AlertDetailScreen({ route, navigation }) {
 
             {requesting && <ActivityIndicator color="#e11d48" style={{ marginTop: 20 }} />}
           </View>
+      {/* Bottom Nav */}
+      <View style={styles.fakeBottomNav}>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="view-grid" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>STATUS</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => navigation?.navigate('PersonnelStatus')}
+        >
+          <MaterialCommunityIcons name="account-group" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>UNITS</Text>
+        </TouchableOpacity>
+        <View style={styles.sosContainer}>
+          <MaterialCommunityIcons name="asterisk" size={28} color="#e11d48" />
+          <Text style={styles.sosLabel}>SOS</Text>
+        </View>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="archive" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>LOGISTICS</Text>
+        </View>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>MAP</Text>
         </View>
       </Modal>
     </View>
@@ -539,374 +572,99 @@ export default function AlertDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#16181d',
+container:         { flex: 1, backgroundColor: '#16181d' },
+  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#26282f' },
+  headerLeft:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle:      { fontSize: 16, fontWeight: '900', color: '#e11d48', letterSpacing: 0.5 },
+  headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  iconBtn:          { padding: 4 },
+  avatarBtn:        { width: 32, height: 32, borderRadius: 6, backgroundColor: '#2d333b', alignItems: 'center', justifyContent: 'center' },
+  scrollView:       { flex: 1 },
+  contentScroll:   { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 100 },
+
+  mainCard:         { backgroundColor: '#1b1d24', borderRadius: 8, flexDirection: 'row', overflow: 'hidden', marginBottom: 24 },
+  cardLeftBorder:  { width: 4, backgroundColor: '#e11d48' },
+  mainCardContent: { flex: 1, padding: 20 },
+  titleRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  mainTitle:       { color: '#f8fafc', fontSize: 22, fontWeight: '800', flex: 1 },
+  levelBadge:      { backgroundColor: '#b91c1c', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginLeft: 12 },
+  levelText:       { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  locationRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
+  locationText:    { color: '#cbd5e1', fontSize: 14, fontWeight: '500' },
+  timeStatsBox:    { backgroundColor: '#13141a', borderRadius: 6, padding: 16, flexDirection: 'row', justifyContent: 'space-between' },
+  timeStatItem:    { flex: 1 },
+  timeStatItemRight: { flex: 1, alignItems: 'flex-end' },
+  timeLabel:       { color: '#94a3b8', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
+  timeValueRed:    { color: '#fca5a5', fontSize: 16, fontWeight: '800' },
+  timeValueWhite:  { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
+
+  sectionContainer: { backgroundColor: '#1b1d24', borderRadius: 8, padding: 20, marginBottom: 24 },
+  sectionHeader:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
+  sectionTitle:    { color: '#f8fafc', fontSize: 14, fontWeight: '700', letterSpacing: 1 },
+  logisticsItem:   { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
+  logisticsIcon:   { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  logisticsTitle:  { color: '#f8fafc', fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  logisticsSubtitle: { color: '#94a3b8', fontSize: 13 },
+
+  requestButton:   { borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed', borderRadius: 6, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 10 },
+  requestButtonText: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
+
+  // ── AX-16: Botón de informe (De la rama dev) ───────────────────────────────────────────────
+  informeButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#1e1b2e',
+    borderWidth: 1, borderColor: '#3b1f6e',
+    borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16,
+    marginTop: 4,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
+  informeButtonText: {
+    flex: 1, color: '#c4b5fd',
+    fontSize: 12, fontWeight: '900', letterSpacing: 0.8,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  informeBadgeRol: {
+    backgroundColor: '#3b1f6e',
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#e11d48', 
-    letterSpacing: 0.5,
+  informeBadgeRolTexto: {
+    color: '#c4b5fd', fontSize: 8, fontWeight: '900', letterSpacing: 0.6,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  iconBtn: {
-    padding: 4,
-  },
-  avatarBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#2d333b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentScroll: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 100, // For the bottom nav
-  },
-  mainCard: {
-    backgroundColor: '#1b1d24',
-    borderRadius: 8,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    marginBottom: 24,
-  },
-  cardLeftBorder: {
-    width: 4,
-    backgroundColor: '#e11d48',
-  },
-  mainCardContent: {
-    flex: 1,
-    padding: 20,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  mainTitle: {
-    color: '#f8fafc',
-    fontSize: 22,
-    fontWeight: '800',
-    flex: 1,
-  },
-  levelBadge: {
-    backgroundColor: '#b91c1c',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginLeft: 12,
-  },
-  levelText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 20,
-  },
-  locationText: {
-    color: '#cbd5e1',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  timeStatsBox: {
-    backgroundColor: '#13141a',
-    borderRadius: 6,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  timeStatItem: {
-    flex: 1,
-  },
-  timeStatItemRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  timeLabel: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  timeValueRed: {
-    color: '#fca5a5',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  timeValueWhite: {
-    color: '#f8fafc',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  sectionContainer: {
-    backgroundColor: '#1b1d24',
-    borderRadius: 8,
-    padding: 20,
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  logisticsItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-  },
-  logisticsIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logisticsTitle: {
-    color: '#f8fafc',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  logisticsSubtitle: {
-    color: '#94a3b8',
-    fontSize: 13,
-  },
-  requestButton: {
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderStyle: 'dashed',
-    borderRadius: 6,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  requestButtonText: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  mapContainer: {
-    height: 250,
-    backgroundColor: '#1a1d24',
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 24,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  mapBackgroundOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#1a1d24',
-    opacity: 0.8,
-  },
-  liveBadge: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    backgroundColor: 'rgba(30, 41, 59, 0.8)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  redDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#fca5a5',
-  },
-  liveText: {
-    color: '#f8fafc',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  mapControls: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    gap: 8,
-  },
-  mapFab: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#2d333b',
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  impactCard: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    backgroundColor: '#2d333b',
-    padding: 12,
-    borderRadius: 4,
-  },
-  impactLabel: {
-    color: '#cbd5e1',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  impactValue: {
-    color: '#f8fafc',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  personnelCard: {
-    borderLeftWidth: 2,
-    borderLeftColor: '#334155',
-    paddingLeft: 16,
-    marginBottom: 20,
-  },
-  personTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  personName: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusText: {
-    color: '#cbd5e1',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  personRoleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  personRoleText: {
-    color: '#94a3b8',
-    fontSize: 13,
-  },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    width: '100%',
-    backgroundColor: '#1b1d24',
-    borderRadius: 12,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    color: '#f8fafc',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  modalSub: {
-    color: '#94a3b8',
-    fontSize: 13,
-    marginBottom: 24,
-    lineHeight: 18,
-  },
-  resourceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  resourceCard: {
-    width: '48%',
-    backgroundColor: '#13141a',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  resIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resName: {
-    color: '#f8fafc',
-    fontSize: 10,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  logisticsStatus: {
-    backgroundColor: '#064e3b',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusMiniText: {
-    color: '#10b981',
-    fontSize: 8,
-    fontWeight: '900',
-  },
+
+  mapContainer:    { height: 250, backgroundColor: '#1a1d24', borderRadius: 8, overflow: 'hidden', marginBottom: 24, position: 'relative', borderWidth: 1, borderColor: '#26282f' },
+  mapBackgroundOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#1a1d24', opacity: 0.8 },
+  liveBadge:       { position: 'absolute', top: 16, left: 16, backgroundColor: 'rgba(30,41,59,0.8)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  redDot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fca5a5' },
+  liveText:        { color: '#f8fafc', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  mapControls:     { position: 'absolute', bottom: 16, right: 16, gap: 8 },
+  mapFab:          { width: 40, height: 40, backgroundColor: '#2d333b', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  impactCard:      { position: 'absolute', bottom: 16, left: 16, backgroundColor: '#2d333b', padding: 12, borderRadius: 4 },
+  impactLabel:     { color: '#cbd5e1', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
+  impactValue:     { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
+
+  personnelCard:   { borderLeftWidth: 2, borderLeftColor: '#334155', paddingLeft: 16, marginBottom: 20 },
+  personTopRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  personName:      { color: '#f8fafc', fontSize: 14, fontWeight: '700' },
+  statusBadge:     { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  statusText:      { color: '#cbd5e1', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  personRoleRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  personRoleText:  { color: '#94a3b8', fontSize: 13 },
+
+  // ── Modales (Rescatados de la rama carona) ───────────────────────────────────────────────
+  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent:    { width: '100%', backgroundColor: '#1b1d24', borderRadius: 12, padding: 24, borderWidth: 1, borderColor: '#26282f' },
+  modalHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle:      { color: '#f8fafc', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  modalSub:        { color: '#94a3b8', fontSize: 13, marginBottom: 24, lineHeight: 18 },
+  resourceGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  resourceCard:    { width: '48%', backgroundColor: '#13141a', borderRadius: 8, padding: 16, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#26282f' },
+  resIcon:         { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  resName:         { color: '#f8fafc', fontSize: 10, fontWeight: '800', textAlign: 'center', letterSpacing: 0.5 },
+  logisticsStatus: { backgroundColor: '#064e3b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  statusMiniText:  { color: '#10b981', fontSize: 8, fontWeight: '900' },
+
+  // ── Navegación inferior (De la rama dev) ───────────────────────────────────────────────
+  fakeBottomNav:   { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', backgroundColor: '#1b1d24', paddingVertical: 12, paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: '#26282f', position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
+  navItem:         { alignItems: 'center', gap: 4, flex: 1 },
+  navLabel:        { color: '#64748b', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  sosContainer:    { backgroundColor: '#2d333b', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', gap: 2, flex: 1.2 },
+  sosLabel:        { color: '#e11d48', fontSize: 10, fontWeight: '800' },
 });
