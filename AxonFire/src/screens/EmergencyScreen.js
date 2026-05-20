@@ -1,24 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// EmergencyScreen.js — MODIFICADO AX-14
-//
-// TAREA imagen 2: Campo "Hora de Llamado" Read-Only en el formulario de cierre.
-//   La hora se captura automáticamente del backend (alertaData.fecha_hora) o
-//   al momento de confirmar la asistencia (new Date()).
-//
-// TAREA imagen 3: Inputs tipo time amigables para:
-//   - Hora de Salida del Móvil (editable)
-//   - Hora de Regreso (editable)
-//
-// El formulario de tiempos aparece en la pantalla de confirmación (ACEPTADO).
-// El operador ve la hora de llamado bloqueada y completa las otras dos.
-//
-// ENDPOINT para registrar los tiempos (cuando el backend lo implemente):
-//   POST /registros_comunicacion/crear
-//   Body: { alerta_id, mensaje, tipo_comunicacion: "INFORMACION", fecha_hora }
-//   Por ahora se guardan localmente hasta que el backend exponga un endpoint
-//   específico de tiempos críticos.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
