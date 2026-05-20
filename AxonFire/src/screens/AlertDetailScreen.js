@@ -541,6 +541,9 @@ export default function AlertDetailScreen({ route, navigation }) {
 
             {requesting && <ActivityIndicator color="#e11d48" style={{ marginTop: 20 }} />}
           </View>
+        </View>
+      </Modal>
+
       {/* Bottom Nav */}
       <View style={styles.fakeBottomNav}>
         <View style={styles.navItem}>
@@ -566,7 +569,7 @@ export default function AlertDetailScreen({ route, navigation }) {
           <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
           <Text style={styles.navLabel}>MAP</Text>
         </View>
-      </Modal>
+      </View>
     </View>
   );
 }

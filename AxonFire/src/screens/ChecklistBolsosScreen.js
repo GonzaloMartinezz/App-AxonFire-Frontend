@@ -15,7 +15,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { API_BASE_URL } from '../config/api';
+
+const BASE_URL = 'http://localhost:3000';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
     setCargandoBolsos(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/bolsos/`, { headers });
+      const res = await fetch(`${BASE_URL}/bolsos/`, { headers });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       const lista = Array.isArray(data) ? data.filter(b => b.estado === 'ACTIVO') : [];
@@ -113,7 +114,7 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/bolsos_inventario/bolso/${bolso.id}`,
+        `${BASE_URL}/bolsos_inventario/bolso/${bolso.id}`,
         { headers }
       );
       if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -181,7 +182,7 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
         ...(controlado === 'FALTANTE' ? { observaciones: observaciones[inventarioId] } : {}),
       }));
 
-      const res = await fetch(`${API_BASE_URL}/checklist_bolsos/bolsos/guardar`, {
+      const res = await fetch(`${BASE_URL}/checklist_bolsos/bolsos/guardar`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ bolsoId: bolsoActivo.id, detalles }),

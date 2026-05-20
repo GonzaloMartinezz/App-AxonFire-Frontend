@@ -149,20 +149,6 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
       onChange('');
     }
   }
-
-  // El retorno del componente JSX iría aquí si fuera necesario exponerlo completo,
-  // manteniendo la consistencia de la UI de la rama dev.
-}
-
-export default function EmergencyScreen({ route, navigation }) {
-  // Obtener alerta_id desde los parámetros de navegación (fallback para dev)
-  const navAlertaId = route?.params?.alerta_id ?? null;
-
-  const { user, token } = useAuth();
-  const usuarioId = user?.id ?? null;
-
-  const [resolvedAlertaId, setResolvedAlertaId] = useState(navAlertaId);
-
   const estaVacio   = texto.length === 0;
   const esValido    = esHoraValida(texto);
 
@@ -417,10 +403,6 @@ export default function EmergencyScreen({ route, navigation }) {
       } catch (err) {
         respuestas = await loadMockResponses(activeAlertaId, usuarioId);
       }
-        }
-      } catch (err) {
-        respuestas = await loadMockResponses(activeAlertaId, usuarioId);
-      }
       
       // Ver si YO ya respondí
       const miRespuesta = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
@@ -463,7 +445,7 @@ export default function EmergencyScreen({ route, navigation }) {
     } finally {
       setLoadingAlerta(false);
     }
-  }, [navAlertaId, token, usuarioId]);
+  }, [resolvedAlertaId, alertaId, token, usuarioId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -785,7 +767,6 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
                 </View>
               </View>
             )}
-          </Animated.View>
 
           {/* Botón cambiar respuesta */}
           {respuesta !== 'FINALIZADA' && !alertaData?.estadoAlerta?.nombre_estado?.includes('FINALIZADO') && (
@@ -870,16 +851,33 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
             </View>
           )}
 
+          {responders.length > 0 && (
+            <View style={styles.respondersPreview}>
+              <View style={styles.respondersHeader}>
+                <MaterialCommunityIcons name="account-group" size={18} color="#3b82f6" />
+                <Text style={styles.respondersTitle}>PERSONAL RESPONDIENDO ({responders.length})</Text>
+              </View>
+              <View style={styles.respondersGrid}>
+                {responders.map((r, idx) => (
+                  <View key={idx} style={styles.responderChip}>
+                    <Text style={styles.responderChipText}>{r.nombre[0]}. {r.apellido}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.confirmButton, loading && styles.buttonDisabled]}
               onPress={() => enviarRespuesta('ACEPTADO')}
               disabled={loading}
             >
-              {loading
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
-              }
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
+              )}
               <Text style={styles.buttonText}>CONFIRMAR ASISTENCIA</Text>
             </TouchableOpacity>
 
@@ -888,64 +886,17 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
               onPress={() => enviarRespuesta('RECHAZADO')}
               disabled={loading}
             >
-              {loading
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
-              }
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
+              )}
               <Text style={styles.buttonText}>RECHAZAR</Text>
             </TouchableOpacity>
           </View>
-)}
-
-        {/* RESPONDERS LIST - Vista de dotación (Pre-confirmación) - Aporte carona */}
-        {responders.length > 0 && (
-          <View style={styles.respondersPreview}>
-            <View style={styles.respondersHeader}>
-              <MaterialCommunityIcons name="account-group" size={18} color="#3b82f6" />
-              <Text style={styles.respondersTitle}>PERSONAL RESPONDIENDO ({responders.length})</Text>
-            </View>
-            <View style={styles.respondersGrid}>
-              {responders.map((r, idx) => (
-                <View key={idx} style={styles.responderChip}>
-                  <Text style={styles.responderChipText}>{r.nombre[0]}. {r.apellido}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* ACCIONES DE RESPUESTA DIRECTA */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.confirmButton, loading && styles.buttonDisabled]}
-            onPress={() => enviarRespuesta('ACEPTADO')}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
-            )}
-            <Text style={styles.buttonText}>CONFIRMAR ASISTENCIA</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.rejectButton, loading && styles.buttonDisabled]}
-            onPress={() => enviarRespuesta('RECHAZADO')}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
-            )}
-            <Text style={styles.buttonText}>RECHAZAR</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* FOOTER */}
         <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
-          <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -1020,8 +971,6 @@ const styles = StyleSheet.create({
   },
   botonGuardarTiemposTexto: {
     color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 1,
-  },
-});
   },
   // Responders List
   respondersPreview: {

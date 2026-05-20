@@ -149,7 +149,7 @@ export default function AlertsScreen({ navigation }) {
                   style={styles.dropdownItem}
                   onPress={() => {
                     setShowMenu(false);
-                    navigation?.navigate('Checklist');
+                    navigation?.navigate('WeeklyChecklist', { initialTab: 'diario' });
                   }}
                 >
                   <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#263238" />
@@ -193,7 +193,7 @@ export default function AlertsScreen({ navigation }) {
                   style={styles.dropdownItem}
                   onPress={() => {
                     setShowMenu(false);
-                    navigation?.navigate('WeeklyChecklist');
+                    navigation?.navigate('WeeklyChecklist', { initialTab: 'inventario' });
                   }}
                 >
                   <MaterialCommunityIcons name="calendar-check" size={20} color="#263238" />
