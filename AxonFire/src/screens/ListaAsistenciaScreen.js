@@ -14,10 +14,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = API_BASE_URL;
 
 // Configuración visual por estado de respuesta
 const CONFIG_ESTADO = {
@@ -60,19 +62,13 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
   async function cargarAlerta() {
     if (!alertaId) return;
     try {
-      const res = await fetch(`${BASE_URL}/alerta/${alertaId}`, { headers });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-      
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = { 
-        id: alertaId || '1', 
-        tipo: 'Incendio Estructural', 
-        ubicacion: 'Calle Falsa 123', 
-        observaciones: 'Se reporta humo saliendo por la ventana trasera.' 
-      };
-      */
-      setAlerta(data);
+      const res = await axios.get(`${BASE_URL}/alerta/${alertaId}`, {
+        headers,
+        timeout: 1500
+      });
+      if (res.status === 200) {
+        setAlerta(res.data);
+      }
     } catch (err) {
       console.error('Error cargando alerta:', err);
     }
@@ -80,39 +76,34 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
 
   // ── Cargar las respuestas (la lista de asistencia) ────────────────────────
   async function cargarRespuestas(esRefresh = false) {
-    if (!alertaId) return;
+    if (!alertaId) {
+      setCargando(false);
+      setRefrescando(false);
+      return;
+    }
     if (esRefresh) setRefrescando(true);
     else setCargando(true);
 
     try {
       // Traemos TODAS las respuestas y filtramos por esta alerta.
-      // El backend actual no tiene un endpoint filtrado por alerta_id,
-      // así que lo hacemos del lado del cliente.
-      const res = await fetch(`${BASE_URL}/respuestas_alertas/`, { headers });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
+      const res = await axios.get(`${BASE_URL}/respuestas_alertas/`, {
+        headers,
+        timeout: 1500
+      });
+      if (res.status === 200) {
+        const data = res.data;
+        const deEstaAlerta = (Array.isArray(data) ? data : []).filter(
+          (r) => r.alerta_id === alertaId || r.alertaId === alertaId
+        );
 
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        { alerta_id: alertaId, usuario_id: '101', estado_respuesta: 'ACEPTADO', fecha_hora: new Date(Date.now() - 600000).toISOString(), usuario: { bombero: { nombre: 'Juan', apellido: 'Pérez' } } },
-        { alerta_id: alertaId, usuario_id: '102', estado_respuesta: 'RECHAZADO', fecha_hora: new Date(Date.now() - 300000).toISOString(), usuario: { bombero: { nombre: 'María', apellido: 'Gómez' } } },
-        { alerta_id: alertaId, usuario_id: '103', estado_respuesta: 'PENDIENTE', fecha_hora: new Date(Date.now() - 100000).toISOString(), usuario: { bombero: { nombre: 'Carlos', apellido: 'López' } } },
-        { alerta_id: alertaId, usuario_id: usuarioId, estado_respuesta: 'PENDIENTE', fecha_hora: new Date(Date.now() - 50000).toISOString(), usuario: { nombre_usuario: 'Yo' } }
-      ];
-      */
+        setRespuestas(deEstaAlerta);
 
-      const deEstaAlerta = (Array.isArray(data) ? data : []).filter(
-        (r) => r.alerta_id === alertaId || r.alertaId === alertaId || !alertaId
-      );
-
-      setRespuestas(deEstaAlerta);
-
-      // Verificamos si el usuario actual ya respondió
-      const yaRespondi = deEstaAlerta.find(
-        (r) => r.usuario_id === usuarioId || r.usuarioId === usuarioId
-      );
-      if (yaRespondi) setMiRespuesta(yaRespondi.estado_respuesta);
-
+        // Verificamos si el usuario actual ya respondió
+        const yaRespondi = deEstaAlerta.find(
+          (r) => r.usuario_id === usuarioId || r.usuarioId === usuarioId
+        );
+        if (yaRespondi) setMiRespuesta(yaRespondi.estado_respuesta);
+      }
     } catch (err) {
       console.error('Error cargando respuestas:', err);
     } finally {
@@ -135,29 +126,31 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
 
     setRespondiendo(true);
     try {
-      const res = await fetch(
+      const res = await axios.post(
         `${BASE_URL}/respuestas_alertas/responder/${alertaId}/${usuarioId}`,
         {
-          method: 'POST',
+          estado_respuesta: estado,
+          fecha_hora: new Date().toISOString(),
+        },
+        {
           headers,
-          body: JSON.stringify({
-            estado_respuesta: estado,
-            fecha_hora: new Date().toISOString(),
-          }),
+          timeout: 2000
         }
       );
 
-      if (!res.ok) throw new Error(`Error ${res.status}`);
+      if (res.status === 200 || res.status === 201) {
+        setMiRespuesta(estado);
+        cargarRespuestas(true);
 
-      setMiRespuesta(estado);
-      cargarRespuestas(true);
-
-      Alert.alert(
-        estado === 'ACEPTADO' ? '✅ Confirmado' : '❌ Rechazado',
-        estado === 'ACEPTADO'
-          ? 'Tu asistencia quedó registrada.'
-          : 'Rechazaste la alerta. Quedó registrado.'
-      );
+        Alert.alert(
+          estado === 'ACEPTADO' ? '✅ Confirmado' : '❌ Rechazado',
+          estado === 'ACEPTADO'
+            ? 'Tu asistencia quedó registrada.'
+            : 'Rechazaste la alerta. Quedó registrado.'
+        );
+      } else {
+        throw new Error(`Status ${res.status}`);
+      }
     } catch (err) {
       console.error('Error al responder:', err);
       Alert.alert('Error', 'No se pudo enviar tu respuesta. Intentá de nuevo.');

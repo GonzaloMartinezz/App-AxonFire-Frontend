@@ -101,7 +101,10 @@ export default function ProfileScreen({ navigation }) {
               <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.adminMenuCard}>
+            <TouchableOpacity 
+              style={styles.adminMenuCard}
+              onPress={() => navigation?.navigate('AdminEquipment')}
+            >
               <View style={[styles.adminMenuIcon, { backgroundColor: '#fce7f3' }]}>
                 <MaterialCommunityIcons name="fire-truck" size={24} color="#be185d" />
               </View>

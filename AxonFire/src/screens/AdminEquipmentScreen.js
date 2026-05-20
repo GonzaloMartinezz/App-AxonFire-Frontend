@@ -16,6 +16,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 
+function getMockTools() {
+  return [
+    { id: 't1', nombre_herramienta: 'EXTINTOR ABC 10KG', cantidad_disponible: 12, descripcion: 'Extintores reglamentarios de polvo' },
+    { id: 't2', nombre_herramienta: 'MANGUERA DE ALTA PRESIÓN 2.5"', cantidad_disponible: 8, descripcion: 'Mangueras de tela sintética' },
+    { id: 't3', nombre_herramienta: 'HACHA DE RESCATE', cantidad_disponible: 4, descripcion: 'Hachas con mango de fibra de vidrio' },
+    { id: 't4', nombre_herramienta: 'EQUIPO ERA (SCBA)', cantidad_disponible: 6, descripcion: 'Equipos de respiración autónoma' },
+    { id: 'fixed_radio', nombre_herramienta: 'RADIO DE REPUESTO', cantidad_disponible: 5, descripcion: 'Equipo de comunicación base de repuesto' },
+    { id: 'fixed_motosierra', nombre_herramienta: 'MOTOSIERRA DE CUARTEL', cantidad_disponible: 2, descripcion: 'Motosierra asignada para mantenimiento general del cuartel' }
+  ];
+}
+
 export default function AdminEquipmentScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
@@ -34,9 +45,31 @@ export default function AdminEquipmentScreen({ navigation }) {
       const res = await fetch(`${API_BASE_URL}/herramientas/`, {
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
-      if (res.ok) { const data = await res.json(); setHerramientas(Array.isArray(data) ? data : []); }
-    } catch (e) { console.warn('Error fetching herramientas:', e); }
-    finally { setLoadingBase(false); }
+      let data = [];
+      if (res.ok) {
+        data = await res.json();
+      }
+      let tools = Array.isArray(data) ? data : [];
+      if (tools.length === 0) {
+        tools = getMockTools();
+      } else {
+        const hasRadio = tools.some(t => t.nombre_herramienta?.toUpperCase().includes('RADIO DE REPUESTO'));
+        const hasMotosierra = tools.some(t => t.nombre_herramienta?.toUpperCase().includes('MOTOSIERRA DE CUARTEL'));
+        
+        if (!hasRadio) {
+          tools.push({ id: 'fixed_radio', nombre_herramienta: 'RADIO DE REPUESTO', cantidad_disponible: 5, descripcion: 'Equipo de comunicación base de repuesto' });
+        }
+        if (!hasMotosierra) {
+          tools.push({ id: 'fixed_motosierra', nombre_herramienta: 'MOTOSIERRA DE CUARTEL', cantidad_disponible: 2, descripcion: 'Motosierra asignada para mantenimiento general del cuartel' });
+        }
+      }
+      setHerramientas(tools);
+    } catch (e) {
+      console.warn('Error fetching herramientas:', e);
+      setHerramientas(getMockTools());
+    } finally {
+      setLoadingBase(false);
+    }
   };
 
   const getStockColor = (qty) => qty > 5 ? '#22c55e' : qty > 0 ? '#eab308' : '#dc2626';

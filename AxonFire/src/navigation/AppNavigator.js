@@ -213,6 +213,7 @@ export default function AppNavigator() {
           <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
           <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
           <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
+          <Stack.Screen name="AdminEquipment" component={AdminEquipmentScreen} />
         </>
       )}
     </Stack.Navigator>
