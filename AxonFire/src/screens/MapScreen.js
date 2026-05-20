@@ -77,7 +77,7 @@ export default function MapScreen({ navigation }) {
               <MaterialCommunityIcons name="shield-account" size={16} color={Colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.emergencyIcon}>
-              <MaterialCommunityIcons name="asterisk" size={16} color={Colors.primary} />
+              <MaterialCommunityIcons name="logout" size={16} color={Colors.primary} />
             </TouchableOpacity>
           </View>
         </View>

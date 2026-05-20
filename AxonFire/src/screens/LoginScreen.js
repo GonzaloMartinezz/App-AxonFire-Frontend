@@ -16,6 +16,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,6 +26,7 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -33,19 +36,40 @@ export default function LoginScreen({ navigation }) {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      if (email.toLowerCase().includes('admin')) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre_usuario: email,
+          password: password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+
+      // Guardar sesión en contexto (id, rol, token)
+      login(data);
+
+      if (data.rol === 'ADMIN') {
         navigation.replace('AdminApp');
         Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');
-      } else if (email.includes('@')) {
-        navigation.replace('MainApp'); 
-        Alert.alert('Acceso Autorizado', 'Bienvenido a la red táctica Axon Fire');
       } else {
-        Alert.alert('Error de Acceso', 'Credenciales no reconocidas por el sistema.');
+        navigation.replace('MainApp');
+        Alert.alert('Acceso Autorizado', 'Bienvenido a la red táctica Axon Fire');
       }
-    }, 1500);
+    } catch (err) {
+      console.error('Login error:', err);
+      Alert.alert('Error de Acceso', err.message || 'Credenciales no reconocidas por el sistema.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   return (
     <View style={styles.container}>
@@ -148,14 +172,6 @@ export default function LoginScreen({ navigation }) {
                 </Text>
               </View>
             </View>
-
-            <TouchableOpacity 
-              style={styles.footerLink}
-              onPress={() => navigation.navigate('Register')}
-            >
-              <Text style={styles.footerLinkText}>SOLICITA ACCESO AQUÍ</Text>
-              <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#fff" style={{ marginLeft: 8 }} />
-            </TouchableOpacity>
 
             <View style={styles.statusFooter}>
               <Text style={styles.statusText}>STATUS: OPERATIONAL</Text>
@@ -339,17 +355,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginLeft: 12,
     flex: 1,
-  },
-  footerLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 60,
-  },
-  footerLinkText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
   },
   statusFooter: {
     flexDirection: 'row',
