@@ -35,7 +35,7 @@ import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
-import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
+import ChecklistBolsosScreen from '../screens/Checklistbolsosscreen';
  
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
