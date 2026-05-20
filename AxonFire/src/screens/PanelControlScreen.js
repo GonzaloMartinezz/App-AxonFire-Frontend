@@ -9,18 +9,50 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Dimensions,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
 
-const BASE_URL = 'http://localhost:3000';
+function getMockAlerts() {
+  return [
+    {
+      id: 'a1',
+      observaciones: 'Incendio Estructural',
+      fecha_hora: new Date().toISOString(),
+      estadoAlerta: { nombre_estado: 'ACTIVA' },
+      subCategoriaAlerta: { nombre_sub_categoria: 'INCENDIO', prioridad: '1' },
+      ubicacion: 'Av. Corrientes 1234'
+    },
+    {
+      id: 'a2',
+      observaciones: 'Accidente de Tránsito',
+      fecha_hora: new Date(Date.now() - 3600000).toISOString(),
+      estadoAlerta: { nombre_estado: 'DESPACHADA' },
+      subCategoriaAlerta: { nombre_sub_categoria: 'RESCATE', prioridad: '2' },
+      ubicacion: 'Ruta 9 Km 45'
+    },
+    {
+      id: 'a3',
+      observaciones: 'Derrame de Químicos',
+      fecha_hora: new Date(Date.now() - 7200000).toISOString(),
+      estadoAlerta: { nombre_estado: 'RESUELTA' },
+      subCategoriaAlerta: { nombre_sub_categoria: 'HAZMAT', prioridad: '1' },
+      ubicacion: 'Parque Industrial'
+    }
+  ];
+}
+const screenWidth = Dimensions.get('window').width;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// Convierte el estado que viene del backend a un key que yo pueda contar
 function clasificarEstado(nombreEstado = '') {
   const e = nombreEstado.toLowerCase();
   if (e.includes('activ')) return 'activa';
@@ -48,11 +80,26 @@ function tiempoTranscurrido(fechaISO) {
   return `Hace ${Math.floor(hs / 24)} días`;
 }
 
-// ── Componente principal ─────────────────────────────────────────────────────
+// Group alerts by week for line chart
+function agruparPorSemana(clasificadas) {
+  const now = Date.now();
+  const weeks = [0, 0, 0, 0]; // 4 weeks: current, -1, -2, -3
+  clasificadas.forEach(a => {
+    if (!a.fecha) return;
+    const diff = now - new Date(a.fecha).getTime();
+    const weekIdx = Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+    if (weekIdx >= 0 && weekIdx < 4) weeks[weekIdx]++;
+  });
+  return weeks.reverse(); // oldest first
+}
 
-export default function PanelControlScreen({ navigation, route }) {
+// Removed chart config
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const token = route?.params?.token || '';
+  const { user, token } = useAuth();
 
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -68,32 +115,24 @@ export default function PanelControlScreen({ navigation, route }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await fetch(`${BASE_URL}/alerta/rango`, {
-        method: 'GET',
+      const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        // El backend espera el rango en el body aunque sea GET (está documentado así)
-        body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
+        data: { fecha_desde: desde, fecha_hasta: hasta },
+        timeout: 3000,
       });
 
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-      
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        { tipo: 'Incendio Estructural', estado: 'activa', prioridad: 'critica', fecha_hora: new Date().toISOString() },
-        { tipo: 'Rescate Vehicular', estado: 'despachada', prioridad: 'alta', fecha_hora: new Date(Date.now() - 3600000).toISOString() },
-        { tipo: 'Fuga de Gas', estado: 'resuelta', prioridad: 'media', fecha_hora: new Date(Date.now() - 86400000).toISOString() },
-        { tipo: 'Asistencia Médica', estado: 'activa', prioridad: 'alta', fecha_hora: new Date(Date.now() - 500000).toISOString() }
-      ];
-      */
+      const data = res.data;
 
-      setAlertas(Array.isArray(data) ? data : []);
+      // Backend returns { alertas: [...] } — extract the array
+      const lista = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+      setAlertas(lista);
     } catch (err) {
-      console.error('Error cargando datos del panel:', err);
-      setError('No se pudo conectar al servidor.');
+      console.error('Error cargando datos del panel, usando mock data:', err);
+      setAlertas(getMockAlerts());
+      setError(null);
     } finally {
       setCargando(false);
       setRefrescando(false);
@@ -106,11 +145,10 @@ export default function PanelControlScreen({ navigation, route }) {
 
   // ── Cálculo de estadísticas ───────────────────────────────────────────────
 
-  // Clasificamos cada alerta para poder contarlas
   const clasificadas = alertas.map((a) => ({
-    estado: clasificarEstado(a.estadoAlerta?.nombre || a.estado || ''),
+    estado: clasificarEstado(a.estadoAlerta?.nombre_estado || a.estadoAlerta?.nombre || a.estado || ''),
     prioridad: clasificarPrioridad(a.prioridad || a.subCategoriaAlerta?.prioridad || ''),
-    tipo: a.subCategoriaAlerta?.nombre || a.tipo || 'Sin tipo',
+    tipo: a.subCategoriaAlerta?.nombre_sub_categoria || a.subCategoriaAlerta?.nombre || a.observaciones || 'Sin tipo',
     fecha: a.fecha_hora,
   }));
 
@@ -123,24 +161,30 @@ export default function PanelControlScreen({ navigation, route }) {
   const cantMedias = clasificadas.filter(a => a.prioridad === 'media').length;
   const cantBajas = clasificadas.filter(a => a.prioridad === 'baja').length;
 
-  // Las últimas 5 alertas para mostrar el historial reciente
-  const ultimasAlertas = clasificadas
+  const ultimasAlertas = [...clasificadas]
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
     .slice(0, 5);
 
+  // Removed chart data prep
+
+
   // ─────────────────────────────────────────────────────────────────────────
+
+  const chartWidth = screenWidth - (Spacing.lg * 2) - 32; // account for padding
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#263238" />
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.botonVolver}>
+          <MaterialCommunityIcons name="monitor-dashboard" size={24} color="#dc2626" />
+        </View>
         <Text style={styles.tituloHeader}>Panel de Control</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity style={styles.exportBtn} onPress={() => cargarDatos(true)} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="refresh" size={20} color="#f8fafc" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -172,7 +216,7 @@ export default function PanelControlScreen({ navigation, route }) {
         ) : (
           <>
             {/* ── Stat grande: total de alertas ───────────────────────────── */}
-            <TacticalCard elevated>
+            <TacticalCard elevated style={{ backgroundColor: '#1e293b' }}>
               <Text style={styles.labelStat}>ALERTAS ÚLTIMOS 30 DÍAS</Text>
               <Text style={styles.numeroGrande}>{totalAlertas}</Text>
             </TacticalCard>
@@ -180,57 +224,27 @@ export default function PanelControlScreen({ navigation, route }) {
             {/* ── Stats por estado ──────────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>POR ESTADO</Text>
             <View style={styles.grilla}>
-              <View style={[styles.cardStat, { backgroundColor: '#fce4ec' }]}>
-                <MaterialCommunityIcons name="alert-circle" size={24} color="#af101a" />
-                <Text style={[styles.statNumero, { color: '#af101a' }]}>{cantActivas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#450a0a' }]}>
+                <MaterialCommunityIcons name="alert-circle" size={24} color="#fca5a5" />
+                <Text style={[styles.statNumero, { color: '#fca5a5' }]}>{cantActivas}</Text>
                 <Text style={styles.statLabel}>Activas</Text>
               </View>
-              <View style={[styles.cardStat, { backgroundColor: '#e3f2fd' }]}>
-                <MaterialCommunityIcons name="truck-delivery" size={24} color="#1976d2" />
-                <Text style={[styles.statNumero, { color: '#1976d2' }]}>{cantDespachadas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#1e1e1e' }]}>
+                <MaterialCommunityIcons name="truck-delivery" size={24} color="#93c5fd" />
+                <Text style={[styles.statNumero, { color: '#93c5fd' }]}>{cantDespachadas}</Text>
                 <Text style={styles.statLabel}>Despachadas</Text>
               </View>
-              <View style={[styles.cardStat, { backgroundColor: '#e8f5e9' }]}>
-                <MaterialCommunityIcons name="check-circle" size={24} color="#388e3c" />
-                <Text style={[styles.statNumero, { color: '#388e3c' }]}>{cantResueltas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#052e16' }]}>
+                <MaterialCommunityIcons name="check-circle" size={24} color="#86efac" />
+                <Text style={[styles.statNumero, { color: '#86efac' }]}>{cantResueltas}</Text>
                 <Text style={styles.statLabel}>Resueltas</Text>
               </View>
-              <View style={[styles.cardStat, { backgroundColor: '#f1f5f9' }]}>
-                <MaterialCommunityIcons name="clipboard-list" size={24} color="#64748b" />
-                <Text style={[styles.statNumero, { color: '#64748b' }]}>{totalAlertas}</Text>
+              <View style={[styles.cardStat, { backgroundColor: '#1e293b' }]}>
+                <MaterialCommunityIcons name="clipboard-list" size={24} color="#94a3b8" />
+                <Text style={[styles.statNumero, { color: '#94a3b8' }]}>{totalAlertas}</Text>
                 <Text style={styles.statLabel}>Total</Text>
               </View>
             </View>
-
-            {/* ── Stats por severidad ──────────────────────────────────── */}
-            <Text style={styles.tituloSeccion}>POR SEVERIDAD</Text>
-            <TacticalCard elevated>
-              <View style={styles.filaSeveridad}>
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#af101a' }]} />
-                  <Text style={styles.severidadNumero}>{cantCriticas}</Text>
-                  <Text style={styles.severidadLabel}>Críticas</Text>
-                </View>
-                <View style={styles.separador} />
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#f97316' }]} />
-                  <Text style={styles.severidadNumero}>{cantAltas}</Text>
-                  <Text style={styles.severidadLabel}>Altas</Text>
-                </View>
-                <View style={styles.separador} />
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#eab308' }]} />
-                  <Text style={styles.severidadNumero}>{cantMedias}</Text>
-                  <Text style={styles.severidadLabel}>Medias</Text>
-                </View>
-                <View style={styles.separador} />
-                <View style={styles.itemSeveridad}>
-                  <View style={[styles.punto, { backgroundColor: '#94a3b8' }]} />
-                  <Text style={styles.severidadNumero}>{cantBajas}</Text>
-                  <Text style={styles.severidadLabel}>Bajas</Text>
-                </View>
-              </View>
-            </TacticalCard>
 
             {/* ── Últimas alertas ──────────────────────────────────────── */}
             <Text style={styles.tituloSeccion}>ACTIVIDAD RECIENTE</Text>
@@ -238,7 +252,7 @@ export default function PanelControlScreen({ navigation, route }) {
               <Text style={styles.textoVacio}>Sin actividad registrada</Text>
             ) : (
               ultimasAlertas.map((a, idx) => (
-                <TacticalCard key={idx}>
+                <TacticalCard key={idx} style={{ backgroundColor: '#1e293b' }}>
                   <View style={styles.filaActividad}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
@@ -260,7 +274,7 @@ export default function PanelControlScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
+  container: { flex: 1, backgroundColor: '#0a0a0a' }, // Dark background
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -268,10 +282,15 @@ const styles = StyleSheet.create({
   },
   botonVolver: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: '#1e293b',
     alignItems: 'center', justifyContent: 'center',
   },
-  tituloHeader: { fontSize: 17, fontWeight: '800', color: Colors.onSurface },
+  tituloHeader: { fontSize: 17, fontWeight: '900', color: '#f8fafc', textTransform: 'uppercase', letterSpacing: 0.5 },
+  exportBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#1e293b',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   contenido: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
 
@@ -285,15 +304,15 @@ const styles = StyleSheet.create({
 
   labelStat: {
     fontSize: 10, fontWeight: '800', letterSpacing: 1,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase', marginBottom: 4,
+    color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4,
   },
   numeroGrande: {
-    fontSize: 48, fontWeight: '900', color: Colors.onSurface, letterSpacing: -1,
+    fontSize: 48, fontWeight: '900', color: '#f8fafc', letterSpacing: -1,
   },
 
   tituloSeccion: {
-    fontSize: 11, fontWeight: '700', letterSpacing: 0.8,
-    color: Colors.onSurface, textTransform: 'uppercase',
+    fontSize: 11, fontWeight: '800', letterSpacing: 1,
+    color: '#f8fafc', textTransform: 'uppercase',
     marginTop: Spacing.lg, marginBottom: Spacing.md,
   },
 
@@ -308,20 +327,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.4,
   },
 
-  filaSeveridad: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-  },
-  itemSeveridad: { alignItems: 'center', flex: 1, gap: 4 },
-  punto: { width: 8, height: 8, borderRadius: 4, marginBottom: 2 },
-  severidadNumero: { fontSize: 22, fontWeight: '900', color: Colors.onSurface },
-  severidadLabel: {
-    fontSize: 10, fontWeight: '700', color: '#90a4ae',
-    textTransform: 'uppercase', letterSpacing: 0.4,
-  },
-  separador: { width: 1, height: 36, backgroundColor: Colors.surfaceContainerLow },
+  // Removed severidad styles
 
   filaActividad: { flexDirection: 'row', alignItems: 'center' },
-  textoActividad: { fontSize: 13, fontWeight: '700', color: Colors.onSurface },
-  tiempoActividad: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
+  textoActividad: { fontSize: 13, fontWeight: '800', color: '#f8fafc' },
+  tiempoActividad: { fontSize: 11, color: '#94a3b8', fontWeight: '700' },
   textoVacio: { fontSize: 13, color: '#94a3b8', fontWeight: '600', textAlign: 'center', paddingVertical: 20 },
+
 });

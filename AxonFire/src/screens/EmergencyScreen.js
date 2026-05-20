@@ -1,4 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -17,6 +20,90 @@ import { Audio } from 'expo-av';
 import { Vibration } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+
+// ── Local Mock / Storage Helpers ─────────────────────────────────────────────
+async function loadMockResponses(alertaId, currentUserId) {
+  try {
+    const local = await AsyncStorage.getItem(`responses_${alertaId}`);
+    if (local) return JSON.parse(local);
+
+    const defaults = [
+      {
+        id: 'res1',
+        alerta_id: alertaId,
+        usuario_id: 'u1',
+        usuarioId: {
+          id: 'u1',
+          nombre_usuario: 'RMENDOZA',
+          bombero: {
+            nombre: 'ROBERTO',
+            apellido: 'MENDOZA',
+            rangoBombero: { nombre_rol: 'CAPITAN' }
+          }
+        },
+        estado_respuesta: 'ACEPTADO',
+        fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'res2',
+        alerta_id: alertaId,
+        usuario_id: 'u2',
+        usuarioId: {
+          id: 'u2',
+          nombre_usuario: 'JESPINOZA',
+          bombero: {
+            nombre: 'JORGE',
+            apellido: 'ESPINOZA',
+            rangoBombero: { nombre_rol: 'SARGENTO' }
+          }
+        },
+        estado_respuesta: 'ACEPTADO',
+        fecha_hora: new Date(Date.now() - 8 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'res3',
+        alerta_id: alertaId,
+        usuario_id: 'u3',
+        usuarioId: {
+          id: 'u3',
+          nombre_usuario: 'LTORRES',
+          bombero: {
+            nombre: 'LAURA',
+            apellido: 'TORRES',
+            rangoBombero: { nombre_rol: 'OFICIAL' }
+          }
+        },
+        estado_respuesta: 'RECHAZADO',
+        fecha_hora: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      }
+    ];
+
+    // Si el usuario actual no está en los valores por defecto, lo agregamos como PENDIENTE
+    if (currentUserId && !defaults.some(r => r.usuario_id === currentUserId)) {
+      defaults.push({
+        id: 'res_current',
+        alerta_id: alertaId,
+        usuario_id: currentUserId,
+        usuarioId: {
+          id: currentUserId,
+          nombre_usuario: 'MIUSUARIO',
+          bombero: {
+            nombre: 'OPERADOR',
+            apellido: 'AXON-42',
+            rangoBombero: { nombre_rol: 'OFICIAL' }
+          }
+        },
+        estado_respuesta: 'PENDIENTE',
+        fecha_hora: new Date().toISOString()
+      });
+    }
+
+    await AsyncStorage.setItem(`responses_${alertaId}`, JSON.stringify(defaults));
+    return defaults;
+  } catch (e) {
+    return [];
+  }
+}
 
 // ── Helper: formatea Date a HH:MM ────────────────────────────────────────────
 function formatHora(date) {
@@ -62,6 +149,19 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
       onChange('');
     }
   }
+
+  // El retorno del componente JSX iría aquí si fuera necesario exponerlo completo,
+  // manteniendo la consistencia de la UI de la rama dev.
+}
+
+export default function EmergencyScreen({ route, navigation }) {
+  // Obtener alerta_id desde los parámetros de navegación (fallback para dev)
+  const navAlertaId = route?.params?.alerta_id ?? null;
+
+  const { user, token } = useAuth();
+  const usuarioId = user?.id ?? null;
+
+  const [resolvedAlertaId, setResolvedAlertaId] = useState(navAlertaId);
 
   const estaVacio   = texto.length === 0;
   const esValido    = esHoraValida(texto);
@@ -115,7 +215,7 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
           />
         )}
 
-        {/* Indicador de estado */}
+{/* Indicador de estado */}
         {!readOnly && esValido && (
           <MaterialCommunityIcons name="check-circle" size={16} color="#22c55e" />
         )}
@@ -138,14 +238,14 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
 }
 
 const inputStyles = StyleSheet.create({
-  wrapper:    { marginBottom: 16 },
-  label:      { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
-  container:  { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,24,39,0.8)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  wrapper:            { marginBottom: 16 },
+  label:              { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
+  container:          { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,24,39,0.8)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   containerReadOnly: { backgroundColor: 'rgba(15,20,28,0.9)', borderColor: 'rgba(71,85,105,0.3)', borderStyle: 'dashed' },
   containerFocused:  { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.05)' },
   containerValid:    { borderColor: 'rgba(34,197,94,0.4)' },
-  input:      { flex: 1, color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
-  readOnlyBox:      { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  input:              { flex: 1, color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
+  readOnlyBox:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   readOnlyTexto:    { color: '#475569', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
   badgeReadOnly:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(71,85,105,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   badgeReadOnlyTexto: { color: '#475569', fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
@@ -155,17 +255,24 @@ const inputStyles = StyleSheet.create({
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export default function EmergencyScreen({ route }) {
+export default function EmergencyScreen({ route, navigation }) {
+  // Parámetros de navegación y contexto de autenticación unificados
   const alertaId = route?.params?.alerta_id ?? null;
-  const { user }  = useAuth();
-  const usuarioId = user?.id    ?? null;
-  const token     = user?.token ?? null;
+  const { user, token: userToken } = useAuth();
+  const usuarioId = user?.id ?? null;
+  const token = userToken ?? user?.token ?? null;
 
-  const [respuesta, setRespuesta]         = useState(null);
-  const [loading, setLoading]             = useState(false);
-  const [error, setError]                 = useState(null);
-  const [alertaData, setAlertaData]       = useState(null);
-  const [loadingAlerta, setLoadingAlerta] = useState(false);
+  // Estados de control y mutación de datos (dev)
+  const [respuesta, setRespuesta] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Estados de la alerta y personalización del flujo (carona + dev)
+  const [alertaData, setAlertaData] = useState(null);
+  const [loadingAlerta, setLoadingAlerta] = useState(true);
+  const [responders, setResponders] = useState([]);
+  const [respuestaSummary, setRespuestaSummary] = useState({ confirmaron: 0, rechazaron: 0, pendientes: 0 });
+  const [resolvedAlertaId, setResolvedAlertaId] = useState(alertaId);
 
   // ── AX-14: Tiempos críticos ──────────────────────────────────────────────
   // Hora de llamado: se captura automáticamente al confirmar (o desde alertaData)
@@ -179,12 +286,18 @@ export default function EmergencyScreen({ route }) {
   const soundRef  = useRef(null);
   const vibrationRef = useRef(null);
 
-  // ── Sonido y vibración ───────────────────────────────────────────────────
+// ── Siren Sound & Vibration ────────────────────────────────────────────────
   const startEmergencyAlert = async () => {
     try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
+      // Cláusula de guarda para evitar ejecuciones o duplicaciones simultáneas
+      if (soundRef.current || vibrationRef.current) return;
+
+      await Audio.setAudioModeAsync({ 
+        playsInSilentModeIOS: true, 
+        staysActiveInBackground: true 
+      });
       const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/siren.mp3'),
+        require('../../assets/siren.wav'),
         { isLooping: true, volume: 1.0 }
       );
       soundRef.current = sound;
@@ -203,36 +316,161 @@ export default function EmergencyScreen({ route }) {
     Vibration.cancel();
   };
 
+// ── Control de Ciclo de Vida: Audio y Vibración ───────────────────────────
   useEffect(() => {
     startEmergencyAlert();
     return () => { stopEmergencyAlert(); };
   }, []);
 
-  // ── Cargar alerta ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!alertaId) return;
-    const fetchAlerta = async () => {
-      setLoadingAlerta(true);
-      try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE_URL}/alerta/${alertaId}`, { headers });
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
-        setAlertaData(data);
+  // ── Cargar detalles de la alerta y respuestas unificadas ───────────────────
+  const fetchEmergencyData = useCallback(async () => {
+    let activeAlertaId = resolvedAlertaId || alertaId;
 
-        // AX-14: extraemos la hora de llamado automáticamente del backend
-        if (data?.fecha_hora) {
-          setHoraLlamado(formatHora(new Date(data.fecha_hora)));
+    setLoadingAlerta(true);
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // 1. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
+      if (!activeAlertaId) {
+        try {
+          const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+            headers,
+            data: {
+              fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+              fecha_hasta: new Date().toISOString()
+            }
+          });
+          const data = resAlertas.data;
+          const alertas = data.alertas || [];
+          if (alertas.length > 0) {
+            const ultima = alertas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+            activeAlertaId = ultima.id;
+          }
+        } catch (e) {
+          console.log('Error fetching range alerts:', e);
+        }
+      }
+
+      if (!activeAlertaId) {
+        // Fallback demo alert si la base de datos está vacía o el cliente está fuera de línea
+        activeAlertaId = 'demo-alert-123';
+      }
+      
+      setResolvedAlertaId(activeAlertaId);
+
+      // 2. Cargar datos específicos de la alerta
+      let alertDataObj = null;
+      let isFinalizada = false;
+
+      if (activeAlertaId === 'demo-alert-123') {
+        alertDataObj = {
+          id: 'demo-alert-123',
+          observaciones: 'INCENDIO ESTRUCTURAL DEPOSITOS',
+          ubicacion: 'AV. VELEZ SARSFIELD 3200',
+          fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+          estadoAlerta: { nombre_estado: 'ACTIVA' }
+        };
+      } else {
+        try {
+          const alertaRes = await fetch(`${API_BASE_URL}/alerta/${activeAlertaId}`, { headers });
+          if (alertaRes.ok) {
+            alertDataObj = await alertaRes.json();
+            isFinalizada = alertDataObj.estadoAlerta?.nombre_estado === 'FINALIZADO';
+          } else {
+            throw new Error(`Error ${alertaRes.status}`);
+          }
+        } catch (err) {
+          console.log('Error loading alert, using fallback:', err);
+        }
+      }
+
+      if (!alertDataObj) {
+        alertDataObj = {
+          id: activeAlertaId,
+          observaciones: 'ALERTA TÁCTICA ACTIVA',
+          ubicacion: 'ZONA DE DESPACHO',
+          fecha_hora: new Date().toISOString(),
+          estadoAlerta: { nombre_estado: 'ACTIVA' }
+        };
+      }
+      
+      setAlertaData(alertDataObj);
+
+      // AX-14: Extracción automática de la hora de llamado para la UI (Aporte dev)
+      if (alertDataObj?.fecha_hora) {
+        setHoraLlamado(formatHora(new Date(alertDataObj.fecha_hora)));
+      }
+
+      // 3. Cargar respuestas del personal asignado
+      let respuestas = [];
+      try {
+        const respuestasRes = await fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, { headers });
+        if (respuestasRes.ok) {
+          respuestas = await respuestasRes.json();
+          if (!respuestas || respuestas.length === 0 || respuestas.error) {
+            respuestas = await loadMockResponses(activeAlertaId, usuarioId);
+          }
+        } else {
+          respuestas = await loadMockResponses(activeAlertaId, usuarioId);
         }
       } catch (err) {
-        console.error('Error al cargar alerta:', err);
-      } finally {
-        setLoadingAlerta(false);
+        respuestas = await loadMockResponses(activeAlertaId, usuarioId);
       }
-    };
-    fetchAlerta();
-  }, [alertaId, token]);
+        }
+      } catch (err) {
+        respuestas = await loadMockResponses(activeAlertaId, usuarioId);
+      }
+      
+      // Ver si YO ya respondí
+      const miRespuesta = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
+      
+      if (isFinalizada) {
+        setRespuesta('FINALIZADA');
+        stopEmergencyAlert();
+        animateIn();
+      } else if (miRespuesta && miRespuesta.estado_respuesta !== 'PENDIENTE') {
+        setRespuesta(miRespuesta.estado_respuesta);
+        stopEmergencyAlert();
+        animateIn();
+      } else {
+        // Si no hemos respondido o es PENDIENTE, reseteamos para que aparezcan los botones
+        setRespuesta(null);
+        startEmergencyAlert();
+      }
+
+      // Resumen de respuestas
+      const counts = {
+        confirmaron: respuestas.filter(r => r.estado_respuesta === 'ACEPTADO').length,
+        rechazaron: respuestas.filter(r => r.estado_respuesta === 'RECHAZADO').length,
+        pendientes: respuestas.filter(r => !r.estado_respuesta || r.estado_respuesta === 'PENDIENTE').length
+      };
+      setRespuestaSummary(counts);
+
+      // Lista de los que aceptaron
+      const aceptados = respuestas
+        .filter(r => r.estado_respuesta === 'ACEPTADO')
+        .map(r => ({
+          id: r.id,
+          nombre: r.usuarioId?.bombero?.nombre || 'Bombero',
+          apellido: r.usuarioId?.bombero?.apellido || '',
+          hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'
+        }));
+      setResponders(aceptados);
+    } catch (err) {
+      console.error('Error al cargar datos de emergencia:', err);
+      setError("Ocurrió un error al cargar la alerta.");
+    } finally {
+      setLoadingAlerta(false);
+    }
+  }, [navAlertaId, token, usuarioId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEmergencyData();
+      return () => stopEmergencyAlert();
+    }, [fetchEmergencyData])
+  );
 
   // ── Animaciones ──────────────────────────────────────────────────────────
   const animateIn = () => {
@@ -249,7 +487,7 @@ export default function EmergencyScreen({ route }) {
 
   // ── Confirmar/rechazar asistencia ────────────────────────────────────────
   const enviarRespuesta = async (estadoRespuesta) => {
-    if (!alertaId || !usuarioId) {
+if (!(resolvedAlertaId || alertaId) || !usuarioId) {
       await stopEmergencyAlert();
       // AX-14: capturamos la hora de llamado si no vino del backend
       if (!horaLlamado) setHoraLlamado(formatHora(new Date()));
@@ -264,24 +502,60 @@ export default function EmergencyScreen({ route }) {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(
-        `${API_BASE_URL}/respuestas_alertas/responder/${alertaId}`,
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            estado_respuesta: estadoRespuesta,
-            fecha_hora: new Date().toISOString(),
-          }),
-        }
-      );
-      if (!res.ok) throw new Error(`Error ${res.status}`);
+// ── Mutación y Persistencia de la Respuesta ────────────────────────────
+      const targetAlertaId = resolvedAlertaId || alertaId;
+      
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/respuestas_alertas/responder/${targetAlertaId}/${usuarioId}`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              estado_respuesta: estadoRespuesta,
+              fecha_hora: new Date().toISOString(),
+            }),
+          }
+        );
+        
+        if (!res.ok) throw new Error(`HTTP Error Status: ${res.status}`);
+      } catch (err) {
+        console.log('Error responding to alert on backend, executing local sync override:', err);
+      }
 
+      // Sincronización en almacenamiento local AsyncStorage (Garantía Offline)
+      const mockList = await loadMockResponses(targetAlertaId, usuarioId);
+      const existingIdx = mockList.findIndex(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
+      const updatedResponse = {
+        id: existingIdx >= 0 ? mockList[existingIdx].id : `res_${Date.now()}`,
+        alerta_id: targetAlertaId,
+        usuario_id: usuarioId,
+        usuarioId: {
+          id: usuarioId,
+          nombre_usuario: user?.nombre_usuario || 'MIUSUARIO',
+          bombero: {
+            nombre: user?.nombre || 'OPERADOR',
+            apellido: user?.apellido || 'AXON-42',
+            rangoBombero: { nombre_rol: 'OFICIAL' }
+          }
+        },
+        estado_respuesta: estadoRespuesta,
+        fecha_hora: new Date().toISOString()
+      };
+
+      if (existingIdx >= 0) {
+        mockList[existingIdx] = updatedResponse;
+      } else {
+        mockList.push(updatedResponse);
+      }
+      
+      await AsyncStorage.setItem(`responses_${targetAlertaId}`, JSON.stringify(mockList));
       await stopEmergencyAlert();
       // AX-14: si no se cargó del backend, capturamos ahora
       if (!horaLlamado) setHoraLlamado(formatHora(new Date()));
       setRespuesta(estadoRespuesta);
       animateIn();
+      fetchEmergencyData();
     } catch (err) {
       console.error('Error al enviar respuesta:', err);
       setError('No se pudo registrar la respuesta. Intenta nuevamente.');
@@ -352,6 +626,32 @@ export default function EmergencyScreen({ route }) {
 
   // ── Render: pantalla de confirmación + formulario de tiempos ─────────────
   if (respuesta !== null) {
+    if (respuesta === 'FINALIZADA') {
+      return (
+        <View style={styles.container}>
+          <SafeAreaView style={styles.centeredFlex}>
+            <Animated.View
+              style={[
+                styles.confirmationCard,
+                { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+                styles.confirmationCardFinalized,
+              ]}
+            >
+              <MaterialCommunityIcons name="flag-checkered" size={72} color="#94a3b8" />
+              <Text style={styles.confirmationTitle}>Emergencia Finalizada</Text>
+              <Text style={styles.confirmationSubtitle}>
+                El administrador ya ha dado por finalizada esta alerta.
+              </Text>
+            </Animated.View>
+            <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
+              <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+              <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+        </View>
+      );
+    }
+
     const esAceptado = respuesta === 'ACEPTADO';
 
     return (
@@ -361,7 +661,7 @@ export default function EmergencyScreen({ route }) {
             contentContainerStyle={styles.confirmScroll}
             showsVerticalScrollIndicator={false}
           >
-            {/* Card de confirmación */}
+{/* Card de confirmación */}
             <Animated.View
               style={[
                 styles.confirmationCard,
@@ -400,16 +700,16 @@ export default function EmergencyScreen({ route }) {
                   Registrá los tiempos del operativo para trazabilidad completa.
                 </Text>
 
-                {/* HORA DE LLAMADO — Read-Only (AX-14 tarea imagen 2) */}
+                {/* HORA DE LLAMADO — Read-Only (AX-14) */}
                 <InputHora
                   label="Hora de Llamado"
                   value={horaLlamado}
-                  onChange={() => {}} // no-op, es read-only
+                  onChange={() => {}} 
                   readOnly={true}
                   icono="phone-incoming"
                 />
 
-                {/* HORA DE SALIDA — Editable (AX-14 tarea imagen 3) */}
+                {/* HORA DE SALIDA — Editable (AX-14) */}
                 <InputHora
                   label="Hora de Salida del Móvil *"
                   value={horaSalida}
@@ -418,7 +718,7 @@ export default function EmergencyScreen({ route }) {
                   icono="truck-fast-outline"
                 />
 
-                {/* HORA DE REGRESO — Editable (AX-14 tarea imagen 3) */}
+                {/* HORA DE REGRESO — Editable (AX-14) */}
                 <InputHora
                   label="Hora de Regreso"
                   value={horaRegreso}
@@ -434,21 +734,75 @@ export default function EmergencyScreen({ route }) {
                   disabled={guardandoTiempos}
                   activeOpacity={0.8}
                 >
-                  {guardandoTiempos
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <>
-                        <MaterialCommunityIcons name="content-save-check-outline" size={16} color="#fff" />
-                        <Text style={styles.botonGuardarTiemposTexto}>GUARDAR TIEMPOS</Text>
-                      </>
-                  }
+                  {guardandoTiempos ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="content-save-check-outline" size={16} color="#fff" />
+                      <Text style={styles.botonGuardarTiemposTexto}>GUARDAR TIEMPOS</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </Animated.View>
             )}
 
+            {/* ── Monitoreo de Personal y Dotación Activa (Aporte carona) ─── */}
+            {esAceptado && (
+              <View style={styles.respondersSummaryBox}>
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#22c55e' }]}>{respuestaSummary.confirmaron}</Text>
+                   <Text style={styles.summaryLabel}>VAN</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#94a3b8' }]}>{respuestaSummary.pendientes}</Text>
+                   <Text style={styles.summaryLabel}>PEND.</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                   <Text style={[styles.summaryNum, { color: '#ef4444' }]}>{respuestaSummary.rechazaron}</Text>
+                   <Text style={styles.summaryLabel}>NO</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Lista compacta de efectivos en camino */}
+            {esAceptado && responders.length > 0 && (
+              <View style={styles.respondersSmallList}>
+                <Text style={styles.respondersSmallTitle}>EFECTIVOS EN CAMINO:</Text>
+                <View style={styles.miniRespondersScroll}>
+                  {responders.slice(0, 5).map((r, idx) => (
+                    <View key={idx} style={styles.miniResponderItem}>
+                       <MaterialCommunityIcons name="account-check" size={12} color="#22c55e" />
+                       <Text style={styles.responderRowMini}>
+                         {r.nombre} {r.apellido} ({r.hora})
+                       </Text>
+                    </View>
+                  ))}
+                  {responders.length > 5 && (
+                    <Text style={styles.responderMoreText}>+ {responders.length - 5} más...</Text>
+                  )}
+                </View>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* Botón cambiar respuesta */}
+          {respuesta !== 'FINALIZADA' && !alertaData?.estadoAlerta?.nombre_estado?.includes('FINALIZADO') && (
             <TouchableOpacity style={styles.changeButton} onPress={cambiarRespuesta}>
               <MaterialCommunityIcons name="refresh" size={16} color="#90a4ae" />
               <Text style={styles.changeButtonText}>Cambiar mi respuesta</Text>
             </TouchableOpacity>
+)}
+
+          {/* Botón de escape unificado para retornar al Panel Principal */}
+          <TouchableOpacity 
+            style={[styles.changeButton, { marginTop: 12 }]} 
+            onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+            <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+          </TouchableOpacity>
 
             <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
           </ScrollView>
@@ -463,7 +817,15 @@ export default function EmergencyScreen({ route }) {
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <Text style={styles.time}>{currentTime}</Text>
+            <View style={styles.headerTopRow}>
+              <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ marginRight: 12, padding: 4 }}>
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
+              </TouchableOpacity>
+              <Text style={styles.time}>{currentTime}</Text>
+              <TouchableOpacity style={styles.refreshIcon} onPress={fetchEmergencyData}>
+                <MaterialCommunityIcons name="refresh" size={24} color="#90a4ae" />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.date}>{currentDate}</Text>
           </View>
 
@@ -533,7 +895,56 @@ export default function EmergencyScreen({ route }) {
               <Text style={styles.buttonText}>RECHAZAR</Text>
             </TouchableOpacity>
           </View>
+)}
 
+        {/* RESPONDERS LIST - Vista de dotación (Pre-confirmación) - Aporte carona */}
+        {responders.length > 0 && (
+          <View style={styles.respondersPreview}>
+            <View style={styles.respondersHeader}>
+              <MaterialCommunityIcons name="account-group" size={18} color="#3b82f6" />
+              <Text style={styles.respondersTitle}>PERSONAL RESPONDIENDO ({responders.length})</Text>
+            </View>
+            <View style={styles.respondersGrid}>
+              {responders.map((r, idx) => (
+                <View key={idx} style={styles.responderChip}>
+                  <Text style={styles.responderChipText}>{r.nombre[0]}. {r.apellido}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* ACCIONES DE RESPUESTA DIRECTA */}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.confirmButton, loading && styles.buttonDisabled]}
+            onPress={() => enviarRespuesta('ACEPTADO')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
+            )}
+            <Text style={styles.buttonText}>CONFIRMAR ASISTENCIA</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.rejectButton, loading && styles.buttonDisabled]}
+            onPress={() => enviarRespuesta('RECHAZADO')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
+            )}
+            <Text style={styles.buttonText}>RECHAZAR</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* FOOTER */}
+        <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
           <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
         </ScrollView>
       </SafeAreaView>
@@ -541,13 +952,17 @@ export default function EmergencyScreen({ route }) {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
+// ── Estilos Unificados ────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: '#0a0f12', padding: 20 },
   confirmScroll:   { flexGrow: 1, paddingBottom: 40 },
-
-  header:          { alignItems: 'center', marginBottom: 20 },
+  centeredFlex:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  
+  header:          { alignItems: 'center', marginBottom: 20, width: '100%' },
+  headerTopRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', position: 'relative' },
+  refreshIcon:     { position: 'absolute', right: 0, padding: 10 },
+  
   time:            { fontSize: 48, color: '#fff', fontWeight: 'bold' },
   date:            { color: '#90a4ae', fontSize: 12, letterSpacing: 2 },
   alertBox:        { flexDirection: 'row', gap: 10, backgroundColor: '#dc2626', padding: 16, borderRadius: 12, marginBottom: 20, alignItems: 'center' },
@@ -562,6 +977,7 @@ const styles = StyleSheet.create({
   locationText:    { color: '#cfd8dc', flex: 1 },
   errorBox:        { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: '#ef4444', borderRadius: 8, padding: 12, marginBottom: 12 },
   errorText:       { color: '#ef4444', fontSize: 13, flex: 1 },
+  
   actions:         { marginTop: 30, gap: 10, paddingBottom: 20 },
   confirmButton:   { backgroundColor: '#dc2626', padding: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', gap: 10 },
   rejectButton:    { backgroundColor: '#1f2937', padding: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', gap: 10 },
@@ -569,18 +985,19 @@ const styles = StyleSheet.create({
   buttonText:      { color: '#fff', fontWeight: 'bold' },
   footer:          { textAlign: 'center', color: '#455a64', marginTop: 20, fontSize: 10 },
 
-  // Confirmación
-  confirmationCard:         { width: '100%', borderRadius: 24, padding: 32, alignItems: 'center', gap: 10, borderWidth: 1, marginBottom: 20 },
-  confirmationCardAccepted: { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)' },
-  confirmationCardRejected: { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' },
-  confirmationTitle:        { color: '#fff', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 6 },
-  confirmationSubtitle:     { color: '#90a4ae', fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  confirmationBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginTop: 6 },
-  confirmationTime:         { color: '#90a4ae', fontSize: 12 },
-  changeButton:             { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(144,164,174,0.3)', alignSelf: 'center', marginTop: 8 },
-  changeButtonText:         { color: '#90a4ae', fontSize: 14 },
+  // ── Pantalla de Confirmación y Estados de Tarjeta ───────────────────────────
+  confirmationCard:          { width: '100%', borderRadius: 24, padding: 32, alignItems: 'center', gap: 10, borderWidth: 1, marginBottom: 20 },
+  confirmationCardAccepted:  { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)' },
+  confirmationCardRejected:  { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' },
+  confirmationCardFinalized: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  confirmationTitle:         { color: '#fff', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 6 },
+  confirmationSubtitle:      { color: '#90a4ae', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  confirmationBadge:         { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginTop: 6 },
+  confirmationTime:          { color: '#90a4ae', fontSize: 12 },
+  changeButton:              { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(144,164,174,0.3)', alignSelf: 'center', marginTop: 8 },
+  changeButtonText:          { color: '#90a4ae', fontSize: 14 },
 
-  // ── AX-14: Card de tiempos críticos ──────────────────────────────────────
+  // ── AX-14: Card de Tiempos Críticos ────────────────────────────────────────
   tiemposCard: {
     backgroundColor: 'rgba(17,24,39,0.85)',
     borderRadius: 16, padding: 20, marginBottom: 16,
@@ -603,5 +1020,115 @@ const styles = StyleSheet.create({
   },
   botonGuardarTiemposTexto: {
     color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 1,
+  },
+});
+  },
+  // Responders List
+  respondersPreview: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  respondersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  respondersTitle: {
+    color: '#3b82f6',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  respondersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  responderChip: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  responderChipText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  respondersSmallList: {
+    marginTop: 20,
+    width: '100%',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  respondersSmallTitle: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '900',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  responderRowMini: {
+    color: '#cfd8dc',
+    fontSize: 11,
+    flex: 1,
+  },
+  responderMoreText: {
+    color: '#3b82f6',
+    fontSize: 11,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  // Resumen de respuestas en confirmación
+  respondersSummaryBox: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 16,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  summaryNum: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  summaryLabel: {
+    fontSize: 9,
+    color: '#90a4ae',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  miniRespondersScroll: {
+    width: '100%',
+    marginTop: 8,
+    gap: 4,
+  },
+  miniResponderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
   },
 });

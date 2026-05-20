@@ -48,8 +48,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-const BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../config/api';
 
 export default function SelectorBomberos({ token, seleccionados = [], onChange, maxSeleccion }) {
   const [modalVisible, setModalVisible] = useState(false);
@@ -73,7 +72,7 @@ export default function SelectorBomberos({ token, seleccionados = [], onChange, 
     setCargando(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE_URL}/usuarios/bomberos`, { headers });
+      const res = await fetch(`${API_BASE_URL}/usuarios/bomberos`, { headers });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       const lista = Array.isArray(data) ? data : [];

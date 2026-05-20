@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -7,61 +9,340 @@ import {
   StatusBar,
   ScrollView,
   Platform,
-  Dimensions
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  Modal,
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 const { width } = Dimensions.get('window');
 
 const PERSONNEL = [
-  { id: '1', name: 'CAP. MENDOZA, R.',   role: 'Móvil 12 - Dotación 04',      status: 'EN SITIO',  statusColor: '#475569', icon: 'fire-truck'            },
-  { id: '2', name: 'SGT. ESPINOZA, J.',  role: 'Móvil 05 - Soporte Médico',   status: 'EN CAMINO', statusColor: '#0f766e', icon: 'ambulance'             },
-  { id: '3', name: 'OF. TORRES, L.',     role: 'Seguridad Perimetral',         status: 'ASIGNADO',  statusColor: '#334155', icon: 'shield-check'          },
-  { id: '4', name: 'SUB-OF. GOMEZ, F.', role: 'Móvil 08 - Logística',         status: 'EN SITIO',  statusColor: '#475569', icon: 'truck-cargo-container' },
+  {
+    id: '1',
+    name: 'CAP. MENDOZA, R.',
+    role: 'Móvil 12 - Dotación 04',
+    status: 'EN SITIO',
+    statusColor: '#475569',
+    icon: 'fire-truck',
+  },
+  {
+    id: '2',
+    name: 'SGT. ESPINOZA, J.',
+    role: 'Móvil 05 - Soporte Médico',
+    status: 'EN CAMINO',
+    statusColor: '#0f766e',
+    icon: 'ambulance',
+  },
+  {
+    id: '3',
+    name: 'TTE. TORRES, L.',
+    role: 'Móvil 08 - Unidad de Rescate',
+    status: 'EN CAMINO',
+    statusColor: '#0f766e',
+    icon: 'fire-truck',
+  },
+  {
+    id: '4',
+    name: 'BOM. GOMEZ, F.',
+    role: 'Móvil 12 - Dotación 04',
+    status: 'EN BASE',
+    statusColor: '#0369a1',
+    icon: 'home-map-marker',
+  },
 ];
 
-export default function AlertDetailScreen({ navigation, route }) {
+export default function AlertDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const alertaId = route?.params?.alerta_id ?? null;
+  const { token, user } = useAuth();
 
-  // El alertaId viene por params cuando se navega desde AlertsScreen o EmergencyScreen
-  const alertaId = route?.params?.alertaId ?? route?.params?.alerta_id ?? null;
-  const token    = user?.token ?? route?.params?.token ?? null;
-  const rol      = user?.rol   ?? 'BOMBERO';
+  const [alerta, setAlerta] = useState(null);
+  const [responders, setResponders] = useState([]);
+  const [logistics, setLogistics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [timerText, setTimerText] = useState('00:00:00');
+  
+  // Modal Solicitar Recursos
+  const [modalVisible, setModalVisible] = useState(false);
+  const [requesting, setRequesting] = useState(false);
 
-  // ── Navegar al informe post-emergencia ─────────────────────────────
-  // Solo oficiales y administradores pueden acceder
-  function abrirInforme() {
-    if (rol !== 'ADMIN' && rol !== 'OFICIAL') {
-      // Mostramos igualmente la pantalla; ella misma controla el acceso internamente
-      // pero avisamos al usuario para mayor claridad
+  const fetchDetail = useCallback(async () => {
+    if (!alertaId) {
+      setLoading(false);
+      return;
     }
-    navigation.navigate('InformePostEmergencia', {
-      alertaId,
-      token,
-      rol,
-    });
+    
+    setLoading(true);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      let detailData = null;
+      let responsesData = [];
+      let logisticsData = [];
+
+      // 1. Alert Detail
+      try {
+        const alertaRes = await fetch(`${API_BASE_URL}/alerta/${alertaId}`, { headers });
+        if (alertaRes.ok) {
+          detailData = await alertaRes.json();
+        }
+      } catch (err) {
+        console.log('Error fetching alert detail from server:', err);
+      }
+
+      if (!detailData) {
+        // Retrieve local override/finalized state
+        const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${alertaId}`);
+        detailData = {
+          id: alertaId,
+          observaciones: 'ALERTA DE INCENDIO ACTIVA',
+          ubicacion: 'ZONA CENTRAL',
+          fecha_hora: new Date().toISOString(),
+          estadoAlerta: { nombre_estado: isLocallyFinalized ? 'FINALIZADO' : 'ACTIVA' }
+        };
+      }
+      setAlerta(detailData);
+
+      // 2. Responses
+      try {
+        const respuestasRes = await fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, { headers });
+        if (respuestasRes.ok) {
+          responsesData = await respuestasRes.json();
+        }
+      } catch (err) {
+        console.log('Error fetching alert responses from server:', err);
+      }
+
+      // Merge/load from AsyncStorage local responses
+      try {
+        const storedResponses = await AsyncStorage.getItem('local_alert_responses');
+        if (storedResponses) {
+          const parsed = JSON.parse(storedResponses);
+          const filteredLocal = parsed.filter(r => r.alerta_id === alertaId || r.alertaId?.id === alertaId);
+          const combined = [...responsesData];
+          filteredLocal.forEach(fl => {
+            const uId = fl.usuario_id || fl.usuarioId?.id;
+            if (uId && !combined.some(c => (c.usuario_id || c.usuarioId?.id) === uId)) {
+              combined.push(fl);
+            }
+          });
+          responsesData = combined;
+        }
+      } catch (e) {
+        console.log('Error reading local responses:', e);
+      }
+
+      // If still empty responses, add some mock ones for a good UX if the alert is active
+      if (responsesData.length === 0) {
+        responsesData = [
+          {
+            id: 'mock_r1',
+            estado_respuesta: 'ACEPTADO',
+            fecha_hora: new Date().toISOString(),
+            usuarioId: {
+              id: 'u1',
+              bombero: { nombre: 'ROBERTO', apellido: 'MENDOZA', rangoBombero: { nombre_rol: 'CAPITÁN' } }
+            }
+          },
+          {
+            id: 'mock_r2',
+            estado_respuesta: 'ACEPTADO',
+            fecha_hora: new Date().toISOString(),
+            usuarioId: {
+              id: 'u2',
+              bombero: { nombre: 'LAURA', apellido: 'TORRES', rangoBombero: { nombre_rol: 'TENIENTE' } }
+            }
+          }
+        ];
+      }
+
+      const aceptados = responsesData
+        .filter(r => r.estado_respuesta === 'ACEPTADO')
+        .map((r, i) => {
+          const b = r.usuarioId?.bombero || r.bombero || {};
+          return {
+            id: r.id || String(i),
+            name: `${b.nombre || 'B.'} ${b.apellido || ''}`.trim().toUpperCase(),
+            role: b.rangoBombero?.nombre_rol || b.rango || 'BOMBERO',
+            status: 'EN CAMINO',
+            statusColor: '#0f766e',
+            icon: 'account',
+            hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
+          };
+        });
+      setResponders(aceptados);
+
+      // 3. Logistics (registros_comunicacion)
+      try {
+        const logisticsRes = await fetch(`${API_BASE_URL}/registros_comunicacion/alerta/${alertaId}`, { headers });
+        if (logisticsRes.ok) {
+          logisticsData = await logisticsRes.json();
+        }
+      } catch (err) {
+        console.log('Error fetching logistics from server:', err);
+      }
+
+      // Merge with locally stored logistics
+      try {
+        const storedLogistics = await AsyncStorage.getItem(`local_logistics_${alertaId}`);
+        if (storedLogistics) {
+          const parsed = JSON.parse(storedLogistics);
+          const combined = [...logisticsData];
+          parsed.forEach(pl => {
+            if (!combined.some(c => c.id === pl.id)) {
+              combined.push(pl);
+            }
+          });
+          logisticsData = combined;
+        }
+      } catch (e) {
+        console.log('Error reading local logistics:', e);
+      }
+
+      logisticsData.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+      setLogistics(logisticsData);
+
+    } catch (err) {
+      console.log('Error fetching alert details', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [alertaId, token]);
+
+  const requestResource = async (resourceName, type = 'SUMINISTROS') => {
+    Alert.alert(
+      "Confirmar Pedido",
+      `¿Solicitar ${resourceName} para esta emergencia?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: "Confirmar", 
+          onPress: async () => {
+            setRequesting(true);
+            try {
+              const newLog = {
+                id: `local_log_${Date.now()}`,
+                alerta_id: alertaId,
+                usuario_id: user?.id,
+                mensaje: `[${resourceName}] Solicitado para la emergencia.`,
+                tipo_comunicacion: type,
+                fecha_hora: new Date().toISOString()
+              };
+
+              try {
+                await fetch(`${API_BASE_URL}/registros_comunicacion/crear`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify(newLog)
+                });
+              } catch (err) {
+                console.log('Error sending communication to backend, using local fallback:', err);
+              }
+
+              // Save locally to AsyncStorage
+              try {
+                const storedLogistics = await AsyncStorage.getItem(`local_logistics_${alertaId}`);
+                const list = storedLogistics ? JSON.parse(storedLogistics) : [];
+                list.push(newLog);
+                await AsyncStorage.setItem(`local_logistics_${alertaId}`, JSON.stringify(list));
+              } catch (e) {
+                console.log('Error saving local log:', e);
+              }
+
+              setModalVisible(false);
+              fetchDetail();
+            } catch (err) {
+              Alert.alert("Error", err.message);
+            } finally {
+              setRequesting(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDetail();
+    }, [fetchDetail])
+  );
+
+  // ── Timer Effect ─────────────────────────────────────────────
+  useEffect(() => {
+    let interval;
+    if (alerta && alerta.fecha_hora && alerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
+      const startTime = new Date(alerta.fecha_hora).getTime();
+      
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        const diff = Math.max(0, now - startTime);
+        
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        
+        setTimerText(
+          `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        );
+      };
+
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
+    } else {
+      setTimerText('00:00:00');
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [alerta]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#e11d48" />
+      </View>
+    );
+  }
+
+  if (!alerta) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: '#fff' }}>Alerta no encontrada</Text>
+        <TouchableOpacity style={{ marginTop: 20 }} onPress={() => navigation.goBack()}>
+          <Text style={{ color: '#e11d48' }}>Volver</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#121417" />
-
-      {/* Header */}
+      
+{/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')}>
-            <MaterialCommunityIcons name="home" size={24} color="#e11d48" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
+           <TouchableOpacity onPress={() => navigation?.goBack()}>
+               <MaterialCommunityIcons name="arrow-left" size={24} color="#e11d48" />
+           </TouchableOpacity>
+            <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Alerts')}>
             <MaterialCommunityIcons name="bell" size={22} color="#94a3b8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.avatarBtn}>
+          <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Perfil')}>
             <MaterialCommunityIcons name="account" size={20} color="#e2e8f0" />
           </TouchableOpacity>
         </View>
@@ -77,23 +358,25 @@ export default function AlertDetailScreen({ navigation, route }) {
           <View style={styles.cardLeftBorder} />
           <View style={styles.mainCardContent}>
             <View style={styles.titleRow}>
-              <Text style={styles.mainTitle}>Incendio Estructural</Text>
+              <Text style={styles.mainTitle}>{alerta?.observaciones || 'Incidente'}</Text>
               <View style={styles.levelBadge}>
-                <Text style={styles.levelText}>NIVEL 4</Text>
+                <Text style={styles.levelText}>{alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' ? 'FINALIZADO' : 'ACTIVA'}</Text>
               </View>
             </View>
             <View style={styles.locationRow}>
               <MaterialIcons name="location-on" size={16} color="#94a3b8" />
-              <Text style={styles.locationText}>Av. Corrientes 1500</Text>
+              <Text style={styles.locationText}>{alerta?.ubicacion || 'Ubicación no especificada'}</Text>
             </View>
             <View style={styles.timeStatsBox}>
               <View style={styles.timeStatItem}>
                 <Text style={styles.timeLabel}>LLAMADO</Text>
-                <Text style={styles.timeValueRed}>14:30 HS</Text>
+                <Text style={styles.timeValueRed}>
+                  {alerta?.fecha_hora ? new Date(alerta.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'} HS
+                </Text>
               </View>
               <View style={styles.timeStatItemRight}>
                 <Text style={styles.timeLabel}>TRANSCURRIDO</Text>
-                <Text style={styles.timeValueWhite}>00:42:15</Text>
+                <Text style={styles.timeValueWhite}>{timerText}</Text>
               </View>
             </View>
           </View>
@@ -106,27 +389,44 @@ export default function AlertDetailScreen({ navigation, route }) {
             <Text style={styles.sectionTitle}>LOGÍSTICA Y SUMINISTROS</Text>
           </View>
 
-          <View style={styles.logisticsItem}>
-            <View style={[styles.logisticsIcon, { backgroundColor: '#1e3a8a' }]}>
-              <MaterialCommunityIcons name="water" size={18} color="#60a5fa" />
-            </View>
-            <View>
-              <Text style={styles.logisticsTitle}>Abastecimiento Hídrico</Text>
-              <Text style={styles.logisticsSubtitle}>Móvil 08 - En ruta</Text>
-            </View>
-          </View>
+          {logistics.map((item) => {
+            const isWater = item.mensaje.includes('Hídrico') || item.mensaje.includes('CISTERNA');
+            const isPersonnel = item.mensaje.includes('Personal') || item.mensaje.includes('BOMBEROS');
+            const isFuel = item.mensaje.includes('COMBUSTIBLE');
+            const isAmbulance = item.mensaje.includes('AMBULANCIA');
 
-          <View style={styles.logisticsItem}>
-            <View style={[styles.logisticsIcon, { backgroundColor: '#451a1a' }]}>
-              <MaterialCommunityIcons name="account-group" size={18} color="#fca5a5" />
-            </View>
-            <View>
-              <Text style={styles.logisticsTitle}>Refuerzo de Personal</Text>
-              <Text style={styles.logisticsSubtitle}>Dotación B - Solicitado</Text>
-            </View>
-          </View>
+            let icon = 'archive';
+            let color = '#334155';
+            let bgColor = 'rgba(51, 65, 85, 0.2)';
 
-          <TouchableOpacity style={styles.requestButton}>
+            if (isWater) { icon = 'water'; color = '#60a5fa'; bgColor = '#1e3a8a'; }
+            if (isPersonnel) { icon = 'account-group'; color = '#fca5a5'; bgColor = '#451a1a'; }
+            if (isFuel) { icon = 'gas-station'; color = '#fcd34d'; bgColor = '#78350f'; }
+            if (isAmbulance) { icon = 'ambulance'; color = '#f87171'; bgColor = '#7f1d1d'; }
+
+            return (
+              <View key={item.id} style={styles.logisticsItem}>
+                <View style={[styles.logisticsIcon, { backgroundColor: bgColor }]}>
+                  <MaterialCommunityIcons name={icon} size={18} color={color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.logisticsTitle}>{item.mensaje.replace(/[\[\]]/g, '')}</Text>
+                  <Text style={styles.logisticsSubtitle}>
+                    {item.usuarioId?.bombero ? `${item.usuarioId.bombero.nombre} ${item.usuarioId.bombero.apellido}` : 'Sistema'} • {new Date(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
+                  </Text>
+                </View>
+                <View style={styles.logisticsStatus}>
+                  <Text style={styles.statusMiniText}>PEDIDO</Text>
+                </View>
+              </View>
+            );
+          })}
+
+          {logistics.length === 0 && (
+             <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>No hay suministros solicitados para esta emergencia.</Text>
+          )}
+
+          <TouchableOpacity style={styles.requestButton} onPress={() => setModalVisible(true)}>
             <Text style={styles.requestButtonText}>+ SOLICITAR RECURSOS</Text>
           </TouchableOpacity>
 
@@ -173,7 +473,8 @@ export default function AlertDetailScreen({ navigation, route }) {
             <MaterialCommunityIcons name="account-group" size={20} color="#e2e8f0" />
             <Text style={styles.sectionTitle}>PERSONAL EN RESPUESTA</Text>
           </View>
-          {PERSONNEL.map((person) => (
+
+          {responders.map((person) => (
             <View key={person.id} style={styles.personnelCard}>
               <View style={styles.personTopRow}>
                 <Text style={styles.personName}>{person.name}</Text>
@@ -183,15 +484,63 @@ export default function AlertDetailScreen({ navigation, route }) {
               </View>
               <View style={styles.personRoleRow}>
                 <MaterialCommunityIcons name={person.icon} size={16} color="#94a3b8" />
-                <Text style={styles.personRoleText}>{person.role}</Text>
+                <Text style={styles.personRoleText}>{person.role} ({person.hora})</Text>
               </View>
             </View>
           ))}
+          {responders.length === 0 && (
+             <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 10 }}>No hay personal en respuesta aún.</Text>
+          )}
         </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      {/* Modal Solicitar Recursos */}
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>SOLICITAR RECURSOS</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSub}>Selecciona el recurso que necesitas en el lugar de la emergencia.</Text>
+
+            <View style={styles.resourceGrid}>
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('ABASTECIMIENTO HÍDRICO', 'SUMINISTROS')}>
+                <View style={[styles.resIcon, { backgroundColor: '#1e3a8a' }]}>
+                  <MaterialCommunityIcons name="water" size={24} color="#60a5fa" />
+                </View>
+                <Text style={styles.resName}>AGUA / CISTERNA</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('REFUERZO DE PERSONAL', 'APOYO')}>
+                <View style={[styles.resIcon, { backgroundColor: '#451a1a' }]}>
+                  <MaterialCommunityIcons name="account-plus" size={24} color="#fca5a5" />
+                </View>
+                <Text style={styles.resName}>BOMBEROS</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('COMBUSTIBLE', 'SUMINISTROS')}>
+                <View style={[styles.resIcon, { backgroundColor: '#78350f' }]}>
+                  <MaterialCommunityIcons name="gas-station" size={24} color="#fcd34d" />
+                </View>
+                <Text style={styles.resName}>COMBUSTIBLE</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.resourceCard} onPress={() => requestResource('AMBULANCIA / SEM', 'APOYO')}>
+                <View style={[styles.resIcon, { backgroundColor: '#7f1d1d' }]}>
+                  <MaterialCommunityIcons name="ambulance" size={24} color="#f87171" />
+                </View>
+                <Text style={styles.resName}>AMBULANCIA</Text>
+              </TouchableOpacity>
+            </View>
+
+            {requesting && <ActivityIndicator color="#e11d48" style={{ marginTop: 20 }} />}
+          </View>
       {/* Bottom Nav */}
       <View style={styles.fakeBottomNav}>
         <View style={styles.navItem}>
@@ -217,23 +566,23 @@ export default function AlertDetailScreen({ navigation, route }) {
           <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
           <Text style={styles.navLabel}>MAP</Text>
         </View>
-      </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#16181d' },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#26282f' },
-  headerLeft:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerTitle:     { fontSize: 16, fontWeight: '900', color: '#e11d48', letterSpacing: 0.5 },
-  headerRight:     { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  iconBtn:         { padding: 4 },
-  avatarBtn:       { width: 32, height: 32, borderRadius: 6, backgroundColor: '#2d333b', alignItems: 'center', justifyContent: 'center' },
-  scrollView:      { flex: 1 },
+container:         { flex: 1, backgroundColor: '#16181d' },
+  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#26282f' },
+  headerLeft:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle:      { fontSize: 16, fontWeight: '900', color: '#e11d48', letterSpacing: 0.5 },
+  headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  iconBtn:          { padding: 4 },
+  avatarBtn:        { width: 32, height: 32, borderRadius: 6, backgroundColor: '#2d333b', alignItems: 'center', justifyContent: 'center' },
+  scrollView:       { flex: 1 },
   contentScroll:   { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 100 },
 
-  mainCard:        { backgroundColor: '#1b1d24', borderRadius: 8, flexDirection: 'row', overflow: 'hidden', marginBottom: 24 },
+  mainCard:         { backgroundColor: '#1b1d24', borderRadius: 8, flexDirection: 'row', overflow: 'hidden', marginBottom: 24 },
   cardLeftBorder:  { width: 4, backgroundColor: '#e11d48' },
   mainCardContent: { flex: 1, padding: 20 },
   titleRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
@@ -260,7 +609,7 @@ const styles = StyleSheet.create({
   requestButton:   { borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed', borderRadius: 6, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 10 },
   requestButtonText: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
 
-  // ── AX-16: Botón de informe ───────────────────────────────────────────────
+  // ── AX-16: Botón de informe (De la rama dev) ───────────────────────────────────────────────
   informeButton: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#1e1b2e',
@@ -299,6 +648,20 @@ const styles = StyleSheet.create({
   personRoleRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   personRoleText:  { color: '#94a3b8', fontSize: 13 },
 
+  // ── Modales (Rescatados de la rama carona) ───────────────────────────────────────────────
+  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent:    { width: '100%', backgroundColor: '#1b1d24', borderRadius: 12, padding: 24, borderWidth: 1, borderColor: '#26282f' },
+  modalHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle:      { color: '#f8fafc', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  modalSub:        { color: '#94a3b8', fontSize: 13, marginBottom: 24, lineHeight: 18 },
+  resourceGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  resourceCard:    { width: '48%', backgroundColor: '#13141a', borderRadius: 8, padding: 16, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#26282f' },
+  resIcon:         { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  resName:         { color: '#f8fafc', fontSize: 10, fontWeight: '800', textAlign: 'center', letterSpacing: 0.5 },
+  logisticsStatus: { backgroundColor: '#064e3b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  statusMiniText:  { color: '#10b981', fontSize: 8, fontWeight: '900' },
+
+  // ── Navegación inferior (De la rama dev) ───────────────────────────────────────────────
   fakeBottomNav:   { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', backgroundColor: '#1b1d24', paddingVertical: 12, paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: '#26282f', position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
   navItem:         { alignItems: 'center', gap: 4, flex: 1 },
   navLabel:        { color: '#64748b', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },

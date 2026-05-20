@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
+import { API_BASE_URL } from '../config/api';
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -58,7 +59,7 @@ export default function ResourcesScreen({ navigation, route }) {
 
     try {
       // Solo los camiones ACTIVOS, listos para servicio
-      const res = await fetch(`${BASE_URL}/camiones/activos`, { headers });
+      const res = await fetch(`${API_BASE_URL}/camiones/activos`, { headers });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setCamiones(Array.isArray(data) ? data : []);
@@ -324,7 +325,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f1315', borderRadius: Radius.lg,
     padding: Spacing.md, marginBottom: Spacing.md,
     borderLeftWidth: 3, borderLeftColor: '#dc2626',
-  },
+},
   errorText: { color: '#f87171', fontSize: 12, fontWeight: '600', flex: 1 },
   vacioCamiones: {
     alignItems: 'center', paddingVertical: 24, gap: 8,

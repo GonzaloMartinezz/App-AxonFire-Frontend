@@ -115,7 +115,7 @@ export default function AlertsScreen({ navigation }) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.menuButton}
-                onPress={() => navigation?.navigate('Mapa')}
+                onPress={() => navigation?.navigate('MainApp')}
               >
                 <MaterialCommunityIcons name="home" size={24} color="#fff" />
               </TouchableOpacity>
@@ -187,6 +187,28 @@ export default function AlertsScreen({ navigation }) {
                 >
                   <MaterialCommunityIcons name="bell-ring-outline" size={20} color="#263238" />
                   <Text style={styles.dropdownItemText}>Alertas Visuales</Text>
+                </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('WeeklyChecklist');
+                  }}
+                >
+                  <MaterialCommunityIcons name="calendar-check" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Checklist Semanal</Text>
+                </TouchableOpacity>
+                <View style={styles.dropdownDivider} />
+                <TouchableOpacity 
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    navigation?.navigate('Reports');
+                  }}
+                >
+                  <MaterialCommunityIcons name="file-document-outline" size={20} color="#263238" />
+                  <Text style={styles.dropdownItemText}>Reportes Legales</Text>
                 </TouchableOpacity>
               </View>
             )}

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -16,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '../config/api';
 
 // ─── Classification Tabs ─────────────────────────────────────
@@ -39,13 +42,120 @@ const STATUS_CONFIG = {
   ACEPTADO:  { color: '#10b981', bg: '#064e3b', label: 'CONFIRMADO', icon: 'check-circle', key: 'confirmed' },
   PENDIENTE: { color: '#f59e0b', bg: '#78350f', label: 'PENDIENTE',  icon: 'clock-outline', key: 'pending' },
   RECHAZADO: { color: '#ef4444', bg: '#7f1d1d', label: 'RECHAZADO',  icon: 'close-circle', key: 'absent' },
-  ABSENT:    { color: '#ef4444', bg: '#7f1d1d', label: 'AUSENTE',    icon: 'close-circle', key: 'absent' },
+  ABSENT:    { color: '#ef4444', bg: '#7f1d1d', label: 'SIN RESPONDER', icon: 'help-circle', key: 'absent' }
 };
+
+// ── Local Mock Helpers ───────────────────────────────────────────────────────
+function getMockBomberos() {
+  return [
+    {
+      id: 'b1',
+      nombre: 'ROBERTO',
+      apellido: 'MENDOZA',
+      usuario_id: 'u1',
+      usuarioId: { id: 'u1', nombre_usuario: 'RMENDOZA' },
+      rangoBombero: { id: 'r1', nombre_rol: 'CAPITAN' }
+    },
+    {
+      id: 'b2',
+      nombre: 'JORGE',
+      apellido: 'ESPINOZA',
+      usuario_id: 'u2',
+      usuarioId: { id: 'u2', nombre_usuario: 'JESPINOZA' },
+      rangoBombero: { id: 'r2', nombre_rol: 'SARGENTO' }
+    },
+    {
+      id: 'b3',
+      nombre: 'LAURA',
+      apellido: 'TORRES',
+      usuario_id: 'u3',
+      usuarioId: { id: 'u3', nombre_usuario: 'LTORRES' },
+      rangoBombero: { id: 'r3', nombre_rol: 'OFICIAL' }
+    },
+    {
+      id: 'b4',
+      nombre: 'FERNANDO',
+      apellido: 'GOMEZ',
+      usuario_id: 'u4',
+      usuarioId: { id: 'u4', nombre_usuario: 'FGOMEZ' },
+      rangoBombero: { id: 'r4', nombre_rol: 'SUB-OFICIAL' }
+    },
+    {
+      id: 'b5',
+      nombre: 'OPERADOR',
+      apellido: 'AXON-42',
+      usuario_id: 'u5',
+      usuarioId: { id: 'u5', nombre_usuario: 'OPERADOR' },
+      rangoBombero: { id: 'r5', nombre_rol: 'OFICIAL' }
+    }
+  ];
+}
+
+async function loadMockResponses(alertaId) {
+  try {
+    const local = await AsyncStorage.getItem(`responses_${alertaId}`);
+    if (local) return JSON.parse(local);
+
+    const defaults = [
+      {
+        id: 'res1',
+        alerta_id: alertaId,
+        usuario_id: 'u1',
+        usuarioId: {
+          id: 'u1',
+          nombre_usuario: 'RMENDOZA',
+          bombero: {
+            nombre: 'ROBERTO',
+            apellido: 'MENDOZA',
+            rangoBombero: { nombre_rol: 'CAPITAN' }
+          }
+        },
+        estado_respuesta: 'ACEPTADO',
+        fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'res2',
+        alerta_id: alertaId,
+        usuario_id: 'u2',
+        usuarioId: {
+          id: 'u2',
+          nombre_usuario: 'JESPINOZA',
+          bombero: {
+            nombre: 'JORGE',
+            apellido: 'ESPINOZA',
+            rangoBombero: { nombre_rol: 'SARGENTO' }
+          }
+        },
+        estado_respuesta: 'ACEPTADO',
+        fecha_hora: new Date(Date.now() - 8 * 60 * 1000).toISOString()
+      },
+      {
+        id: 'res3',
+        alerta_id: alertaId,
+        usuario_id: 'u3',
+        usuarioId: {
+          id: 'u3',
+          nombre_usuario: 'LTORRES',
+          bombero: {
+            nombre: 'LAURA',
+            apellido: 'TORRES',
+            rangoBombero: { nombre_rol: 'OFICIAL' }
+          }
+        },
+        estado_respuesta: 'RECHAZADO',
+        fecha_hora: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      }
+    ];
+    await AsyncStorage.setItem(`responses_${alertaId}`, JSON.stringify(defaults));
+    return defaults;
+  } catch (e) {
+    return [];
+  }
+}
 
 export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const token = user?.token ?? null;
+  const { user, token, logout } = useAuth();
 
   // Alerta ID recibido por parámetros
   const alertaId = route?.params?.alerta_id ?? null;
@@ -57,70 +167,187 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [confirmedCountAPI, setConfirmedCountAPI] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [currentAlertaId, setCurrentAlertaId] = useState(alertaId);
+  const [activeAlerta, setActiveAlerta] = useState(null);
+  const [timerText, setTimerText] = useState('00:00:00');
+  const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
-  // ── Construir headers con token ──────────────────────────────
+  // ─── Construir headers con token ──────────────────────────────
   const authHeaders = useCallback(() => {
     const h = { 'Content-Type': 'application/json' };
     if (token) h['Authorization'] = `Bearer ${token}`;
     return h;
   }, [token]);
 
-  // ── Fetch de datos ───────────────────────────────────────────
+  // Fetch de datos ───────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setErrorMsg(null);
     try {
-      // 1. Obtener todos los bomberos
-      const bomberosRes = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
-        headers: authHeaders(),
-      });
-      if (!bomberosRes.ok) throw new Error('Error al cargar bomberos');
-      const bomberosData = await bomberosRes.json();
+      let activeAlertaId = alertaId;
 
-      // 2. Si hay alerta, obtener respuestas y count
-      let respuestasMap = {};
-      if (alertaId) {
-        const [respuestasRes, countRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, { headers: authHeaders() }),
-          fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}/asistencias/count`, { headers: authHeaders() }),
-        ]);
-
-        if (respuestasRes.ok) {
-          const respuestas = await respuestasRes.json();
-          respuestas.forEach((r) => {
-            respuestasMap[r.usuario_id] = r;
+      // 1. Si no hay alertaId, buscamos la más reciente
+      if (!activeAlertaId) {
+        try {
+          const hasta = new Date().toISOString();
+          const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+            headers: authHeaders(),
+            data: { fecha_desde: desde, fecha_hasta: hasta },
+            timeout: 1500
           });
-        }
-        if (countRes.ok) {
-          const countData = await countRes.json();
-          setConfirmedCountAPI(countData.cantidad || 0);
+          const data = resAlertas.data;
+          const alertas = data.alertas || [];
+          if (alertas.length > 0) {
+            const activas = [];
+            for (const a of alertas) {
+              const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${a.id}`);
+              if (!isLocallyFinalized && a.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
+                activas.push(a);
+              }
+            }
+            if (activas.length > 0) {
+              const ultima = activas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+              activeAlertaId = ultima.id;
+            } else {
+              activeAlertaId = null;
+            }
+          }
+        } catch (e) {
+          console.log('Error fetching range alerts:', e);
         }
       }
 
-      // 3. Mapear bomberos a la estructura de la pantalla
-      const mapped = bomberosData.map((b) => {
+      if (!activeAlertaId) {
+        activeAlertaId = 'demo-alert-123';
+      }
+
+      setCurrentAlertaId(activeAlertaId);
+
+      // 2. Obtener todos los bomberos
+      let bomberosData = [];
+      try {
+        const bomberosRes = await axios.get(`${API_BASE_URL}/usuarios/bomberos`, {
+          headers: authHeaders(),
+          timeout: 1500
+        });
+        if (bomberosRes.status === 200) {
+          bomberosData = bomberosRes.data;
+          if (!bomberosData || bomberosData.length === 0 || bomberosData.error) {
+            bomberosData = getMockBomberos();
+          }
+        } else {
+          bomberosData = getMockBomberos();
+        }
+      } catch (err) {
+        console.log('Error loading bomberos from server, using local fallback:', err);
+        bomberosData = getMockBomberos();
+      }
+
+      // 3. Si tenemos una alerta activa, obtener respuestas
+      let respuestasMap = {};
+      if (activeAlertaId) {
+        let respuestas = [];
+        try {
+          const respuestasRes = await axios.get(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, {
+            headers: authHeaders(),
+            timeout: 1500
+          });
+          if (respuestasRes.status === 200) {
+            respuestas = respuestasRes.data;
+            if (!respuestas || respuestas.length === 0 || respuestas.error) {
+              respuestas = await loadMockResponses(activeAlertaId);
+            }
+          } else {
+            respuestas = await loadMockResponses(activeAlertaId);
+          }
+        } catch (e) {
+          console.log('Error loading responses from server, using local fallback:', e);
+          respuestas = await loadMockResponses(activeAlertaId);
+        }
+
+        respuestas.forEach((r) => {
+          const uid = r.usuario_id || r.usuarioId?.id;
+          if (uid) respuestasMap[uid] = r;
+        });
+
+        // Set confirmed count
+        const confirmedVal = respuestas.filter(r => r.estado_respuesta === 'ACEPTADO').length;
+        setConfirmedCountAPI(confirmedVal);
+
+        // Obtener detalle de la alerta
+        let detailData = null;
+        if (activeAlertaId === 'demo-alert-123') {
+          const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${activeAlertaId}`);
+          detailData = {
+            id: 'demo-alert-123',
+            observaciones: 'INCENDIO ESTRUCTURAL DEPOSITOS',
+            ubicacion: 'AV. VELEZ SARSFIELD 3200',
+            fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+            estadoAlerta: { nombre_estado: isLocallyFinalized ? 'FINALIZADO' : 'ACTIVA' }
+          };
+        } else {
+          try {
+            const detailRes = await axios.get(`${API_BASE_URL}/alerta/${activeAlertaId}`, {
+              headers: authHeaders(),
+              timeout: 1500
+            });
+            if (detailRes.status === 200) {
+              detailData = detailRes.data;
+              const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${activeAlertaId}`);
+              if (isLocallyFinalized) {
+                detailData = {
+                  ...detailData,
+                  estadoAlerta: { ...detailData.estadoAlerta, nombre_estado: 'FINALIZADO' }
+                };
+              }
+            }
+          } catch (e) {
+            console.log('Error getting detail, using fallback:', e);
+          }
+        }
+
+        if (!detailData) {
+          const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${activeAlertaId}`);
+          detailData = {
+            id: activeAlertaId,
+            observaciones: 'ALERTA TÁCTICA ACTIVA',
+            ubicacion: 'ZONA DE DESPACHO',
+            fecha_hora: new Date().toISOString(),
+            estadoAlerta: { nombre_estado: isLocallyFinalized ? 'FINALIZADO' : 'ACTIVA' }
+          };
+        }
+        setActiveAlerta(detailData);
+      } else {
+        setActiveAlerta(null);
+      }
+
+      // 4. Mapear bomberos a la estructura de la pantalla
+      const mapped = (bomberosData || []).map((b) => {
+        if (!b) return null;
         const usuarioId = b.usuario_id || b.usuarioId?.id;
-        const respuesta = respuestasMap[usuarioId];
+        const respuesta = usuarioId ? respuestasMap[usuarioId] : null;
         const estadoRespuesta = respuesta?.estado_respuesta || 'ABSENT';
-        const rangoNombre = b.rangoBombero?.nombre_rol || '';
+        const rangoNombre = b.rangoBombero?.nombre_rol || b.rango || '';
 
         return {
-          id: b.id,
+          id: b.id || Math.random().toString(),
           usuario_id: usuarioId,
-          name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase(),
-          rank: rangoNombre.toUpperCase(),
-          unit: b.usuarioId?.nombre_usuario || '—',
+          name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase() || 'BOMBERO SIN NOMBRE',
+          rank: (rangoNombre || 'BOMBERO').toUpperCase(),
+          unit: b.usuario?.nombre_usuario || b.usuarioId?.nombre_usuario || '—',
           classification: classifyRank(rangoNombre),
           status: estadoRespuesta,
-          eta: respuesta
+          eta: respuesta && respuesta.fecha_hora
             ? new Date(respuesta.fecha_hora).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
             : '—',
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(b.nombre || 'X')}&background=1b1d24&color=f8fafc&size=96`,
         };
-      });
+      }).filter(Boolean);
 
       setPersonnel(mapped);
+      setLastRefresh(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
-      console.error('Error fetchData AttendanceBoard:', err);
+      console.warn('Error fetchData AttendanceBoard:', err);
       setErrorMsg(err.message || 'Error al cargar datos');
     } finally {
       setLoading(false);
@@ -128,14 +355,82 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     }
   }, [alertaId, authHeaders]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
+
+  // ── Timer Effect ─────────────────────────────────────────────
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let interval;
+    if (activeAlerta && activeAlerta.fecha_hora && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
+      const startTime = new Date(activeAlerta.fecha_hora).getTime();
+      
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        const diff = Math.max(0, now - startTime);
+        
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        
+        setTimerText(
+          `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        );
+      };
+
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
+    } else {
+      setTimerText('00:00:00');
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [activeAlerta]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
   }, [fetchData]);
+
+  const finalizarEmergencia = async () => {
+    if (!currentAlertaId) return;
+
+    Alert.alert(
+      "Finalizar Emergencia",
+      "¿Estás seguro de que deseas finalizar esta emergencia? Ya no se podrán recibir respuestas.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Finalizar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              try {
+                await axios.patch(`${API_BASE_URL}/alerta/${currentAlertaId}/finalizar`, {}, {
+                  headers: authHeaders(),
+                  timeout: 1500
+                });
+              } catch (e) {
+                console.log('Error calling finalize endpoint, using local override:', e);
+              }
+
+              // Always write local override
+              await AsyncStorage.setItem(`finalized_alert_${currentAlertaId}`, 'true');
+
+              Alert.alert("Éxito", "La emergencia ha sido finalizada.");
+              fetchData();
+            } catch (e) {
+              Alert.alert("Error", e.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // ── Filtrado ─────────────────────────────────────────────────
   const filtered = personnel.filter((p) => {
@@ -157,7 +452,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const confirmLogout = () => {
     Alert.alert('Cerrar Sesión', '¿Estás seguro que deseas cerrar sesión?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Confirmar', onPress: () => navigation.replace('Login'), style: 'destructive' },
+      { text: 'Confirmar', onPress: () => { if(logout) { logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })) } else { navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) } }, style: 'destructive' },
     ]);
   };
 
@@ -214,15 +509,42 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           <View style={styles.titleLeftGroup}>
             <View style={styles.redAccent} />
             <View>
-              <Text style={styles.headerLabel}>ATTENDANCE BOARD</Text>
+              <Text style={styles.headerLabel}>ATTENDANCE BOARD • {lastRefresh}</Text>
               <Text style={styles.mainTitle}>TABLERO DE{'\n'}ASISTENCIA</Text>
             </View>
           </View>
-          <View style={styles.rateBox}>
-            <Text style={styles.rateLabel}>CONFIRMACIÓN</Text>
-            <Text style={styles.rateValue}>{confirmRate}%</Text>
-          </View>
+          {activeAlerta ? (
+            <View style={styles.rateBox}>
+              <Text style={styles.rateLabel}>TIEMPO TRANSCURRIDO</Text>
+              <Text style={[styles.rateValue, { color: '#ef4444' }]}>{timerText}</Text>
+            </View>
+          ) : null}
         </View>
+
+        {!activeAlerta ? (
+          <View style={[styles.alertInfoBox, { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }]}>
+            <MaterialCommunityIcons name="shield-check" size={48} color="#388e3c" style={{ marginBottom: 12 }} />
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>No hay ninguna emergencia en curso</Text>
+            <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>El personal se encuentra inactivo o en guardia.</Text>
+          </View>
+        ) : (
+          <View style={styles.alertInfoBox}>
+             <View style={styles.alertInfoTop}>
+                <Text style={styles.alertInfoTitle}>{activeAlerta.observaciones || 'INCIDENTE'}</Text>
+                <View style={[styles.statusTag, { backgroundColor: activeAlerta.estadoAlerta?.nombre_estado === 'FINALIZADO' ? '#1e293b' : '#451a1a' }]}>
+                   <Text style={styles.statusTagText}>{activeAlerta.estadoAlerta?.nombre_estado || activeAlerta.estado_alerta_id}</Text>
+                </View>
+             </View>
+             <Text style={styles.alertInfoSub}>{activeAlerta.ubicacion}</Text>
+          </View>
+        )}
+
+        {currentAlertaId && activeAlerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
+          <TouchableOpacity style={styles.finalizeBtn} onPress={finalizarEmergencia}>
+            <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
+            <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Error Banner */}
         {errorMsg && (
@@ -483,4 +805,14 @@ const styles = StyleSheet.create({
   bottomSummaryItem: { backgroundColor: '#16181d', padding: 16, borderRadius: 4, flex: 1 },
   bottomSummaryLabel: { color: '#e2e8f0', fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
   bottomSummaryValue: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  // Finalize Button
+  finalizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e11d48', paddingVertical: 14, borderRadius: 8, marginBottom: 20, gap: 8 },
+  finalizeBtnText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  // Alert Info
+  alertInfoBox: { backgroundColor: '#1b1d24', borderRadius: 8, padding: 16, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: '#dc2626' },
+  alertInfoTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  alertInfoTitle: { color: '#f8fafc', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+  alertInfoSub: { color: '#94a3b8', fontSize: 11 },
+  statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  statusTagText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 });

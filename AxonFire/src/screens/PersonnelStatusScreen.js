@@ -70,7 +70,7 @@ export default function PersonnelStatusScreen({ navigation }) {
       
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
-        <TouchableOpacity onPress={() => navigation?.navigate('Mapa')}>
+        <TouchableOpacity onPress={() => navigation?.navigate('MainApp')}>
           <MaterialCommunityIcons name="home" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>VANGUARD COMMAND</Text>

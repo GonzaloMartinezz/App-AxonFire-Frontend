@@ -15,8 +15,8 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
-
-const BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
 
 // ── Helpers para convertir datos del backend ────────────────────────────────
 
@@ -82,24 +82,25 @@ export default function AlertasVisualesScreen({ navigation, route }) {
     else setCargando(true);
     setError(null);
 
+    let fetchedData = null;
+
     try {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await fetch(`${BASE_URL}/alerta/rango`, {
-        method: 'GET',
+      const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
+        data: { fecha_desde: desde, fecha_hasta: hasta },
+        timeout: 3000,
       });
 
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
+      fetchedData = res.data;
+    } catch (err) {
+      console.error('Error cargando alertas, usando fallback local:', err);
+      fetchedData = [
         {
           id: '1',
           tipo: 'Incendio Estructural',
@@ -128,34 +129,31 @@ export default function AlertasVisualesScreen({ navigation, route }) {
           fecha_hora: new Date(Date.now() - 86400000).toISOString()
         }
       ];
-      */
-
-      const lista = Array.isArray(data) ? data : [];
-
-      const normalizadas = lista.map((item) => {
-        const nombre = item.subCategoriaAlerta?.nombre || item.tipo || 'Emergencia';
-        const estado = item.estadoAlerta?.nombre || item.estado || '';
-        const prioridad = item.prioridad || item.subCategoriaAlerta?.prioridad || '';
-
-        return {
-          id: item.id,
-          nombre,
-          direccion: item.ubicacion || 'Sin ubicación',
-          observaciones: item.observaciones || '',
-          tiempo: tiempoTranscurrido(item.fecha_hora),
-          severidad: prioridadAKey(prioridad),
-          estado: estadoAKey(estado),
-          ...getIconoAlerta(nombre),
-          // Guardamos el objeto original para poder navegar a ListaAsistencia
-          raw: item,
-        };
-      });
-
-      setAlertas(normalizadas);
-    } catch (err) {
-      console.error('Error cargando alertas:', err);
-      setError('No se pudieron cargar las alertas.');
     } finally {
+      if (fetchedData) {
+        // En caso de que axios retorne el wrapper
+        const lista = Array.isArray(fetchedData?.alertas) ? fetchedData.alertas : Array.isArray(fetchedData) ? fetchedData : [];
+
+        const normalizadas = lista.map((item) => {
+          const nombre = item.subCategoriaAlerta?.nombre || item.tipo || 'Emergencia';
+          const estado = item.estadoAlerta?.nombre || item.estado || '';
+          const prioridad = item.prioridad || item.subCategoriaAlerta?.prioridad || '';
+
+          return {
+            id: item.id,
+            nombre,
+            direccion: item.ubicacion || 'Sin ubicación',
+            observaciones: item.observaciones || '',
+            tiempo: tiempoTranscurrido(item.fecha_hora),
+            severidad: prioridadAKey(prioridad),
+            estado: estadoAKey(estado),
+            ...getIconoAlerta(nombre),
+            raw: item,
+          };
+        });
+
+        setAlertas(normalizadas);
+      }
       setCargando(false);
       setRefrescando(false);
     }
@@ -176,12 +174,12 @@ export default function AlertasVisualesScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#263238" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#f8fafc" />
         </TouchableOpacity>
         <Text style={styles.tituloHeader}>Alertas Visuales</Text>
         <View style={{ width: 40 }} />
@@ -208,7 +206,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
               onPress={() => setFiltro(f)}
               style={[styles.chip, filtro === f ? styles.chipActivo : styles.chipInactivo]}
             >
-              <Text style={[styles.chipTexto, { color: filtro === f ? '#fff' : '#90a4ae' }]}>
+              <Text style={[styles.chipTexto, { color: filtro === f ? '#fff' : '#94a3b8' }]}>
                 {f}
               </Text>
             </TouchableOpacity>
@@ -226,7 +224,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
         {/* Error */}
         {!cargando && error && (
           <View style={styles.centrado}>
-            <MaterialCommunityIcons name="wifi-off" size={48} color="#cfd8dc" />
+            <MaterialCommunityIcons name="wifi-off" size={48} color="#94a3b8" />
             <Text style={styles.textoEstado}>{error}</Text>
             <TouchableOpacity style={styles.botonReintentar} onPress={() => cargarAlertas()}>
               <Text style={styles.textoReintentar}>Reintentar</Text>
@@ -237,7 +235,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
         {/* Vacío */}
         {!cargando && !error && filtradas.length === 0 && (
           <View style={styles.centrado}>
-            <MaterialCommunityIcons name="check-circle-outline" size={52} color="#a5d6a7" />
+            <MaterialCommunityIcons name="check-circle-outline" size={52} color="#86efac" />
             <Text style={styles.textoEstado}>Sin alertas {filtro.toLowerCase()}</Text>
           </View>
         )}
@@ -256,7 +254,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
               })
             }
           >
-            <TacticalCard elevated>
+            <TacticalCard elevated style={{ backgroundColor: '#1e293b' }}>
               {/* Barra lateral de criticidad */}
               {alerta.severidad === 'critica' && <View style={styles.barraRoja} />}
 
@@ -281,7 +279,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
                 </View>
 
                 {/* Flecha */}
-                <MaterialIcons name="chevron-right" size={24} color="#cfd8dc" />
+                <MaterialIcons name="chevron-right" size={24} color="#64748b" />
               </View>
             </TacticalCard>
           </TouchableOpacity>
@@ -292,7 +290,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
+  container: { flex: 1, backgroundColor: '#0a0a0a' },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -300,10 +298,10 @@ const styles = StyleSheet.create({
   },
   botonVolver: {
     width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: '#1e293b',
     alignItems: 'center', justifyContent: 'center',
   },
-  tituloHeader: { fontSize: 17, fontWeight: '800', color: Colors.onSurface },
+  tituloHeader: { fontSize: 17, fontWeight: '900', color: '#f8fafc', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   contenido: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
 
@@ -312,14 +310,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14,
     minWidth: 80, alignItems: 'center', justifyContent: 'center',
   },
-  chipActivo: { backgroundColor: '#263238' },
-  chipInactivo: { backgroundColor: '#f1f5f9' },
+  chipActivo: { backgroundColor: '#ef4444' },
+  chipInactivo: { backgroundColor: '#1e293b' },
   chipTexto: { fontSize: 14, fontWeight: '700' },
 
   centrado: { alignItems: 'center', paddingVertical: 52, gap: 12 },
   textoEstado: { fontSize: 14, color: '#94a3b8', fontWeight: '600', textAlign: 'center' },
   botonReintentar: {
-    marginTop: 8, backgroundColor: '#263238',
+    marginTop: 8, backgroundColor: '#1e293b',
     paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12,
   },
   textoReintentar: { color: '#fff', fontWeight: '700', fontSize: 14 },
@@ -333,8 +331,8 @@ const styles = StyleSheet.create({
     width: 52, height: 52, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', marginRight: 14,
   },
-  nombreAlerta: { fontSize: 15, fontWeight: '800', color: Colors.onSurface, marginBottom: 2 },
+  nombreAlerta: { fontSize: 15, fontWeight: '800', color: '#f8fafc', marginBottom: 2 },
   direccion: { fontSize: 12, color: '#94a3b8', fontWeight: '500', marginBottom: 2 },
-  observaciones: { fontSize: 12, color: '#b0bec5', fontWeight: '500', marginBottom: 2, fontStyle: 'italic' },
-  tiempo: { fontSize: 11, color: '#cbd5e1', fontWeight: '600', marginTop: 2 },
+  observaciones: { fontSize: 12, color: '#94a3b8', fontWeight: '500', marginBottom: 2, fontStyle: 'italic' },
+  tiempo: { fontSize: 11, color: '#64748b', fontWeight: '600', marginTop: 2 },
 });

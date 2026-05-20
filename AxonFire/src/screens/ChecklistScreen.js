@@ -7,13 +7,20 @@ import {
   StyleSheet,
   SafeAreaView,
   Platform,
-  ActivityIndicator,
+  Switch,
   Alert,
+  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config/api';
+import { useAuth } from '../context/AuthContext';
+import DamageReportField, { isDamageReportComplete } from '../components/DamageReportField';
+
+const ScrollContainer = Platform.OS === 'web' ? View : ScrollView;
 import SelectorBomberos from '../components/SelectorBomberos';
 
 const BASE_URL = 'http://localhost:3000';
@@ -64,31 +71,33 @@ function getIcono(nombre = '') {
 
 export default function ChecklistScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-
-  const camionId    = route?.params?.camionId     || null;
+// Parámetros de navegación y autenticación dinámicos (Rama dev)
+  const camionId     = route?.params?.camionId     || null;
   const camionNombre = route?.params?.camionNombre || 'MÓVIL';
-  const token       = route?.params?.token         || '';
+  const token        = route?.params?.token         || '';
 
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
+  // Estados dinámicos para control de inventario por sectores
   const [sectores, setSectores]           = useState([]);
   const [faltantesAyer, setFaltantesAyer] = useState(new Set());
   const [estadoItems, setEstadoItems]     = useState({});
   const [observaciones, setObservaciones] = useState({});
-  const [acompanantes, setAcompanantes]   = useState([]); // ← AX-13
+  const [acompanantes, setAcompanantes]   = useState([]); // Requerimiento AX-13
   const [cargando, setCargando]           = useState(true);
   const [refrescando, setRefrescando]     = useState(false);
   const [guardando, setGuardando]         = useState(false);
   const [error, setError]                 = useState(null);
 
+  // Carga dinámica del inventario del camión agrupado por sector
   async function cargarInventario() {
     if (!camionId) return;
     try {
       const res = await fetch(
-        `${BASE_URL}/camiones_inventario/camion/${camionId}/agrupado`,
+        `${API_BASE_URL}/camiones_inventario/camion/${camionId}/agrupado`,
         { headers }
       );
       if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -107,10 +116,11 @@ export default function ChecklistScreen({ navigation, route }) {
     }
   }
 
+  // Consulta del estado del día anterior para advertir sobre faltantes históricos
   async function cargarFaltantesAyer() {
     if (!camionId) return;
     try {
-      const res = await fetch(`${BASE_URL}/checklist/historial/${camionId}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/checklist/historial/${camionId}`, { headers });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const historial = await res.json();
       if (!Array.isArray(historial) || historial.length === 0) return;
@@ -162,6 +172,7 @@ export default function ChecklistScreen({ navigation, route }) {
     setObservaciones((prev) => ({ ...prev, [inventarioId]: texto }));
   }
 
+  // Guardado del checklist con validaciones rigurosas de observaciones obligatorias
   async function guardarChecklist() {
     const sinMarcar = Object.entries(estadoItems).filter(([, v]) => v === null);
     if (sinMarcar.length > 0) {
@@ -186,23 +197,42 @@ export default function ChecklistScreen({ navigation, route }) {
       const body = {
         camionId,
         detalles,
-        // AX-13: IDs de los acompañantes seleccionados en el selector
+        // AX-13: Mapeo de bomberos acompañantes asignados al móvil
         acompanantesIds: acompanantes.map(b => b.usuario_id),
       };
 
-      const res = await fetch(`${BASE_URL}/checklist/guardar`, {
+      const res = await fetch(`${API_BASE_URL}/checklist/guardar`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`Error ${res.status}`);
 
-      Alert.alert('✅ Guardado', 'El checklist diario fue guardado correctamente.', [
-        { text: 'OK', onPress: () => navigation?.goBack() },
-      ]);
+      // Intento de respaldo/espejo en almacenamiento local offline (Estrategia de carona)
+      try {
+        const localHist = await AsyncStorage.getItem('daily_checklist_history');
+        const history = localHist ? JSON.parse(localHist) : [];
+        history.push({ ...body, fecha_control: new Date().toISOString() });
+        await AsyncStorage.setItem('daily_checklist_history', JSON.stringify(history));
+      } catch (e) {
+        console.log('Error guardando copia de respaldo local:', e);
+      }
+
+      if (Platform.OS === 'web') {
+        alert('El checklist diario fue guardado correctamente.');
+        navigation?.goBack();
+      } else {
+        Alert.alert('✅ Guardado', 'El checklist diario fue guardado correctamente.', [
+          { text: 'OK', onPress: () => navigation?.goBack() },
+        ]);
+      }
     } catch (err) {
       console.error('Error guardando checklist:', err);
-      Alert.alert('Error', 'No se pudo guardar el checklist. Intentá de nuevo.');
+      if (Platform.OS === 'web') {
+        alert('No se pudo guardar el checklist. Intentá de nuevo.');
+      } else {
+        Alert.alert('Error', 'No se pudo guardar el checklist. Intentá de nuevo.');
+      }
     } finally {
       setGuardando(false);
     }
@@ -224,12 +254,12 @@ export default function ChecklistScreen({ navigation, route }) {
           <Text style={styles.topBarTitle}>CHECKLIST DIARIO</Text>
         </View>
         <View style={styles.avatarPlaceholder}>
-          <MaterialCommunityIcons name="clipboard-check" size={20} color="#fff" />
+<MaterialCommunityIcons name="clipboard-check" size={20} color="#fff" />
         </View>
       </View>
 
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView
+        <ScrollContainer
           contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -241,7 +271,7 @@ export default function ChecklistScreen({ navigation, route }) {
             />
           }
         >
-          {/* Header */}
+          {/* Header e Identificación del Móvil */}
           <View style={styles.headerTitleBox}>
             <Text style={styles.mainTitle}>
               <Text style={{ color: '#fff' }}>{camionNombre.toUpperCase()} — </Text>
@@ -252,6 +282,7 @@ export default function ChecklistScreen({ navigation, route }) {
               <Text style={styles.dateText}>{fechaHoy()}</Text>
             </View>
 
+            {/* Barra de Progreso del Chequeo Operativo */}
             {totalItems > 0 && (
               <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
@@ -261,6 +292,7 @@ export default function ChecklistScreen({ navigation, route }) {
               </View>
             )}
 
+            {/* Banner de Advertencia: Novedades Críticas de la Guardia Anterior */}
             {faltantesAyer.size > 0 && (
               <View style={styles.alertaAyer}>
                 <MaterialCommunityIcons name="alert" size={16} color="#f59e0b" />
@@ -270,7 +302,25 @@ export default function ChecklistScreen({ navigation, route }) {
               </View>
             )}
           </View>
+          </View>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.iconButton, hidrico.piton === 'ok' && styles.iconButtonActive]}
+              onPress={() => setHidrico({ ...hidrico, piton: 'ok' })}
+            >
+              <MaterialCommunityIcons name="check" size={18} color={hidrico.piton === 'ok' ? '#fff' : '#e2e8f0'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.iconButton, hidrico.piton === 'fail' && styles.iconButtonFail]}
+              onPress={() => setHidrico({ ...hidrico, piton: 'fail' })}
+            >
+              <MaterialCommunityIcons name="close" size={18} color={hidrico.piton === 'fail' ? '#fff' : '#e2e8f0'} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <DamageReportField visible={hidrico.piton === 'fail'} justification={getDamage('hid_piton').justification} onJustificationChange={(t) => updateDamage('hid_piton', 'justification', t)} theme="dark" />
 
+{/* Estados de Carga y Errores de Red */}
           {cargando && (
             <View style={styles.centrado}>
               <ActivityIndicator size="large" color="#dc2626" />
@@ -295,7 +345,7 @@ export default function ChecklistScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Sectores con herramientas */}
+          {/* Renderizado Dinámico de Sectores y Herramientas */}
           {!cargando && !error && camionId && sectores.map((sector) => (
             <View key={sector.nombre_sector}>
               <View style={styles.sectionHeader}>
@@ -401,7 +451,7 @@ export default function ChecklistScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* ── AX-13: Selector de acompañantes ── */}
+          {/* Selector de Dotación Acompañante de la Guardia */}
           {!cargando && !error && totalItems > 0 && (
             <SelectorBomberos
               token={token}
@@ -410,7 +460,7 @@ export default function ChecklistScreen({ navigation, route }) {
             />
           )}
 
-          {/* Botón guardar */}
+          {/* Botón de Guardado e Inicialización del Checklist */}
           {!cargando && !error && totalItems > 0 && (
             <TouchableOpacity
               style={[styles.saveButton, guardando && { opacity: 0.6 }]}
@@ -428,19 +478,66 @@ export default function ChecklistScreen({ navigation, route }) {
               )}
             </TouchableOpacity>
           )}
-        </ScrollView>
+
+          <View style={{ height: 100 }} />
+        </ScrollContainer>
       </SafeAreaView>
+
+      {/* Navegación Inferior Global del Sistema */}
+      <View style={styles.fakeBottomNav}>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="fire" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>INCIDENTS</Text>
+        </View>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="account-group" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>UNITS</Text>
+        </View>
+        <View style={styles.sosContainer}>
+          <MaterialCommunityIcons name="plus-circle" size={24} color="#fff" />
+          <Text style={styles.sosLabel}>SOS</Text>
+        </View>
+        <View style={styles.navItem}>
+          <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
+          <Text style={styles.navLabel}>MAP</Text>
+        </View>
+        <View style={styles.navItemActive}>
+          <MaterialCommunityIcons name="clipboard-text" size={24} color="#dc2626" />
+          <Text style={[styles.navLabel, { color: '#dc2626' }]}>LOGS</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:         { flex: 1, backgroundColor: '#16181d' },
-  topBar:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#1a1c23', borderBottomWidth: 1, borderBottomColor: '#26282f' },
+container: { 
+    flex: 1, 
+    backgroundColor: '#16181d',
+    ...Platform.select({
+      web: {
+        height: '100vh',
+        overflow: 'hidden',
+      },
+    }),
+  },
+  scrollView: {
+    flex: 1,
+    ...Platform.select({
+      web: {
+        height: 'calc(100vh - 120px)',
+        overflowY: 'auto',
+      },
+      default: {
+        height: '100%',
+      },
+    }),
+  },
+  topBar:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#1a1c23', borderBottomWidth: 1, borderBottomColor: '#26282f' },
   topBarLeft:        { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatarPlaceholder: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' },
   topBarTitle:       { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 1 },
-  scrollContent:     { padding: 24 },
+  scrollContent:     { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 200 },
   headerTitleBox:    { marginBottom: 32 },
   mainTitle:         { fontSize: 26, fontWeight: '900', letterSpacing: -0.5, marginBottom: 8 },
   dateRow:           { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
@@ -477,4 +574,47 @@ const styles = StyleSheet.create({
   textoEstado:       { color: '#475569', fontSize: 13, fontWeight: '600', textAlign: 'center' },
   botonReintentar:   { marginTop: 8, backgroundColor: '#dc2626', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 4 },
   textoReintentar:   { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  fakeBottomNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    backgroundColor: '#16181d',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#26282f',
+    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+  },
+  navItem: {
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    paddingBottom: 6,
+  },
+  navItemActive: {
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    paddingBottom: 6,
+  },
+  navLabel: {
+    color: '#64748b',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  sosContainer: {
+    backgroundColor: '#ef4444',
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  sosLabel: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '900',
+  }
 });
