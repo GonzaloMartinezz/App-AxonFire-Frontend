@@ -27,7 +27,7 @@ import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
  
-// ── PANTALLAS NUEVAS ────────────────────────────────────────────────────────
+// ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
@@ -191,7 +191,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Emergency" component={EmergencyScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
  
-        {/* ── PANTALLAS NUEVAS (4 tareas del ClickUp) ──────────────────────── */}
+        {/* ── JUAMPI ESTAS SON LAS 4 TAREAS estan aqui abajo ──────────────────────── */}
         <Stack.Screen name="PanelControl" component={PanelControlScreen} />
         <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
         <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
