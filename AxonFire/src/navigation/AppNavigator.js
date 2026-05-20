@@ -26,13 +26,15 @@ import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
 import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+
+
  
 // ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
- 
+ import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
  
@@ -196,6 +198,7 @@ export default function AppNavigator() {
         <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
         <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
         <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
+        <Stack.Screen name="ChecklistBolsos" component={ChecklistBolsosScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
