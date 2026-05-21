@@ -22,17 +22,20 @@ import ReportsScreen from '../screens/ReportsScreen';
 import AddFirefighterScreen from '../screens/AddFirefighterScreen';
 import AlertDetailScreen from '../screens/AlertDetailScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
-import ChecklistScreen from '../screens/ChecklistScreen';
 import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
 import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen';
+
  
-// ── PANTALLAS NUEVAS ────────────────────────────────────────────────────────
+// ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
+import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
+import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
  
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -198,7 +201,7 @@ export default function AppNavigator() {
           {/* Pantallas comunes/modales */}
           <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="NewAlert" component={NewAlertScreen} />
-          <Stack.Screen name="Checklist" component={ChecklistScreen} />
+
           <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
           <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
           <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
@@ -211,6 +214,10 @@ export default function AppNavigator() {
           <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
           <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
           <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
+          <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
+          <Stack.Screen name="AdminEquipment" component={AdminEquipmentScreen} />
+          <Stack.Screen name="ChecklistBolsos" component={ChecklistBolsosScreen} />
+          <Stack.Screen name="InformePostEmergencia" component={InformePostEmergenciaScreen} />
         </>
       )}
     </Stack.Navigator>

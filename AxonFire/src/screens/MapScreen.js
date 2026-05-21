@@ -6,38 +6,56 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
-  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../context/AuthContext';
 import { Colors, Typography, Spacing, Radius } from '../theme';
+import { useAuth } from '../context/AuthContext';
+import { Alert } from 'react-native';
 
 export default function MapScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { logout, user } = useAuth();
+  const { user, logout } = useAuth();
+  
+  const handleAdminPress = () => {
+    if (user?.rol === 'ADMIN') {
+      const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
+      if (isCurrentlyAdmin) {
+        navigation.navigate('MainApp');
+      } else {
+        navigation.navigate('AdminApp');
+      }
+    } else {
+      if (Platform.OS === 'web') alert('Esta sección es exclusiva para administradores.');
+      else Alert.alert('Acceso Denegado', 'Esta sección es exclusiva para administradores.');
+    }
+  };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro que deseas cerrar sesión?',
-      [
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Deseas cerrar sesión?')) {
+        logout();
+      }
+    } else {
+      Alert.alert('Cerrar Sesión', '¿Deseas cerrar sesión?', [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: () => logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })), style: 'destructive' }
-      ]
-    );
+        { text: 'Salir', style: 'destructive', onPress: () => logout() }
+      ]);
+    }
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
+      {/* ── Full-screen Map Background ── */}
       <View style={StyleSheet.absoluteFill}>
         <LinearGradient
           colors={['#c8d6c5', '#a8b8a5', '#788c75', '#5a7055']}
           style={StyleSheet.absoluteFill}
         >
+          {/* Grid lines — use % so they scale to any screen */}
           {[...Array(8)].map((_, i) => (
             <View
               key={`h-${i}`}
@@ -51,13 +69,16 @@ export default function MapScreen({ navigation }) {
             />
           ))}
 
+          {/* Fire perimeter (dashed) */}
           <View style={styles.perimeterLine} />
 
+          {/* Fire front label */}
           <View style={styles.fireMarker}>
             <MaterialCommunityIcons name="fire" size={16} color="#fff" />
             <Text style={styles.fireMarkerText}>FRENTE DE FUEGO</Text>
           </View>
 
+          {/* Water point markers */}
           <View style={[styles.mapPin, { top: '58%', left: '30%' }]}>
             <MaterialCommunityIcons name="water" size={14} color={Colors.alertBlue} />
           </View>
@@ -65,12 +86,14 @@ export default function MapScreen({ navigation }) {
             <MaterialCommunityIcons name="water" size={14} color={Colors.alertBlue} />
           </View>
 
+          {/* Responder marker */}
           <View style={[styles.mapPinOrange, { top: '40%', left: '60%' }]}>
             <MaterialCommunityIcons name="account-hard-hat" size={14} color={Colors.tertiary} />
           </View>
         </LinearGradient>
       </View>
 
+      {/* ── Top Overlay ── */}
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerBar}>
           <View style={styles.headerLeft}>
@@ -80,24 +103,22 @@ export default function MapScreen({ navigation }) {
             <Text style={styles.headerTitle}>AXON FIRE</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity
-              style={styles.emergencyIcon}
-              onPress={() => {
-                if (user?.rol === 'ADMIN') {
-                  navigation.navigate('AdminApp');
-                } else {
-                  Alert.alert('Acceso Restringido', 'Solo administradores pueden acceder al panel de control.');
-                }
-              }}
-            >
-              <MaterialCommunityIcons name="shield-account" size={16} color={Colors.primary} />
-            </TouchableOpacity>
+            {user?.rol === 'ADMIN' && (
+              <TouchableOpacity style={styles.emergencyIcon} onPress={handleAdminPress} title="Admin Panel">
+                <MaterialCommunityIcons 
+                  name={navigation.getState()?.routeNames?.includes('Panel') ? "account-hard-hat" : "shield-account"} 
+                  size={16} 
+                  color={Colors.primary} 
+                />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.emergencyIcon} onPress={handleLogout}>
               <MaterialCommunityIcons name="logout" size={16} color={Colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
 
+        {/* Mission Status Card */}
         <View style={styles.missionCard}>
           <View style={styles.missionLeft}>
             <Text style={styles.missionLabel}>ESTADO DE MISIÓN</Text>
@@ -126,6 +147,7 @@ export default function MapScreen({ navigation }) {
         </View>
       </View>
 
+      {/* ── Map Controls (right side) ── */}
       <View style={[styles.mapControls, { bottom: 120 }]}>
         <TouchableOpacity style={styles.controlBtn}>
           <MaterialCommunityIcons name="layers-outline" size={20} color={Colors.onSurface} />
@@ -176,6 +198,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: Radius.lg,
     gap: 5,
+    boxShadow: '0px 4px 12px rgba(175,16,26,0.4)',
     elevation: 6,
   },
   fireMarkerText: {
@@ -193,6 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.15)',
     elevation: 4,
   },
   mapPinOrange: {
@@ -203,6 +227,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.tertiaryFixed,
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.15)',
     elevation: 4,
   },
   topOverlay: {
@@ -238,7 +263,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     color: '#fff',
     textTransform: 'uppercase',
-    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadow: '0px 1px 4px rgba(0,0,0,0.3)',
   },
   emergencyIcon: {
     width: 36,

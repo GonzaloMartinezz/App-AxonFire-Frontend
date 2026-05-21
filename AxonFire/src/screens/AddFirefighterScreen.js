@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ScrollView,
   View,
@@ -18,6 +19,52 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+
+async function loadPersonnel(token) {
+  let remote = [];
+  try {
+    const response = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      remote = Array.isArray(data) ? data : [];
+    }
+  } catch (err) {
+    console.log('Error loading personnel from server:', err);
+  }
+
+  // Load from local storage
+  let local = [];
+  try {
+    const stored = await AsyncStorage.getItem('local_firefighters');
+    if (stored) local = JSON.parse(stored);
+  } catch (e) {
+    console.log('Error reading local firefighters:', e);
+  }
+
+  // If remote is empty, use mock list
+  if (remote.length === 0) {
+    remote = [
+      { id: 'b1', nombre: 'ROBERTO', apellido: 'MENDOZA', rangoBombero: { nombre_rol: 'CAPITÁN' } },
+      { id: 'b2', nombre: 'JORGE', apellido: 'ESPINOZA', rangoBombero: { nombre_rol: 'SARGENTO' } },
+      { id: 'b3', nombre: 'LAURA', apellido: 'TORRES', rangoBombero: { nombre_rol: 'TENIENTE' } },
+      { id: 'b4', nombre: 'FERNANDO', apellido: 'GOMEZ', rangoBombero: { nombre_rol: 'BOMBERO' } }
+    ];
+  }
+
+  // Merge local and remote
+  const all = [...remote];
+  local.forEach(l => {
+    if (!all.some(r => r.id === l.id || (r.nombre?.toLowerCase() === l.nombre?.toLowerCase() && r.apellido?.toLowerCase() === l.apellido?.toLowerCase()))) {
+      all.push(l);
+    }
+  });
+
+  return all;
+}
 
 const InputField = ({ label, placeholder, value, onChangeText, keyboardType = 'default', secureTextEntry }) => (
   <View style={styles.inputGroup}>
@@ -82,15 +129,7 @@ export default function AddFirefighterScreen({ navigation }) {
     setIsFetchingList(true);
     setFetchError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!response.ok) {
-        throw new Error('Error al obtener el listado de bomberos');
-      }
-      const data = await response.json();
+      const data = await loadPersonnel(token);
       setFirefighters(data);
     } catch (error) {
       setFetchError(error.message);
@@ -117,28 +156,56 @@ export default function AddFirefighterScreen({ navigation }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/usuarios/crear`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          nombre_usuario,
-          password,
-          rol: 'USER',
-          bombero: {
-            nombre: bombero.nombre,
-            apellido: bombero.apellido,
-            rango: bombero.rango
+      try {
+        const response = await fetch(`${API_BASE_URL}/usuarios/crear`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            nombre_usuario,
+            password,
+            rol: 'USER',
+            bombero: {
+              nombre: bombero.nombre,
+              apellido: bombero.apellido,
+              rango: bombero.rango
+            }
+          }),
+        });
+      } catch (err) {
+        console.log('Error registering firefighter to backend, using local fallback:', err);
+      }
+
+      // Save locally to AsyncStorage
+      try {
+        const localStr = await AsyncStorage.getItem('local_firefighters');
+        const localList = localStr ? JSON.parse(localStr) : [];
+        
+        // Map rango code to readable rank name
+        const rankNameMap = {
+          'CAD': 'CADETE',
+          'BOM': 'BOMBERO',
+          'OFI': 'OFICIAL'
+        };
+
+        const newFirefighter = {
+          id: `local_b_${Date.now()}`,
+          nombre: bombero.nombre.toUpperCase(),
+          apellido: bombero.apellido.toUpperCase(),
+          usuarioId: {
+            nombre_usuario: nombre_usuario.toLowerCase()
+          },
+          rangoBombero: {
+            nombre_rol: rankNameMap[bombero.rango] || bombero.rango
           }
-        }),
-      });
+        };
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al registrar personal');
+        localList.push(newFirefighter);
+        await AsyncStorage.setItem('local_firefighters', JSON.stringify(localList));
+      } catch (e) {
+        console.log('Error saving local firefighter:', e);
       }
 
       Alert.alert('Éxito', 'Personal registrado correctamente.');

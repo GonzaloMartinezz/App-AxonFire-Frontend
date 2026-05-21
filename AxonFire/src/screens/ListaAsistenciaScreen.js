@@ -14,12 +14,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 
-import { API_BASE_URL } from '../config/api';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+const BASE_URL = API_BASE_URL;
 
 // Configuración visual por estado de respuesta
 const CONFIG_ESTADO = {
@@ -40,6 +41,10 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
   const usuarioId = user?.id || '';
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
 
   // Estos params llegan cuando navegás desde AlertsScreen o desde el menú
   // pasándole el id de la alerta que querés ver
@@ -57,10 +62,13 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
   async function cargarAlerta() {
     if (!alertaId) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/alerta/${alertaId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await axios.get(`${BASE_URL}/alerta/${alertaId}`, {
+        headers,
+        timeout: 1500
       });
-      setAlerta(res.data);
+      if (res.status === 200) {
+        setAlerta(res.data);
+      }
     } catch (err) {
       console.error('Error cargando alerta:', err);
     }
@@ -68,25 +76,34 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
 
   // ── Cargar las respuestas (la lista de asistencia) ────────────────────────
   async function cargarRespuestas(esRefresh = false) {
-    if (!alertaId) return;
+    if (!alertaId) {
+      setCargando(false);
+      setRefrescando(false);
+      return;
+    }
     if (esRefresh) setRefrescando(true);
     else setCargando(true);
 
     try {
-      // Traemos las respuestas específicas de esta alerta
-      const res = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      // Traemos TODAS las respuestas y filtramos por esta alerta.
+      const res = await axios.get(`${BASE_URL}/respuestas_alertas/`, {
+        headers,
+        timeout: 1500
       });
-      const data = res.data || [];
+      if (res.status === 200) {
+        const data = res.data;
+        const deEstaAlerta = (Array.isArray(data) ? data : []).filter(
+          (r) => r.alerta_id === alertaId || r.alertaId === alertaId
+        );
 
-      setRespuestas(data);
+        setRespuestas(deEstaAlerta);
 
-      // Verificamos si el usuario actual ya respondió
-      const yaRespondi = data.find(
-        (r) => r.usuario_id === usuarioId || r.usuarioId === usuarioId
-      );
-      if (yaRespondi) setMiRespuesta(yaRespondi.estado_respuesta);
-
+        // Verificamos si el usuario actual ya respondió
+        const yaRespondi = deEstaAlerta.find(
+          (r) => r.usuario_id === usuarioId || r.usuarioId === usuarioId
+        );
+        if (yaRespondi) setMiRespuesta(yaRespondi.estado_respuesta);
+      }
     } catch (err) {
       console.error('Error cargando respuestas:', err);
     } finally {
@@ -109,24 +126,31 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
 
     setRespondiendo(true);
     try {
-      await axios.post(
-        `${API_BASE_URL}/respuestas_alertas/responder/${alertaId}/${usuarioId}`,
+      const res = await axios.post(
+        `${BASE_URL}/respuestas_alertas/responder/${alertaId}/${usuarioId}`,
         {
           estado_respuesta: estado,
           fecha_hora: new Date().toISOString(),
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers,
+          timeout: 2000
+        }
       );
 
-      setMiRespuesta(estado);
-      cargarRespuestas(true);
+      if (res.status === 200 || res.status === 201) {
+        setMiRespuesta(estado);
+        cargarRespuestas(true);
 
-      Alert.alert(
-        estado === 'ACEPTADO' ? '✅ Confirmado' : '❌ Rechazado',
-        estado === 'ACEPTADO'
-          ? 'Tu asistencia quedó registrada.'
-          : 'Rechazaste la alerta. Quedó registrado.'
-      );
+        Alert.alert(
+          estado === 'ACEPTADO' ? '✅ Confirmado' : '❌ Rechazado',
+          estado === 'ACEPTADO'
+            ? 'Tu asistencia quedó registrada.'
+            : 'Rechazaste la alerta. Quedó registrado.'
+        );
+      } else {
+        throw new Error(`Status ${res.status}`);
+      }
     } catch (err) {
       console.error('Error al responder:', err);
       Alert.alert('Error', 'No se pudo enviar tu respuesta. Intentá de nuevo.');

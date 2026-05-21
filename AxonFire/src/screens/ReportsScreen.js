@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
+  Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -29,6 +32,9 @@ const INVENTORY_ITEMS = [
 
 export default function ReportsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  // Legal Draft generation removed
+
+  // PDF and Legal Draft functionality removed
 
   return (
     <View style={styles.container}>
@@ -36,7 +42,7 @@ export default function ReportsScreen({ navigation }) {
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation?.navigate('Mapa')} style={styles.avatar}>
+          <TouchableOpacity onPress={() => navigation?.navigate('MainApp')} style={styles.avatar}>
             <MaterialCommunityIcons name="home" size={18} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>AXON FIRE</Text>
@@ -56,11 +62,6 @@ export default function ReportsScreen({ navigation }) {
         <Text style={styles.incidentDesc}>
           Respuesta ante Incendio Estructural - Sector Centro
         </Text>
-
-        <TouchableOpacity style={styles.pdfBtn}>
-          <MaterialCommunityIcons name="file-pdf-box" size={16} color="#fff" />
-          <Text style={styles.pdfBtnText}>Generar PDF</Text>
-        </TouchableOpacity>
 
         {/* ── Timeline ── */}
         <View style={styles.timeline}>
@@ -189,15 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 13, color: Colors.onSurfaceVariant,
     marginBottom: Spacing.md,
   },
-  pdfBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-    backgroundColor: Colors.alertBlue,
-    paddingVertical: 10, paddingHorizontal: 16,
-    borderRadius: Radius.xl, alignSelf: 'flex-start',
-    marginBottom: Spacing.xl,
-  },
-  pdfBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
   timeline: { marginBottom: Spacing.lg, paddingLeft: 2 },
   timelineItem: { flexDirection: 'row' },
   timelineLine: { alignItems: 'center', width: 16, marginRight: Spacing.md },
@@ -280,4 +273,5 @@ const styles = StyleSheet.create({
   inventoryStatus: {
     fontSize: 10, fontWeight: '700', textTransform: 'uppercase',
   },
+  // Removed legalBtn styles
 });

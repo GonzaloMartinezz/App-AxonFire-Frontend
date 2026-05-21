@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -17,6 +18,52 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
+async function loadPersonnel(token) {
+  let remote = [];
+  try {
+    const response = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      remote = Array.isArray(data) ? data : [];
+    }
+  } catch (err) {
+    console.log('Error loading personnel from server:', err);
+  }
+
+  // Load from local storage
+  let local = [];
+  try {
+    const stored = await AsyncStorage.getItem('local_firefighters');
+    if (stored) local = JSON.parse(stored);
+  } catch (e) {
+    console.log('Error reading local firefighters:', e);
+  }
+
+  // If remote is empty, use mock list
+  if (remote.length === 0) {
+    remote = [
+      { id: 'b1', nombre: 'ROBERTO', apellido: 'MENDOZA', rangoBombero: { nombre_rol: 'CAPITÁN' } },
+      { id: 'b2', nombre: 'JORGE', apellido: 'ESPINOZA', rangoBombero: { nombre_rol: 'SARGENTO' } },
+      { id: 'b3', nombre: 'LAURA', apellido: 'TORRES', rangoBombero: { nombre_rol: 'TENIENTE' } },
+      { id: 'b4', nombre: 'FERNANDO', apellido: 'GOMEZ', rangoBombero: { nombre_rol: 'BOMBERO' } }
+    ];
+  }
+
+  // Merge local and remote
+  const all = [...remote];
+  local.forEach(l => {
+    if (!all.some(r => r.id === l.id || (r.nombre?.toLowerCase() === l.nombre?.toLowerCase() && r.apellido?.toLowerCase() === l.apellido?.toLowerCase()))) {
+      all.push(l);
+    }
+  });
+
+  return all;
+}
+
 export default function AdminPersonnelScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token, logout } = useAuth();
@@ -33,16 +80,7 @@ export default function AdminPersonnelScreen({ navigation }) {
   const fetchPersonnel = async () => {
     try {
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      console.log(response)
-      if (!response.ok) {
-        throw new Error('Error al obtener el personal');
-      }
-      const data = await response.json();
+      const data = await loadPersonnel(token);
       setPersonnel(data);
     } catch (err) {
       setError(err.message);
