@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -63,6 +64,23 @@ function clasificarEstado(nombreEstado = '') {
   if (e.includes('RESUEL') || e.includes('CERRAD')) return 'resuelta';
   return 'activa';
 }
+
+function getStatusBadgeStyles(estado = '') {
+  const est = estado.toLowerCase();
+  switch (est) {
+    case 'activa':
+      return { bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', label: 'ACTIVA' };
+    case 'despachada':
+      return { bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', label: 'DESPACHADA' };
+    case 'progreso':
+      return { bg: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', label: 'EN PROGRESO' };
+    case 'resuelta':
+      return { bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981', label: 'RESUELTA' };
+    default:
+      return { bg: '#26282f', color: '#94a3b8', label: estado.toUpperCase() };
+  }
+}
+
 
 function clasificarPrioridad(prioridad = '') {
   const p = String(prioridad).toLowerCase();
@@ -133,7 +151,23 @@ export default function PanelControlScreen({ navigation }) {
 
       const data = res.data;
       const lista = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
-      setAlertas(lista);
+      
+      // Resolve local finalized overrides
+      const resolvedLista = await Promise.all(lista.map(async (a) => {
+        const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${a.id}`);
+        if (isLocallyFinalized === 'true') {
+          return {
+            ...a,
+            estadoAlerta: {
+              ...a.estadoAlerta,
+              nombre_estado: 'FINALIZADO'
+            }
+          };
+        }
+        return a;
+      }));
+
+      setAlertas(resolvedLista);
     } catch (err) {
       console.error('Error cargando datos del panel, usando mock data:', err);
       setAlertas(getMockAlerts());
@@ -496,6 +530,7 @@ export default function PanelControlScreen({ navigation }) {
               ultimasAlertas.map((a, idx) => {
                 const iconInfo = getAlertIcon(a.tipo);
                 const priorityColor = getPriorityColor(a.prioridad);
+                const statusStyle = getStatusBadgeStyles(a.estado);
                 return (
                   <TouchableOpacity 
                     key={a.id || idx} 
@@ -516,9 +551,9 @@ export default function PanelControlScreen({ navigation }) {
                               {a.prioridad.toUpperCase()}
                             </Text>
                           </View>
-                          <View style={[styles.statusBadge, { backgroundColor: a.estado === 'resuelta' ? '#064e3b' : '#451a1a' }]}>
-                            <Text style={[styles.statusBadgeText, { color: a.estado === 'resuelta' ? '#10b981' : '#fca5a5' }]}>
-                              {a.estado.toUpperCase()}
+                          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                            <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
+                              {statusStyle.label}
                             </Text>
                           </View>
                         </View>

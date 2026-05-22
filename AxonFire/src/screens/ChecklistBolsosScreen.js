@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Platform,
   TextInput,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -77,6 +78,12 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   const [guardando, setGuardando]                   = useState(false);
   const [error, setError]                           = useState(null);
 
+  // ── Estado de Modo Administrador ─────────────────────────────────────────────
+  const [modoAdmin, setModoAdmin]               = useState(false);
+  const [modalVisible, setModalVisible]         = useState(false);
+  const [nuevoNombreBolso, setNuevoNombreBolso] = useState('');
+  const [creando, setCreando]                   = useState(false);
+
   // ── Carga de bolsos ──────────────────────────────────────────────────────────
 
   async function cargarBolsos() {
@@ -86,12 +93,13 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
       const res = await fetch(`${API_BASE_URL}/bolsos/`, { headers });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
-      const lista = Array.isArray(data) ? data.filter(b => b.estado === 'ACTIVO') : [];
+      // Traemos todos los bolsos; el filtro de activos/inactivos lo hacemos en el render
+      const lista = Array.isArray(data) ? data : [];
       setBolsos(lista);
 
-      // Si vino un bolsoId por params, lo seleccionamos directamente
+      // Si vino un bolsoId por params, lo seleccionamos directamente (solo si está activo)
       if (bolsoIdParam) {
-        const encontrado = lista.find(b => b.id === bolsoIdParam);
+        const encontrado = lista.find(b => b.id === bolsoIdParam && b.estado === 'ACTIVO');
         if (encontrado) seleccionarBolso(encontrado, lista);
       }
     } catch (err) {
@@ -100,6 +108,90 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
     } finally {
       setCargandoBolsos(false);
     }
+  }
+
+  // ── CRUD de bolsos ────────────────────────────────────────────────────────────
+
+  async function crearBolso() {
+    if (!nuevoNombreBolso.trim()) {
+      Alert.alert('Error', 'El nombre del bolso no puede estar vacío.');
+      return;
+    }
+    setCreando(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/bolsos`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ nombre_bolso: nuevoNombreBolso.trim(), estado: 'ACTIVO' }),
+      });
+      if (res.ok) {
+        Alert.alert('✅ Listo', 'Bolso creado correctamente.');
+        setNuevoNombreBolso('');
+        setModalVisible(false);
+        cargarBolsos();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        Alert.alert('Error', errData.error || 'No se pudo crear el bolso.');
+      }
+    } catch (err) {
+      console.error('Error creando bolso:', err);
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    } finally {
+      setCreando(false);
+    }
+  }
+
+  async function toggleEstadoBolso(bolso) {
+    const nuevoEstado = bolso.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    try {
+      const res = await fetch(`${API_BASE_URL}/bolsos/${bolso.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+      if (res.ok) {
+        cargarBolsos();
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar el estado del bolso.');
+      }
+    } catch (err) {
+      console.error('Error actualizando bolso:', err);
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    }
+  }
+
+  function eliminarBolso(bolso) {
+    Alert.alert(
+      'Eliminar Bolso',
+      `¿Estás seguro de eliminar "${bolso.nombre_bolso?.toUpperCase()}"? Esta acción es permanente.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar', style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await fetch(`${API_BASE_URL}/bolsos/${bolso.id}`, {
+                method: 'DELETE',
+                headers,
+              });
+              if (res.status === 204 || res.ok) {
+                Alert.alert('✅ Eliminado', 'El bolso fue eliminado correctamente.');
+                cargarBolsos();
+              } else {
+                const errData = await res.json().catch(() => ({}));
+                Alert.alert(
+                  '⚠️ No se pudo eliminar',
+                  errData.error || 'Este bolso tiene registros históricos. Desactivalo en su lugar.'
+                );
+              }
+            } catch (err) {
+              console.error('Error eliminando bolso:', err);
+              Alert.alert('Error', 'No se pudo conectar al servidor.');
+            }
+          },
+        },
+      ]
+    );
   }
 
   // ── Seleccionar bolso y cargar su inventario ──────────────────────────────────
@@ -236,13 +328,30 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
             {bolsoActivo && (
               <Text style={styles.topBarSub}>{bolsoActivo.nombre_bolso?.toUpperCase()}</Text>
             )}
+            {!bolsoActivo && modoAdmin && (
+              <Text style={[styles.topBarSub, { color: '#f59e0b' }]}>MODO ADMINISTRADOR</Text>
+            )}
           </View>
         </View>
-        {bolsoActivo && (
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setBolsoActivo(null)}>
-            <MaterialCommunityIcons name="swap-horizontal" size={20} color="#94a3b8" />
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {bolsoActivo && (
+            <TouchableOpacity style={styles.iconBtn} onPress={() => setBolsoActivo(null)}>
+              <MaterialCommunityIcons name="swap-horizontal" size={20} color="#94a3b8" />
+            </TouchableOpacity>
+          )}
+          {!bolsoActivo && (
+            <TouchableOpacity
+              style={[styles.iconBtn, modoAdmin && styles.iconBtnActive]}
+              onPress={() => setModoAdmin(v => !v)}
+            >
+              <MaterialCommunityIcons
+                name={modoAdmin ? 'cog' : 'cog-outline'}
+                size={20}
+                color={modoAdmin ? '#f59e0b' : '#94a3b8'}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -253,64 +362,168 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
             tintColor="#dc2626" colors={['#dc2626']} />
         }
       >
-        {/* ── PASO 1: Selector de bolso ─────────────────────────────────── */}
+        {/* ── PASO 1: Selector / Administrador de bolso ──────────────────── */}
         {!bolsoActivo && (
           <>
-            <View style={styles.introBox}>
-              <MaterialCommunityIcons name="bag-personal" size={32} color="#dc2626" />
-              <Text style={styles.introTitulo}>¿Qué bolso vas a revisar?</Text>
-              <Text style={styles.introSub}>
-                Seleccioná el kit para registrar el control post-emergencia
-              </Text>
-            </View>
+            {/* ── MODO ADMIN: botón de agregar + lista completa ────────────── */}
+            {modoAdmin ? (
+              <>
+                {/* Encabezado modo admin */}
+                <View style={styles.adminHeaderBox}>
+                  <MaterialCommunityIcons name="shield-key-outline" size={28} color="#f59e0b" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.adminHeaderTitulo}>GESTIÓN DE BOLSOS</Text>
+                    <Text style={styles.adminHeaderSub}>Creá, activá o desactivá los kits de emergencia</Text>
+                  </View>
+                </View>
 
-            {cargandoBolsos && (
-              <View style={styles.centrado}>
-                <ActivityIndicator size="large" color="#dc2626" />
-                <Text style={styles.textoEstado}>Cargando bolsos...</Text>
-              </View>
-            )}
-
-            {error && (
-              <TouchableOpacity style={styles.errorCard} onPress={cargarBolsos}>
-                <MaterialCommunityIcons name="wifi-off" size={16} color="#f87171" />
-                <Text style={styles.errorText}>{error} Tocá para reintentar.</Text>
-              </TouchableOpacity>
-            )}
-
-            {!cargandoBolsos && !error && bolsos.length === 0 && (
-              <View style={styles.centrado}>
-                <MaterialCommunityIcons name="bag-remove-outline" size={44} color="#334155" />
-                <Text style={styles.textoEstado}>No hay bolsos activos registrados.</Text>
-              </View>
-            )}
-
-            {/* Grid de bolsos */}
-            <View style={styles.gridBolsos}>
-              {bolsos.map(bolso => (
+                {/* Botón agregar nuevo bolso */}
                 <TouchableOpacity
-                  key={bolso.id}
-                  style={styles.cardBolso}
-                  onPress={() => seleccionarBolso(bolso)}
-                  activeOpacity={0.75}
+                  style={styles.btnAgregarBolso}
+                  onPress={() => { setNuevoNombreBolso(''); setModalVisible(true); }}
+                  activeOpacity={0.8}
                 >
-                  <View style={styles.iconoBolsoBox}>
-                    <MaterialCommunityIcons
-                      name={getIconoBolso(bolso.nombre_bolso)}
-                      size={28}
-                      color="#dc2626"
-                    />
-                  </View>
-                  <Text style={styles.nombreBolso} numberOfLines={2}>
-                    {bolso.nombre_bolso?.toUpperCase()}
-                  </Text>
-                  <View style={styles.estadoBolsoRow}>
-                    <View style={styles.puntoverde} />
-                    <Text style={styles.estadoBolsoText}>ACTIVO</Text>
-                  </View>
+                  <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#f59e0b" />
+                  <Text style={styles.btnAgregarBolsoText}>AGREGAR NUEVO BOLSO</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+
+                {cargandoBolsos && (
+                  <View style={styles.centrado}>
+                    <ActivityIndicator size="large" color="#f59e0b" />
+                    <Text style={styles.textoEstado}>Cargando bolsos...</Text>
+                  </View>
+                )}
+
+                {/* Listado completo para admin */}
+                {!cargandoBolsos && bolsos.map(bolso => {
+                  const activo = bolso.estado === 'ACTIVO';
+                  return (
+                    <View
+                      key={bolso.id}
+                      style={[
+                        styles.cardBolsoAdmin,
+                        { borderLeftColor: activo ? '#22c55e' : '#475569' },
+                      ]}
+                    >
+                      <View style={styles.cardBolsoAdminTop}>
+                        <View style={[
+                          styles.iconoBolsoBoxAdmin,
+                          { backgroundColor: activo ? '#172213' : '#1e2130' },
+                        ]}>
+                          <MaterialCommunityIcons
+                            name={getIconoBolso(bolso.nombre_bolso)}
+                            size={24}
+                            color={activo ? '#22c55e' : '#475569'}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.cardBolsoAdminNombre} numberOfLines={1}>
+                            {bolso.nombre_bolso?.toUpperCase()}
+                          </Text>
+                          <View style={styles.estadoBolsoAdminRow}>
+                            <View style={[styles.estadoPunto, { backgroundColor: activo ? '#22c55e' : '#475569' }]} />
+                            <Text style={[styles.estadoBolsoAdminText, { color: activo ? '#22c55e' : '#64748b' }]}>
+                              {activo ? 'OPERATIVO' : 'DESACTIVADO'}
+                            </Text>
+                          </View>
+                        </View>
+                        {/* Badge estado */}
+                        <View style={[styles.badgeEstadoAdmin, { backgroundColor: activo ? '#14532d' : '#1e293b' }]}>
+                          <Text style={[styles.badgeEstadoAdminText, { color: activo ? '#4ade80' : '#64748b' }]}>
+                            {activo ? 'ON' : 'OFF'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Controles admin */}
+                      <View style={styles.controlesAdmin}>
+                        <TouchableOpacity
+                          style={[styles.btnAdminAccion, { borderColor: activo ? '#dc2626' : '#22c55e' }]}
+                          onPress={() => toggleEstadoBolso(bolso)}
+                          activeOpacity={0.75}
+                        >
+                          <MaterialCommunityIcons
+                            name={activo ? 'toggle-switch-off-outline' : 'toggle-switch-outline'}
+                            size={14}
+                            color={activo ? '#f87171' : '#4ade80'}
+                          />
+                          <Text style={[styles.btnAdminAccionText, { color: activo ? '#f87171' : '#4ade80' }]}>
+                            {activo ? 'DESACTIVAR' : 'ACTIVAR'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.btnAdminAccion, { borderColor: '#7f1d1d' }]}
+                          onPress={() => eliminarBolso(bolso)}
+                          activeOpacity={0.75}
+                        >
+                          <MaterialCommunityIcons name="trash-can-outline" size={14} color="#f87171" />
+                          <Text style={[styles.btnAdminAccionText, { color: '#f87171' }]}>ELIMINAR</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            ) : (
+              /* ── MODO NORMAL: selector de bolsos activos ────────────── */
+              <>
+                <View style={styles.introBox}>
+                  <MaterialCommunityIcons name="bag-personal" size={32} color="#dc2626" />
+                  <Text style={styles.introTitulo}>¿Qué bolso vas a revisar?</Text>
+                  <Text style={styles.introSub}>
+                    Seleccioná el kit para registrar el control post-emergencia
+                  </Text>
+                </View>
+
+                {cargandoBolsos && (
+                  <View style={styles.centrado}>
+                    <ActivityIndicator size="large" color="#dc2626" />
+                    <Text style={styles.textoEstado}>Cargando bolsos...</Text>
+                  </View>
+                )}
+
+                {error && (
+                  <TouchableOpacity style={styles.errorCard} onPress={cargarBolsos}>
+                    <MaterialCommunityIcons name="wifi-off" size={16} color="#f87171" />
+                    <Text style={styles.errorText}>{error} Tocá para reintentar.</Text>
+                  </TouchableOpacity>
+                )}
+
+                {!cargandoBolsos && !error && bolsos.filter(b => b.estado === 'ACTIVO').length === 0 && (
+                  <View style={styles.centrado}>
+                    <MaterialCommunityIcons name="bag-remove-outline" size={44} color="#334155" />
+                    <Text style={styles.textoEstado}>No hay bolsos activos registrados.</Text>
+                  </View>
+                )}
+
+                {/* Grid de bolsos activos */}
+                <View style={styles.gridBolsos}>
+                  {bolsos.filter(b => b.estado === 'ACTIVO').map(bolso => (
+                    <TouchableOpacity
+                      key={bolso.id}
+                      style={styles.cardBolso}
+                      onPress={() => seleccionarBolso(bolso)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={styles.iconoBolsoBox}>
+                        <MaterialCommunityIcons
+                          name={getIconoBolso(bolso.nombre_bolso)}
+                          size={28}
+                          color="#dc2626"
+                        />
+                      </View>
+                      <Text style={styles.nombreBolso} numberOfLines={2}>
+                        {bolso.nombre_bolso?.toUpperCase()}
+                      </Text>
+                      <View style={styles.estadoBolsoRow}>
+                        <View style={styles.puntoverde} />
+                        <Text style={styles.estadoBolsoText}>ACTIVO</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
           </>
         )}
 
@@ -455,6 +668,63 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
           </>
         )}
       </ScrollView>
+
+      {/* ── Modal: Crear nuevo bolso ──────────────────────────────────────────── */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Header del modal */}
+            <View style={styles.modalHeader}>
+              <MaterialCommunityIcons name="bag-personal-outline" size={22} color="#f59e0b" />
+              <Text style={styles.modalTitulo}>NUEVO BOLSO</Text>
+            </View>
+            <Text style={styles.modalSub}>
+              Ingresá el nombre del kit de emergencia. Quedará disponible de inmediato para los bomberos.
+            </Text>
+
+            {/* Input nombre */}
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej: Bolso de Trauma, Kit de Cuerdas..."
+              placeholderTextColor="#475569"
+              value={nuevoNombreBolso}
+              onChangeText={setNuevoNombreBolso}
+              autoCapitalize="words"
+              autoFocus
+            />
+
+            {/* Botones */}
+            <View style={styles.modalBotones}>
+              <TouchableOpacity
+                style={styles.modalBtnCancelar}
+                onPress={() => setModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalBtnCancelarText}>CANCELAR</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnCrear, creando && { opacity: 0.6 }]}
+                onPress={crearBolso}
+                disabled={creando}
+                activeOpacity={0.8}
+              >
+                {creando
+                  ? <ActivityIndicator size="small" color="#000" />
+                  : <>
+                      <MaterialCommunityIcons name="plus" size={16} color="#000" />
+                      <Text style={styles.modalBtnCrearText}>CREAR BOLSO</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -591,4 +861,100 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3, borderLeftColor: '#dc2626', marginBottom: 12,
   },
   errorText: { color: '#f87171', fontSize: 12, fontWeight: '600', flex: 1 },
+
+  // ── Modo Admin ────────────────────────────────────────────────────────────────
+  iconBtnActive: { backgroundColor: '#451a03' },
+
+  adminHeaderBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#1a1c23', borderRadius: 8, padding: 16,
+    borderWidth: 1, borderColor: '#451a03', marginBottom: 14,
+  },
+  adminHeaderTitulo: {
+    color: '#f59e0b', fontSize: 12, fontWeight: '900', letterSpacing: 1.5,
+  },
+  adminHeaderSub: {
+    color: '#78716c', fontSize: 10, fontWeight: '600', marginTop: 2,
+  },
+
+  btnAgregarBolso: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 10, backgroundColor: '#1c1a10', borderRadius: 8,
+    borderWidth: 1, borderColor: '#78350f',
+    borderStyle: 'dashed', paddingVertical: 16, marginBottom: 16,
+  },
+  btnAgregarBolsoText: {
+    color: '#f59e0b', fontSize: 12, fontWeight: '900', letterSpacing: 1.5,
+  },
+
+  // Tarjeta admin
+  cardBolsoAdmin: {
+    backgroundColor: '#1b1d24', borderRadius: 8, padding: 14,
+    borderLeftWidth: 3, marginBottom: 10,
+  },
+  cardBolsoAdminTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconoBolsoBoxAdmin: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cardBolsoAdminNombre: {
+    color: '#e2e8f0', fontSize: 12, fontWeight: '800', letterSpacing: 0.4,
+  },
+  estadoBolsoAdminRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  estadoPunto: { width: 6, height: 6, borderRadius: 3 },
+  estadoBolsoAdminText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
+  badgeEstadoAdmin: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4,
+  },
+  badgeEstadoAdminText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+
+  // Controles admin
+  controlesAdmin: {
+    flexDirection: 'row', gap: 8, marginTop: 12,
+    paddingTop: 12, borderTopWidth: 1, borderTopColor: '#26282f',
+  },
+  btnAdminAccion: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 8, borderRadius: 4,
+    borderWidth: 1, backgroundColor: '#0f1117',
+  },
+  btnAdminAccionText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+
+  // ── Modal crear bolso ─────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(10, 12, 18, 0.88)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#1a1c23', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 24, paddingBottom: 40,
+    borderTopWidth: 1, borderColor: '#26282f',
+  },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10,
+  },
+  modalTitulo: {
+    color: '#f59e0b', fontSize: 14, fontWeight: '900', letterSpacing: 1.5,
+  },
+  modalSub: {
+    color: '#64748b', fontSize: 12, fontWeight: '500', lineHeight: 18,
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#12141a', borderRadius: 8, padding: 14,
+    color: '#e2e8f0', fontSize: 13, fontWeight: '600',
+    borderWidth: 1, borderColor: '#334155', marginBottom: 20,
+  },
+  modalBotones: { flexDirection: 'row', gap: 10 },
+  modalBtnCancelar: {
+    flex: 1, paddingVertical: 14, borderRadius: 8,
+    borderWidth: 1, borderColor: '#334155', alignItems: 'center',
+  },
+  modalBtnCancelarText: { color: '#64748b', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  modalBtnCrear: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, borderRadius: 8,
+    backgroundColor: '#f59e0b',
+  },
+  modalBtnCrearText: { color: '#000', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
 });

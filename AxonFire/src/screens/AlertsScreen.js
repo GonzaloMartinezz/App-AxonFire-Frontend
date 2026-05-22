@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import { useFocusEffect } from '@react-navigation/native';
@@ -73,13 +74,13 @@ const StatusBadge = ({ severity, type = 'severity' }) => {
       case 'alta':
         return { bg: 'rgba(251, 191, 36, 0.15)', text: '#fbbf24', label: 'ALTA' };
       case 'activa':
-        return { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', label: 'Activa' };
+        return { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', label: 'ACTIVA' };
       case 'despachada':
-        return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', label: 'Despachada' };
+        return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', label: 'DESPACHADA' };
       case 'progreso':
-        return { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', label: 'En Progreso' };
+        return { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', label: 'EN PROGRESO' };
       case 'resuelta':
-        return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', label: 'Resuelta' };
+        return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', label: 'RESUELTA' };
       default:
         return { bg: '#26282f', text: '#94a3b8', label: severity.toUpperCase() };
     }
@@ -124,9 +125,14 @@ export default function AlertsScreen({ navigation }) {
       if (res.data && (res.data.alertas || Array.isArray(res.data))) {
         const list = Array.isArray(res.data.alertas) ? res.data.alertas : Array.isArray(res.data) ? res.data : [];
         
-        const mappedAlerts = list.map(a => {
+        const mappedAlerts = await Promise.all(list.map(async (a) => {
           const tipo = a.subCategoriaAlerta?.nombre_sub_categoria || a.subCategoriaAlerta?.nombre || a.observaciones || 'Incidente General';
-          const estado = clasificarEstado(a.estadoAlerta?.nombre_estado || a.estadoAlerta?.nombre || a.estado || '');
+          
+          // Check local finalized override
+          const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${a.id}`);
+          const rawStatus = isLocallyFinalized === 'true' ? 'FINALIZADO' : (a.estadoAlerta?.nombre_estado || a.estadoAlerta?.nombre || a.estado || '');
+          
+          const estado = clasificarEstado(rawStatus);
           const prioridad = clasificarPrioridad(a.prioridad || a.subCategoriaAlerta?.prioridad || '');
           
           return {
@@ -139,7 +145,7 @@ export default function AlertsScreen({ navigation }) {
             fecha_hora: a.fecha_hora,
             ...getAlertIcon(tipo)
           };
-        });
+        }));
         
         mappedAlerts.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
         setAlerts(mappedAlerts);

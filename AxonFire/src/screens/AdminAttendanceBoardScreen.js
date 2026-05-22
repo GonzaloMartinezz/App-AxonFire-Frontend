@@ -30,10 +30,33 @@ const CLASSIFICATION_TABS = [
   { key: 'tropa', label: 'TROPA', icon: 'account-hard-hat' },
 ];
 
+// Mapear código/rango de backend a jerarquía completa
+const rankNameMap = {
+  'CAD': 'CADETE',
+  'BOM': 'BOMBERO',
+  'OFI': 'OFICIAL',
+  'CADETE': 'CADETE',
+  'BOMBERO': 'BOMBERO',
+  'OFICIAL': 'OFICIAL',
+  'CAPITAN': 'CAPITÁN',
+  'CAPITÁN': 'CAPITÁN',
+  'SARGENTO': 'SARGENTO',
+  'TENIENTE': 'TENIENTE',
+  'CABO': 'CABO',
+  'SUB-OFICIAL': 'SUBOFICIAL',
+  'SUBOFICIAL': 'SUBOFICIAL'
+};
+
+const translateRank = (rango) => {
+  if (!rango) return 'BOMBERO';
+  const rUpper = String(rango).toUpperCase().trim();
+  return rankNameMap[rUpper] || rUpper;
+};
+
 // Mapear rango a clasificación
 const classifyRank = (rangoNombre) => {
   if (!rangoNombre) return 'tropa';
-  const r = rangoNombre.toLowerCase();
+  const r = translateRank(rangoNombre).toLowerCase();
   if (r.includes('capitán') || r.includes('capitan') || r.includes('teniente') || r.includes('oficial') || r.includes('comandante')) return 'officer';
   if (r.includes('sargento') || r.includes('cabo') || r.includes('suboficial')) return 'suboficial';
   return 'tropa';
@@ -196,6 +219,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
+  const accentColor = user?.rol === 'ADMIN' ? '#dc2626' : '#0284c7';
 
   // Alerta ID recibido por parámetros (flexible snake_case y camelCase)
   const paramAlertaId = route?.params?.alerta_id ?? route?.params?.alertaId ?? null;
@@ -327,6 +351,60 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           }
         }
 
+        // ── Consistencia Local: Inyectar/sobreescribir con local_response si existe ──
+        const currentUserId = user?.id || '';
+        const localResponse = await AsyncStorage.getItem(`local_response_${activeAlertaId}`);
+        
+        let miRespuestaVal = localResponse;
+        const miRespObj = respuestas.find(
+          (r) => (r.usuario_id || r.usuarioId?.id || r.usuarioId) === currentUserId
+        );
+        
+        if (miRespObj && miRespObj.estado_respuesta !== 'PENDIENTE' && !miRespuestaVal) {
+          miRespuestaVal = miRespObj.estado_respuesta;
+          await AsyncStorage.setItem(`local_response_${activeAlertaId}`, miRespuestaVal);
+        } else if (miRespuestaVal && (!miRespObj || miRespObj.estado_respuesta !== miRespuestaVal)) {
+          const existingIdx = respuestas.findIndex(
+            (r) => (r.usuario_id || r.usuarioId?.id || r.usuarioId) === currentUserId
+          );
+          
+          // Cross-reference lookup in bomberosData for current logged-in firefighter profile
+          const myProfile = (bomberosData || []).find(
+            (b) => (b.usuario_id || b.usuarioId?.id) === currentUserId
+          );
+
+          const myName = myProfile?.nombre || user?.nombre || 'BOMBERO';
+          const myApellido = myProfile?.apellido || user?.apellido || '';
+          const myRawRango = myProfile?.rangoBombero?.nombre_rol || myProfile?.rango || user?.rol || 'BOMBERO';
+          const myRango = translateRank(myRawRango);
+
+          const updatedResp = {
+            id: respuestas[existingIdx]?.id || `local_${Date.now()}`,
+            alerta_id: activeAlertaId,
+            usuario_id: currentUserId,
+            usuarioId: {
+              id: currentUserId,
+              nombre_usuario: user?.nombre_usuario || 'MIUSUARIO',
+              bombero: {
+                nombre: myName,
+                apellido: myApellido,
+                rangoBombero: { nombre_rol: myRango }
+              }
+            },
+            estado_respuesta: miRespuestaVal,
+            fecha_hora: respuestas[existingIdx]?.fecha_hora || new Date().toISOString()
+          };
+          
+          if (existingIdx >= 0) {
+            respuestas[existingIdx] = updatedResp;
+          } else {
+            respuestas.push(updatedResp);
+          }
+        }
+        
+        setMiRespuesta(miRespuestaVal || 'PENDIENTE');
+
+        // Ahora sí, armar respuestasMap y setear confirmedVal con la lista de respuestas resuelta!
         respuestas.forEach((r) => {
           const uid = r.usuario_id || r.usuarioId?.id || r.usuarioId;
           if (uid) respuestasMap[uid] = r;
@@ -335,17 +413,6 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         // Set confirmed count
         const confirmedVal = respuestas.filter(r => r.estado_respuesta === 'ACEPTADO').length;
         setConfirmedCountAPI(confirmedVal);
-
-        // Evaluar mi propia respuesta
-        const currentUserId = user?.id || '';
-        const miRespObj = respuestas.find(
-          (r) => (r.usuario_id || r.usuarioId?.id || r.usuarioId) === currentUserId
-        );
-        if (miRespObj) {
-          setMiRespuesta(miRespObj.estado_respuesta);
-        } else {
-          setMiRespuesta(null);
-        }
 
         // Obtener detalle de la alerta
         let detailData = null;
@@ -400,13 +467,14 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         const usuarioId = b.usuario_id || b.usuarioId?.id;
         const respuesta = usuarioId ? respuestasMap[usuarioId] : null;
         const estadoRespuesta = respuesta?.estado_respuesta || 'ABSENT';
-        const rangoNombre = b.rangoBombero?.nombre_rol || b.rango || '';
+        const rawRango = b.rangoBombero?.nombre_rol || b.rango || '';
+        const rangoNombre = translateRank(rawRango);
 
         return {
           id: b.id || Math.random().toString(),
           usuario_id: usuarioId,
           name: `${b.nombre || ''} ${b.apellido || ''}`.trim().toUpperCase() || 'BOMBERO SIN NOMBRE',
-          rank: (rangoNombre || 'BOMBERO').toUpperCase(),
+          rank: rangoNombre.toUpperCase(),
           unit: b.usuario?.nombre_usuario || b.usuarioId?.nombre_usuario || '—',
           classification: classifyRank(rangoNombre),
           status: estadoRespuesta,
@@ -521,6 +589,10 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         });
 
         await AsyncStorage.setItem(`responses_${currentAlertaId}`, JSON.stringify(filteredList));
+        
+        // Sincronizar local_response para consistencia con EmergencyScreen
+        await AsyncStorage.setItem(`local_response_${currentAlertaId}`, estado);
+        
         exitoso = true;
       } catch (storageErr) {
         console.log('Error escribiendo en storage local:', storageErr);
@@ -640,7 +712,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <StatusBar style="light" backgroundColor="#16181d" />
-        <ActivityIndicator size="large" color="#dc2626" />
+        <ActivityIndicator size="large" color={accentColor} />
         <Text style={{ color: '#94a3b8', marginTop: 16, fontSize: 12, letterSpacing: 1 }}>CARGANDO DATOS…</Text>
       </View>
     );
@@ -675,12 +747,12 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#dc2626" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentColor} />}
       >
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={styles.titleLeftGroup}>
-            <View style={styles.redAccent} />
+            <View style={[styles.redAccent, { backgroundColor: accentColor }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.headerLabel}>
                 {activeAlerta ? 'DETALLE DE ASISTENCIA' : 'ATTENDANCE BOARD'} • {lastRefresh}
@@ -724,7 +796,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
                 disabled={respondiendo}
               >
                 <LinearGradient
-                  colors={['#dc2626', '#991b1b']}
+                  colors={user?.rol === 'ADMIN' ? ['#dc2626', '#991b1b'] : ['#0284c7', '#0369a1']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.rsvpGradient}
@@ -768,7 +840,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         )}
 
         {!activeAlerta && (
-          <View style={[styles.alertInfoBox, { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }]}>
+          <View style={[styles.alertInfoBox, { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, borderLeftColor: accentColor }]}>
             <MaterialCommunityIcons name="shield-check" size={48} color="#388e3c" style={{ marginBottom: 12 }} />
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>No hay ninguna emergencia en curso</Text>
             <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>El personal se encuentra inactivo o en guardia.</Text>
@@ -867,14 +939,14 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
             return (
               <TouchableOpacity
                 key={tab.key}
-                style={[styles.classTab, isActive && styles.classTabActive]}
+                style={[styles.classTab, isActive && { backgroundColor: accentColor }]}
                 onPress={() => setActiveTab(tab.key)}
                 activeOpacity={0.7}
               >
                 <MaterialCommunityIcons name={tab.icon} size={16} color={isActive ? '#fff' : '#64748b'} />
                 <Text style={[styles.classTabText, isActive && styles.classTabTextActive]}>{tab.label}</Text>
                 <View style={[styles.classTabBadge, isActive && styles.classTabBadgeActive]}>
-                  <Text style={[styles.classTabBadgeText, isActive && { color: '#dc2626' }]}>{count}</Text>
+                  <Text style={[styles.classTabBadgeText, isActive && { color: accentColor }]}>{count}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -883,7 +955,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
 
         {/* Section Header */}
         <View style={styles.sectionHeader}>
-          <View style={styles.sectionLine} />
+          <View style={[styles.sectionLine, { backgroundColor: accentColor }]} />
           <Text style={styles.sectionTitle}>LISTA DE PERSONAL</Text>
           <View style={styles.sectionCountBadge}>
             <Text style={styles.sectionCountText}>

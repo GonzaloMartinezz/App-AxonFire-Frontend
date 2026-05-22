@@ -70,6 +70,22 @@ function esHoraValida(str) {
   return regex.test(str);
 }
 
+// ── Helper: obtiene estilos de insignia de estado dinámicos ───────────────────
+function obtenerBadgeEstado(nombreEstado = '') {
+  const e = nombreEstado.toUpperCase();
+  if (e === 'FINALIZADO' || e.includes('RESUEL') || e.includes('CERRAD')) {
+    return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', label: 'RESUELTA' };
+  }
+  if (e === 'EN CURSO' || e.includes('PROGRESO') || e.includes('CURSO')) {
+    return { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', label: 'EN PROGRESO' };
+  }
+  if (e.includes('DESPACH')) {
+    return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', label: 'DESPACHADA' };
+  }
+  return { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', label: 'ACTIVA' };
+}
+
+
 // ── Componente: Input de hora amigable ────────────────────────────────────────
 function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-outline' }) {
   const [texto, setTexto] = useState(value || '');
@@ -628,9 +644,14 @@ export default function AlertDetailScreen({ route, navigation }) {
           <View style={styles.mainCardContent}>
             <View style={styles.titleRow}>
               <Text style={styles.mainTitle}>{alerta?.observaciones || 'Incidente'}</Text>
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelText}>{alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' ? 'FINALIZADO' : 'ACTIVA'}</Text>
-              </View>
+              {(() => {
+                const badgeEst = obtenerBadgeEstado(alerta?.estadoAlerta?.nombre_estado || alerta?.estadoAlerta?.nombre || alerta?.estado || '');
+                return (
+                  <View style={[styles.levelBadge, { backgroundColor: badgeEst.bg }]}>
+                    <Text style={[styles.levelText, { color: badgeEst.text }]}>{badgeEst.label}</Text>
+                  </View>
+                );
+              })()}
             </View>
             <View style={styles.locationRow}>
               <MaterialIcons name="location-on" size={16} color="#94a3b8" />

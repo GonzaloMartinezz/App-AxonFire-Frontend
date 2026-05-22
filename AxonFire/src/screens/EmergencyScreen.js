@@ -521,8 +521,9 @@ export default function EmergencyScreen({ route, navigation }) {
         setRespuesta('FINALIZADA');
         stopEmergencyAlert();
         animateIn();
-        if (!promptedRef.current[activeAlertaId]) {
-          promptedRef.current[activeAlertaId] = true;
+        const alreadyPrompted = await AsyncStorage.getItem(`prompted_bags_${activeAlertaId}`);
+        if (!alreadyPrompted) {
+          await AsyncStorage.setItem(`prompted_bags_${activeAlertaId}`, 'true');
           revisionBolsos.mostrar({ token, navigation, alertaId: activeAlertaId });
         }
       } else if (miRespuestaVal && miRespuestaVal !== 'PENDIENTE') {
@@ -899,27 +900,25 @@ export default function EmergencyScreen({ route, navigation }) {
             )}
 
             {/* ── Monitoreo de Personal y Dotación Activa (Aporte carona) ─── */}
-            {esAceptado && (
-              <View style={styles.respondersSummaryBox}>
-                <View style={styles.summaryItem}>
-                   <Text style={[styles.summaryNum, { color: '#22c55e' }]}>{respuestaSummary.confirmaron}</Text>
-                   <Text style={styles.summaryLabel}>VAN</Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryItem}>
-                   <Text style={[styles.summaryNum, { color: '#94a3b8' }]}>{respuestaSummary.pendientes}</Text>
-                   <Text style={styles.summaryLabel}>PEND.</Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryItem}>
-                   <Text style={[styles.summaryNum, { color: '#ef4444' }]}>{respuestaSummary.rechazaron}</Text>
-                   <Text style={styles.summaryLabel}>NO</Text>
-                </View>
+            <View style={styles.respondersSummaryBox}>
+              <View style={styles.summaryItem}>
+                 <Text style={[styles.summaryNum, { color: '#22c55e' }]}>{respuestaSummary.confirmaron}</Text>
+                 <Text style={styles.summaryLabel}>VAN</Text>
               </View>
-            )}
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                 <Text style={[styles.summaryNum, { color: '#94a3b8' }]}>{respuestaSummary.pendientes}</Text>
+                 <Text style={styles.summaryLabel}>PEND.</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                 <Text style={[styles.summaryNum, { color: '#ef4444' }]}>{respuestaSummary.rechazaron}</Text>
+                 <Text style={styles.summaryLabel}>NO</Text>
+              </View>
+            </View>
 
             {/* Lista compacta de efectivos en camino */}
-            {esAceptado && responders.length > 0 && (
+            {responders.length > 0 && (
               <View style={styles.respondersSmallList}>
                 <Text style={styles.respondersSmallTitle}>EFECTIVOS EN CAMINO:</Text>
                 <View style={styles.miniRespondersScroll}>
