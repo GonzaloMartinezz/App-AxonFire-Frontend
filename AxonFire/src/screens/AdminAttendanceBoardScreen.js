@@ -14,12 +14,13 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '../config/api';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Classification Tabs ─────────────────────────────────────
 const CLASSIFICATION_TABS = [
@@ -91,61 +92,92 @@ function getMockBomberos() {
   ];
 }
 
-async function loadMockResponses(alertaId) {
+async function loadMockResponses(alertaId, realBomberos = []) {
   try {
     const local = await AsyncStorage.getItem(`responses_${alertaId}`);
     if (local) return JSON.parse(local);
 
-    const defaults = [
-      {
-        id: 'res1',
-        alerta_id: alertaId,
-        usuario_id: 'u1',
-        usuarioId: {
-          id: 'u1',
-          nombre_usuario: 'RMENDOZA',
-          bombero: {
-            nombre: 'ROBERTO',
-            apellido: 'MENDOZA',
-            rangoBombero: { nombre_rol: 'CAPITAN' }
-          }
+    const defaults = [];
+
+    if (realBomberos && realBomberos.length > 0) {
+      realBomberos.forEach((b, idx) => {
+        let estado = 'PENDIENTE';
+        if (idx % 3 === 0) estado = 'ACEPTADO';
+        else if (idx % 3 === 1) estado = 'RECHAZADO';
+
+        defaults.push({
+          id: `res_real_${b.id}`,
+          alerta_id: alertaId,
+          usuario_id: b.usuario_id,
+          usuarioId: {
+            id: b.usuario_id,
+            nombre_usuario: b.usuarioId?.nombre_usuario || b.nombre.toLowerCase(),
+            bombero: {
+              nombre: b.nombre,
+              apellido: b.apellido,
+              rangoBombero: { nombre_rol: b.rangoBombero?.nombre_rol || 'BOMBERO' }
+            }
+          },
+          estado_respuesta: estado,
+          fecha_hora: new Date(Date.now() - (10 - idx) * 60 * 1000).toISOString()
+        });
+      });
+    }
+
+    if (defaults.length === 0) {
+      const fallbackMock = [
+        {
+          id: 'res1',
+          alerta_id: alertaId,
+          usuario_id: 'u1',
+          usuarioId: {
+            id: 'u1',
+            nombre_usuario: 'RMENDOZA',
+            bombero: {
+              nombre: 'ROBERTO',
+              apellido: 'MENDOZA',
+              rangoBombero: { nombre_rol: 'CAPITAN' }
+            }
+          },
+          estado_respuesta: 'ACEPTADO',
+          fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString()
         },
-        estado_respuesta: 'ACEPTADO',
-        fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'res2',
-        alerta_id: alertaId,
-        usuario_id: 'u2',
-        usuarioId: {
-          id: 'u2',
-          nombre_usuario: 'JESPINOZA',
-          bombero: {
-            nombre: 'JORGE',
-            apellido: 'ESPINOZA',
-            rangoBombero: { nombre_rol: 'SARGENTO' }
-          }
+        {
+          id: 'res2',
+          alerta_id: alertaId,
+          usuario_id: 'u2',
+          usuarioId: {
+            id: 'u2',
+            nombre_usuario: 'JESPINOZA',
+            bombero: {
+              nombre: 'JORGE',
+              apellido: 'ESPINOZA',
+              rangoBombero: { nombre_rol: 'SARGENTO' }
+            }
+          },
+          estado_respuesta: 'ACEPTADO',
+          fecha_hora: new Date(Date.now() - 8 * 60 * 1000).toISOString()
         },
-        estado_respuesta: 'ACEPTADO',
-        fecha_hora: new Date(Date.now() - 8 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'res3',
-        alerta_id: alertaId,
-        usuario_id: 'u3',
-        usuarioId: {
-          id: 'u3',
-          nombre_usuario: 'LTORRES',
-          bombero: {
-            nombre: 'LAURA',
-            apellido: 'TORRES',
-            rangoBombero: { nombre_rol: 'OFICIAL' }
-          }
-        },
-        estado_respuesta: 'RECHAZADO',
-        fecha_hora: new Date(Date.now() - 5 * 60 * 1000).toISOString()
-      }
-    ];
+        {
+          id: 'res3',
+          alerta_id: alertaId,
+          usuario_id: 'u3',
+          usuarioId: {
+            id: 'u3',
+            nombre_usuario: 'LTORRES',
+            bombero: {
+              nombre: 'LAURA',
+              apellido: 'TORRES',
+              rangoBombero: { nombre_rol: 'OFICIAL' }
+            }
+          },
+          estado_respuesta: 'RECHAZADO',
+          fecha_hora: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        }
+      ];
+      fallbackMock.forEach(f => defaults.push(f));
+    }
+
     await AsyncStorage.setItem(`responses_${alertaId}`, JSON.stringify(defaults));
     return defaults;
   } catch (e) {
@@ -157,8 +189,8 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
 
-  // Alerta ID recibido por parámetros
-  const alertaId = route?.params?.alerta_id ?? null;
+  // Alerta ID recibido por parámetros (flexible snake_case y camelCase)
+  const paramAlertaId = route?.params?.alerta_id ?? route?.params?.alertaId ?? null;
 
   const [activeTab, setActiveTab] = useState('all');
   const [searchText, setSearchText] = useState('');
@@ -167,10 +199,14 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [confirmedCountAPI, setConfirmedCountAPI] = useState(0);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [currentAlertaId, setCurrentAlertaId] = useState(alertaId);
+  const [currentAlertaId, setCurrentAlertaId] = useState(paramAlertaId);
   const [activeAlerta, setActiveAlerta] = useState(null);
   const [timerText, setTimerText] = useState('00:00:00');
   const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+  // Estados para RSVP interactivo
+  const [miRespuesta, setMiRespuesta] = useState(null);
+  const [respondiendo, setRespondiendo] = useState(false);
 
   // ─── Construir headers con token ──────────────────────────────
   const authHeaders = useCallback(() => {
@@ -183,18 +219,20 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const fetchData = useCallback(async () => {
     setErrorMsg(null);
     try {
-      let activeAlertaId = alertaId;
+      let activeAlertaId = paramAlertaId;
 
       // 1. Si no hay alertaId, buscamos la más reciente
       if (!activeAlertaId) {
         try {
           const hasta = new Date().toISOString();
           const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-          const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
-            headers: authHeaders(),
-            data: { fecha_desde: desde, fecha_hasta: hasta },
-            timeout: 1500
-          });
+          const resAlertas = await axios.post(`${API_BASE_URL}/alerta/rango`, 
+            { fecha_desde: desde, fecha_hasta: hasta },
+            {
+              headers: authHeaders(),
+              timeout: 15000
+            }
+          );
           const data = resAlertas.data;
           const alertas = data.alertas || [];
           if (alertas.length > 0) {
@@ -228,7 +266,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       try {
         const bomberosRes = await axios.get(`${API_BASE_URL}/usuarios/bomberos`, {
           headers: authHeaders(),
-          timeout: 1500
+          timeout: 15000
         });
         if (bomberosRes.status === 200) {
           bomberosData = bomberosRes.data;
@@ -243,36 +281,63 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         bomberosData = getMockBomberos();
       }
 
-      // 3. Si tenemos una alerta activa, obtener respuestas
+      // 3. Si tenemos una alerta activa, obtener respuestas (con dual API fallback de contingencia)
       let respuestasMap = {};
+      let respuestas = [];
       if (activeAlertaId) {
-        let respuestas = [];
         try {
           const respuestasRes = await axios.get(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, {
             headers: authHeaders(),
-            timeout: 1500
+            timeout: 15000
           });
           if (respuestasRes.status === 200) {
             respuestas = respuestasRes.data;
             if (!respuestas || respuestas.length === 0 || respuestas.error) {
-              respuestas = await loadMockResponses(activeAlertaId);
+              respuestas = await loadMockResponses(activeAlertaId, bomberosData);
             }
           } else {
-            respuestas = await loadMockResponses(activeAlertaId);
+            respuestas = await loadMockResponses(activeAlertaId, bomberosData);
           }
         } catch (e) {
-          console.log('Error loading responses from server, using local fallback:', e);
-          respuestas = await loadMockResponses(activeAlertaId);
+          console.log('Intento 1 fallido, probando endpoint de backup de respuestas:', e);
+          try {
+            const respuestasResBackup = await axios.get(`${API_BASE_URL}/respuestas_alertas/`, {
+              headers: authHeaders(),
+              timeout: 15000
+            });
+            if (respuestasResBackup.status === 200) {
+              const allResp = respuestasResBackup.data;
+              respuestas = (Array.isArray(allResp) ? allResp : []).filter(
+                (r) => r.alerta_id === activeAlertaId || r.alertaId === activeAlertaId
+              );
+            } else {
+              respuestas = await loadMockResponses(activeAlertaId, bomberosData);
+            }
+          } catch (backupErr) {
+            console.log('Ambos endpoints de respuesta fallaron, usando mock local:', backupErr);
+            respuestas = await loadMockResponses(activeAlertaId, bomberosData);
+          }
         }
 
         respuestas.forEach((r) => {
-          const uid = r.usuario_id || r.usuarioId?.id;
+          const uid = r.usuario_id || r.usuarioId?.id || r.usuarioId;
           if (uid) respuestasMap[uid] = r;
         });
 
         // Set confirmed count
         const confirmedVal = respuestas.filter(r => r.estado_respuesta === 'ACEPTADO').length;
         setConfirmedCountAPI(confirmedVal);
+
+        // Evaluar mi propia respuesta
+        const currentUserId = user?.id || '';
+        const miRespObj = respuestas.find(
+          (r) => (r.usuario_id || r.usuarioId?.id || r.usuarioId) === currentUserId
+        );
+        if (miRespObj) {
+          setMiRespuesta(miRespObj.estado_respuesta);
+        } else {
+          setMiRespuesta(null);
+        }
 
         // Obtener detalle de la alerta
         let detailData = null;
@@ -289,7 +354,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           try {
             const detailRes = await axios.get(`${API_BASE_URL}/alerta/${activeAlertaId}`, {
               headers: authHeaders(),
-              timeout: 1500
+              timeout: 15000
             });
             if (detailRes.status === 200) {
               detailData = detailRes.data;
@@ -353,7 +418,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [alertaId, authHeaders]);
+  }, [paramAlertaId, authHeaders, user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -393,6 +458,102 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     fetchData();
   }, [fetchData]);
 
+  // ── Responder a la alerta ─────────────────────────────────────────────────
+  const responderAlerta = async (estado) => {
+    const currentUserId = user?.id || '';
+    if (!currentUserId) {
+      Alert.alert('Error', 'No se encontró tu usuario. Volvé a iniciar sesión.');
+      return;
+    }
+    if (!currentAlertaId) {
+      Alert.alert('Error', 'No hay ninguna alerta activa para responder.');
+      return;
+    }
+
+    setRespondiendo(true);
+    try {
+      const payload = {
+        estado_respuesta: estado,
+        fecha_hora: new Date().toISOString(),
+      };
+
+      let exitoso = false;
+      try {
+        const res = await axios.post(
+          `${API_BASE_URL}/respuestas_alertas/responder/${currentAlertaId}/${currentUserId}`,
+          payload,
+          {
+            headers: authHeaders(),
+            timeout: 10000
+          }
+        );
+        if (res.status === 200 || res.status === 201) {
+          exitoso = true;
+        }
+      } catch (err) {
+        console.log('Error enviando RSVP al servidor, guardando localmente:', err);
+      }
+
+      // Guardado local de resiliencia
+      try {
+        const localSaved = await AsyncStorage.getItem(`responses_${currentAlertaId}`);
+        const parsedList = localSaved ? JSON.parse(localSaved) : [];
+
+        // Remover duplicados previos
+        const filteredList = parsedList.filter(
+          (r) => (r.usuario_id || r.usuarioId?.id || r.usuarioId) !== currentUserId
+        );
+
+        filteredList.push({
+          id: `local_${Date.now()}`,
+          alerta_id: currentAlertaId,
+          usuario_id: currentUserId,
+          estado_respuesta: estado,
+          fecha_hora: new Date().toISOString()
+        });
+
+        await AsyncStorage.setItem(`responses_${currentAlertaId}`, JSON.stringify(filteredList));
+        exitoso = true;
+      } catch (storageErr) {
+        console.log('Error escribiendo en storage local:', storageErr);
+      }
+
+      if (exitoso) {
+        setMiRespuesta(estado);
+        Alert.alert(
+          estado === 'ACEPTADO' ? '✅ Confirmado' : '❌ Rechazado',
+          estado === 'ACEPTADO'
+            ? 'Tu asistencia ha sido confirmada.'
+            : 'Has rechazado la convocatoria.'
+        );
+        fetchData();
+      } else {
+        throw new Error('No se pudo procesar la respuesta');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo enviar tu respuesta. Intentá de nuevo.');
+    } finally {
+      setRespondiendo(false);
+    }
+  };
+
+  const confirmarRSVP = (estado) => {
+    Alert.alert(
+      estado === 'ACEPTADO' ? 'Confirmar Asistencia' : 'Rechazar Convocatoria',
+      estado === 'ACEPTADO'
+        ? '¿Confirmás que vas a responder a esta emergencia?'
+        : '¿Estás seguro que querés rechazar el llamado?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: estado === 'ACEPTADO' ? 'Confirmar' : 'Rechazar',
+          style: estado === 'ACEPTADO' ? 'default' : 'destructive',
+          onPress: () => responderAlerta(estado),
+        },
+      ]
+    );
+  };
+
   const finalizarEmergencia = async () => {
     if (!currentAlertaId) return;
 
@@ -410,7 +571,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
               try {
                 await axios.patch(`${API_BASE_URL}/alerta/${currentAlertaId}/finalizar`, {}, {
                   headers: authHeaders(),
-                  timeout: 1500
+                  timeout: 15000
                 });
               } catch (e) {
                 console.log('Error calling finalize endpoint, using local override:', e);
@@ -484,9 +645,11 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#94a3b8" />
-          </TouchableOpacity>
+          {navigation.canGoBack() && (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 8 }}>
+              <MaterialCommunityIcons name="arrow-left" size={22} color="#94a3b8" />
+            </TouchableOpacity>
+          )}
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
         <View style={styles.topBarRight}>
@@ -508,38 +671,101 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         <View style={styles.headerRow}>
           <View style={styles.titleLeftGroup}>
             <View style={styles.redAccent} />
-            <View>
-              <Text style={styles.headerLabel}>ATTENDANCE BOARD • {lastRefresh}</Text>
-              <Text style={styles.mainTitle}>TABLERO DE{'\n'}ASISTENCIA</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerLabel}>
+                {activeAlerta ? 'DETALLE DE ASISTENCIA' : 'ATTENDANCE BOARD'} • {lastRefresh}
+              </Text>
+              <Text style={styles.mainTitle} numberOfLines={2}>
+                {activeAlerta ? (activeAlerta.observaciones || 'INCIDENTE DE EMERGENCIA') : 'TABLERO DE\nASISTENCIA'}
+              </Text>
+              {activeAlerta && activeAlerta.ubicacion ? (
+                <Text style={styles.alertInfoSub}>{activeAlerta.ubicacion}</Text>
+              ) : null}
             </View>
           </View>
-          {activeAlerta ? (
+          {activeAlerta && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO' ? (
             <View style={styles.rateBox}>
-              <Text style={styles.rateLabel}>TIEMPO TRANSCURRIDO</Text>
+              <Text style={styles.rateLabel}>TRANSCURRIDO</Text>
               <Text style={[styles.rateValue, { color: '#ef4444' }]}>{timerText}</Text>
             </View>
           ) : null}
         </View>
 
-        {!activeAlerta ? (
+        {/* Panel de RSVP interactivo (si está activa y no se ha respondido) */}
+        {activeAlerta && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO' && !miRespuesta && (
+          <View style={styles.rsvpCard}>
+            <Text style={styles.rsvpTitle}>🚨 CONVOCATORIA ACTIVA</Text>
+            <Text style={styles.rsvpSubtitle}>
+              Por favor, confirma tu disponibilidad de respuesta para este incidente.
+            </Text>
+            <View style={styles.rsvpButtons}>
+              <TouchableOpacity
+                style={styles.btnRsvpRechazar}
+                onPress={() => confirmarRSVP('RECHAZADO')}
+                disabled={respondiendo}
+              >
+                <MaterialCommunityIcons name="close-circle" size={18} color="#ef4444" />
+                <Text style={styles.btnRsvpRechazarText}>NO PUEDO</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.btnRsvpAceptar}
+                onPress={() => confirmarRSVP('ACEPTADO')}
+                disabled={respondiendo}
+              >
+                <LinearGradient
+                  colors={['#dc2626', '#991b1b']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.rsvpGradient}
+                >
+                  {respondiendo ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="check-circle" size={18} color="#fff" />
+                      <Text style={styles.btnRsvpAceptarText}>VOY AL CUARTEL</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Banner de Respuesta Emitida */}
+        {miRespuesta && (
+          <View
+            style={[
+              styles.myResponseBanner,
+              {
+                borderColor: miRespuesta === 'ACEPTADO' ? '#10b981' : '#ef4444',
+                backgroundColor: miRespuesta === 'ACEPTADO' ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={miRespuesta === 'ACEPTADO' ? 'check-circle' : 'close-circle'}
+              size={20}
+              color={miRespuesta === 'ACEPTADO' ? '#10b981' : '#ef4444'}
+            />
+            <Text style={[styles.myResponseText, { color: miRespuesta === 'ACEPTADO' ? '#10b981' : '#ef4444' }]}>
+              {miRespuesta === 'ACEPTADO'
+                ? 'TU ASISTENCIA HA SIDO CONFIRMADA PARA ESTA EMERGENCIA'
+                : 'HAS DECLINADO LA CONVOCATORIA A ESTA EMERGENCIA'}
+            </Text>
+          </View>
+        )}
+
+        {!activeAlerta && (
           <View style={[styles.alertInfoBox, { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }]}>
             <MaterialCommunityIcons name="shield-check" size={48} color="#388e3c" style={{ marginBottom: 12 }} />
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>No hay ninguna emergencia en curso</Text>
             <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>El personal se encuentra inactivo o en guardia.</Text>
           </View>
-        ) : (
-          <View style={styles.alertInfoBox}>
-             <View style={styles.alertInfoTop}>
-                <Text style={styles.alertInfoTitle}>{activeAlerta.observaciones || 'INCIDENTE'}</Text>
-                <View style={[styles.statusTag, { backgroundColor: activeAlerta.estadoAlerta?.nombre_estado === 'FINALIZADO' ? '#1e293b' : '#451a1a' }]}>
-                   <Text style={styles.statusTagText}>{activeAlerta.estadoAlerta?.nombre_estado || activeAlerta.estado_alerta_id}</Text>
-                </View>
-             </View>
-             <Text style={styles.alertInfoSub}>{activeAlerta.ubicacion}</Text>
-          </View>
         )}
 
-        {currentAlertaId && activeAlerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
+        {user?.rol === 'ADMIN' && currentAlertaId && activeAlerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
           <TouchableOpacity style={styles.finalizeBtn} onPress={finalizarEmergencia}>
             <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
             <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
@@ -591,7 +817,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         </View>
 
         {/* API Count Badge */}
-        {alertaId && (
+        {paramAlertaId && (
           <View style={styles.apiCountBadge}>
             <MaterialCommunityIcons name="account-check" size={16} color="#10b981" />
             <Text style={styles.apiCountText}>
@@ -708,7 +934,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
             <View style={styles.bottomSummaryItem}>
               <Text style={styles.bottomSummaryLabel}>CONFIRMADOS API</Text>
               <Text style={styles.bottomSummaryValue}>
-                {String(alertaId ? confirmedCountAPI : confirmedCount).padStart(2, '0')}
+                {String(paramAlertaId ? confirmedCountAPI : confirmedCount).padStart(2, '0')}
               </Text>
             </View>
           </View>
@@ -815,4 +1041,49 @@ const styles = StyleSheet.create({
   alertInfoSub: { color: '#94a3b8', fontSize: 11 },
   statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   statusTagText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+
+  // RSVP Card & Banners unificados
+  rsvpCard: {
+    backgroundColor: '#1c1917',
+    borderWidth: 1,
+    borderColor: '#78350f',
+    borderRadius: 8,
+    padding: 18,
+    marginBottom: 20,
+  },
+  rsvpTitle: { color: '#fbbf24', fontWeight: '900', fontSize: 13, letterSpacing: 0.5, marginBottom: 4 },
+  rsvpSubtitle: { color: '#d6d3d1', fontSize: 12, lineHeight: 16, marginBottom: 14 },
+  rsvpButtons: { flexDirection: 'row', gap: 12 },
+  btnRsvpRechazar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#2d1a1c',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  btnRsvpRechazarText: { color: '#ef4444', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  btnRsvpAceptar: { flex: 1.5, borderRadius: 8, overflow: 'hidden' },
+  rsvpGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  btnRsvpAceptarText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
+  myResponseBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 20,
+  },
+  myResponseText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, flex: 1 },
 });

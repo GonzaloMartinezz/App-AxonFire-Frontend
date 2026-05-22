@@ -31,7 +31,6 @@ import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen'
  
 // ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
-import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
@@ -40,18 +39,33 @@ import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
  
-// Custom Tab Bar (sin cambios)
+// ── Bombero Tab Bar ─────────────────────────────────────────────
+// 5 tabs: Mapa · Alertas · SOS (FAB) · Emergencia · Perfil
+// Logística y Asistencia siguen accesibles como Stack screens.
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
- 
+
+  // Icon pairs: [inactive (outline), active (filled)]
+  const ICON_MAP = {
+    Mapa:      ['map-outline',          'map'],
+    Alertas:   ['bell-outline',         'bell'],
+    Emergencia:['shield-alert-outline', 'shield-alert'],
+    Perfil:    ['account-outline',      'account'],
+  };
+
   return (
-    <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
+    <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
       <View style={styles.tabBarInner}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
-          const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
+          const label =
+            options.tabBarLabel !== undefined
+              ? options.tabBarLabel
+              : options.title !== undefined
+              ? options.title
+              : route.name;
           const isFocused = state.index === index;
- 
+
           const onPress = () => {
             const event = navigation.emit({
               type: 'tabPress',
@@ -62,101 +76,43 @@ function CustomTabBar({ state, descriptors, navigation }) {
               navigation.navigate(route.name);
             }
           };
- 
+
+          // FAB central de SOS
           if (route.name === 'SOS') {
             return (
-              <TouchableOpacity key={route.key} onPress={onPress} style={styles.fabContainer} activeOpacity={0.8}>
-                <LinearGradient colors={['#dc2626', '#991b1b']} style={styles.fab}>
-                  <MaterialCommunityIcons name="plus" size={32} color="#fff" />
-                </LinearGradient>
-                <Text style={styles.tabLabel}>ALERTA</Text>
+              <TouchableOpacity
+                key={route.key}
+                onPress={onPress}
+                style={styles.fabContainer}
+                activeOpacity={0.85}
+              >
+                <View style={styles.fab}>
+                  <MaterialCommunityIcons name="alarm-light" size={28} color="#fff" />
+                </View>
+                <Text style={styles.fabLabel}>ALERTA</Text>
               </TouchableOpacity>
             );
           }
- 
-          let iconName;
-          if (route.name === 'Mapa') iconName = isFocused ? 'map' : 'map-outline';
-          else if (route.name === 'Alertas') iconName = isFocused ? 'bell' : 'bell-outline';
-          else if (route.name === 'Cuarteles') iconName = isFocused ? 'office-building' : 'office-building-outline';
-          else if (route.name === 'Perfil') iconName = isFocused ? 'account' : 'account-outline';
-          else if (route.name === 'Emergencia') iconName = isFocused ? 'shield-alert' : 'shield-alert-outline';
-          else if (route.name === 'Asistencia') iconName = isFocused ? 'clipboard-check' : 'clipboard-check-outline';
+
+          const icons = ICON_MAP[route.name] || ['circle-outline', 'circle'];
+          const iconName = isFocused ? icons[1] : icons[0];
 
           return (
-            <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
-              <MaterialCommunityIcons name={iconName} size={26} color={isFocused ? '#fff' : '#90a4ae'} />
-              {isFocused && <View style={styles.activeDot} />}
-              <Text style={[styles.tabLabel, { color: isFocused ? '#fff' : '#90a4ae' }]}>{label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
- 
-function MainTabNavigator() {
-  return (
-    <Tab.Navigator tabBar={props => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Mapa" component={MapScreen} />
-      <Tab.Screen name="Alertas" component={AlertsScreen} />
-      <Tab.Screen name="Emergencia" component={EmergencyScreen} />
-      <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'ALERTA' }} />
-      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
-      <Tab.Screen name="Cuarteles" component={ResourcesScreen} />
-      <Tab.Screen name="Perfil" component={ProfileScreen} />
-    </Tab.Navigator>
-  );
-}
- 
-// Admin Tab Bar (sin cambios)
-function AdminTabBar({ state, descriptors, navigation }) {
-  const insets = useSafeAreaInsets();
- 
-  return (
-    <View style={[styles.tabBarContainer, { backgroundColor: '#1a1c23', paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
-      <View style={styles.tabBarInner}>
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
-          const isFocused = state.index === index;
- 
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
- 
-          if (route.name === 'SOS') {
-            return (
-              <TouchableOpacity key={route.key} onPress={onPress} style={styles.fabContainerAdmin} activeOpacity={0.8}>
-                <View style={styles.fabAdmin}>
-                  <MaterialCommunityIcons name="alarm-light" size={32} color="#fff" />
-                </View>
-                <Text style={styles.tabLabelAdminRed}>SOS</Text>
-              </TouchableOpacity>
-            );
-          }
- 
-          let iconName;
-          if (route.name === 'Panel') iconName = 'monitor-dashboard';
-          else if (route.name === 'Mapa') iconName = 'map';
-          else if (route.name === 'Alertas') iconName = 'alert';
-          else if (route.name === 'Asistencia') iconName = 'clipboard-check';
-          else if (route.name === 'Personal') iconName = 'account-group';
- 
-          return (
-            <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
-              <View style={[styles.adminIconBox, isFocused && { backgroundColor: '#dc2626' }]}>
-                <MaterialCommunityIcons name={iconName} size={22} color={isFocused ? '#fff' : '#64748b'} />
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={styles.tabItem}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.tabIconPill, isFocused && styles.tabIconPillActive]}>
+                <MaterialCommunityIcons
+                  name={iconName}
+                  size={20}
+                  color={isFocused ? '#fff' : '#64748b'}
+                />
               </View>
-              <Text style={[styles.tabLabel, { color: isFocused ? '#fff' : '#64748b', fontSize: 9, letterSpacing: 1 }]}>
-                {label.toUpperCase()}
+              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
+                {String(label).toUpperCase()}
               </Text>
             </TouchableOpacity>
           );
@@ -165,16 +121,114 @@ function AdminTabBar({ state, descriptors, navigation }) {
     </View>
   );
 }
+
+function MainTabNavigator() {
+  return (
+    <Tab.Navigator
+      tabBar={props => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="Mapa"       component={MapScreen}       options={{ title: 'Mapa' }} />
+      <Tab.Screen name="Alertas"    component={AlertsScreen}    options={{ title: 'Alertas' }} />
+      <Tab.Screen name="SOS"        component={NewAlertScreen}  options={{ title: 'Alerta' }} />
+      <Tab.Screen name="Emergencia" component={EmergencyScreen} options={{ title: 'Emergencia' }} />
+      <Tab.Screen name="Perfil"     component={ProfileScreen}   options={{ title: 'Perfil' }} />
+    </Tab.Navigator>
+  );
+}
  
+// ── Admin Tab Bar ───────────────────────────────────────────────
+function AdminTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets();
+
+  // Icon pairs: [inactive (outline), active (filled)]
+  const ICON_MAP = {
+    Panel:     ['monitor-dashboard-outline', 'monitor-dashboard'],
+    Mapa:      ['map-outline',               'map'],
+    Alertas:   ['bell-outline',              'bell'],
+    Asistencia:['clipboard-list-outline',    'clipboard-list'],
+  };
+
+  return (
+    <View style={[styles.adminTabBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
+      <View style={styles.adminTabInner}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label =
+            options.tabBarLabel !== undefined
+              ? options.tabBarLabel
+              : options.title !== undefined
+              ? options.title
+              : route.name;
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          // FAB central para SOS
+          if (route.name === 'SOS') {
+            return (
+              <TouchableOpacity
+                key={route.key}
+                onPress={onPress}
+                style={styles.adminFabWrap}
+                activeOpacity={0.85}
+              >
+                <View style={styles.adminFab}>
+                  <MaterialCommunityIcons name="alarm-light" size={28} color="#fff" />
+                </View>
+                <Text style={styles.adminFabLabel}>ALERTA</Text>
+              </TouchableOpacity>
+            );
+          }
+
+          const icons = ICON_MAP[route.name] || ['circle-outline', 'circle'];
+          const iconName = isFocused ? icons[1] : icons[0];
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={styles.adminTabItem}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.adminIconPill, isFocused && styles.adminIconPillActive]}>
+                <MaterialCommunityIcons
+                  name={iconName}
+                  size={20}
+                  color={isFocused ? '#fff' : '#475569'}
+                />
+              </View>
+              <Text style={[styles.adminTabLabel, isFocused && styles.adminTabLabelActive]}>
+                {String(label).toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function AdminTabNavigator() {
   return (
-    <Tab.Navigator tabBar={props => <AdminTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Panel" component={PanelControlScreen} />
-      <Tab.Screen name="Mapa" component={MapScreen} />
-      <Tab.Screen name="SOS" component={NewAlertScreen} />
-      <Tab.Screen name="Alertas" component={AlertsScreen} />
-      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
-      <Tab.Screen name="Personal" component={AdminPersonnelScreen} />
+    <Tab.Navigator
+      tabBar={props => <AdminTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="Panel"      component={PanelControlScreen}        options={{ title: 'Panel' }} />
+      <Tab.Screen name="Mapa"       component={MapScreen}                 options={{ title: 'Mapa' }} />
+      <Tab.Screen name="SOS"        component={NewAlertScreen}            options={{ title: 'Alerta' }} />
+      <Tab.Screen name="Alertas"    component={AlertsScreen}              options={{ title: 'Alertas' }} />
+      <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} options={{ title: 'Asistencia' }} />
     </Tab.Navigator>
   );
 }
@@ -211,21 +265,22 @@ export default function AppNavigator() {
           
           {/* Pantallas nuevas */}
           <Stack.Screen name="PanelControl" component={PanelControlScreen} />
-          <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
+          <Stack.Screen name="ListaAsistencia" component={AdminAttendanceBoardScreen} />
           <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
           <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
           <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
           <Stack.Screen name="AdminEquipment" component={AdminEquipmentScreen} />
-          <Stack.Screen name="ChecklistBolsos" component={ChecklistBolsosScreen} />
           <Stack.Screen name="InformePostEmergencia" component={InformePostEmergenciaScreen} />
+          <Stack.Screen name="ChecklistBolsos" component={ChecklistBolsosScreen} />
+          <Stack.Screen name="Logistica" component={ResourcesScreen} />
         </>
       )}
     </Stack.Navigator>
   );
 }
  
-// Estilos (sin cambios respecto al original)
 const styles = StyleSheet.create({
+  // ── Bombero Tab Bar ──────────────────────────────────────────
   tabBarContainer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#263238',
@@ -249,15 +304,90 @@ const styles = StyleSheet.create({
       web: { boxShadow: '0px 4px 12px rgba(220, 38, 38, 0.4)' },
     }),
   },
-  fabContainerAdmin: { alignItems: 'center', top: -16 },
-  fabAdmin: {
-    width: 56, height: 56, borderRadius: 12, backgroundColor: '#b91c1c', alignItems: 'center', justifyContent: 'center',
+
+  // ── Admin Tab Bar ────────────────────────────────────────────
+  adminTabBar: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: '#1a1c23',
+    borderTopWidth: 1,
+    borderTopColor: '#26282f',
+    paddingTop: 10,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.3, shadowRadius: 12 },
+      android: { elevation: 20 },
+      web: { boxShadow: '0px -4px 16px rgba(0,0,0,0.4)' },
+    }),
+  },
+  adminTabInner: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+  },
+  adminTabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 8,
+    maxWidth: 80,
+  },
+  adminIconPill: {
+    width: 40,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 3,
+  },
+  adminIconPillActive: {
+    backgroundColor: '#dc2626',
+  },
+  adminTabLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 0.8,
+  },
+  adminTabLabelActive: {
+    color: '#f8fafc',
+  },
+  // FAB central admin
+  adminFabWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: 80,
+    paddingBottom: 4,
+    top: -10,
+  },
+  adminFab: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#b91c1c',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#7f1d1d',
     ...Platform.select({
       ios: { shadowColor: '#b91c1c', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.6, shadowRadius: 10 },
       android: { elevation: 10 },
       web: { boxShadow: '0px 4px 16px rgba(185, 28, 28, 0.6)' },
     }),
   },
-  tabLabelAdminRed: { fontSize: 9, fontWeight: '900', marginTop: 6, color: '#fca5a5', letterSpacing: 1 },
+  adminFabLabel: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#fca5a5',
+    letterSpacing: 1,
+    marginTop: 4,
+  },
+  // Legacy (kept for bombero tab bar)
   adminIconBox: { padding: 8, borderRadius: 6, marginBottom: 4 },
+  tabLabelAdminRed: { fontSize: 9, fontWeight: '900', marginTop: 6, color: '#fca5a5', letterSpacing: 1 },
+  fabContainerAdmin: { alignItems: 'center', top: -16 },
+  fabAdmin: {
+    width: 56, height: 56, borderRadius: 12, backgroundColor: '#b91c1c', alignItems: 'center', justifyContent: 'center',
+  },
 });

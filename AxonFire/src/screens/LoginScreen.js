@@ -54,7 +54,7 @@ export default function LoginScreen({ navigation }) {
         throw new Error(data.error || 'Error en el inicio de sesión');
       }
 
-      await login({ id: data.id, rol: data.rol }, data.token);
+      await login({ id: data.id, rol: data.rol, nombre_usuario: data.nombre_usuario || username }, data.token);
 
       if (data.rol === 'ADMIN') {
         Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');

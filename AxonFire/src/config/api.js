@@ -1,1 +1,1 @@
-export const API_BASE_URL = 'http://172.20.10.10:3005';
+export const API_BASE_URL = 'https://axon-fire-back.onrender.com';

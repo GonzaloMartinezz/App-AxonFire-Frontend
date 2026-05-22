@@ -11,29 +11,26 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius } from '../theme';
-import TacticalCard from '../components/TacticalCard';
-import StatusBadge from '../components/StatusBadge';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-// ── Helpers para convertir datos del backend ────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────
 
 function getIconoAlerta(nombre = '') {
   const n = nombre.toLowerCase();
   if (n.includes('incendio') || n.includes('fuego'))
-    return { icono: 'fire', color: '#dc2626', fondo: '#fee2e2' };
+    return { icono: 'fire', color: '#fca5a5', fondo: '#2d1515' };
   if (n.includes('rescate') || n.includes('vehicular'))
-    return { icono: 'car-wrench', color: '#d97706', fondo: '#fef3c7' };
+    return { icono: 'car-wrench', color: '#fbbf24', fondo: '#271e05' };
   if (n.includes('gas') || n.includes('quimico') || n.includes('hazmat'))
-    return { icono: 'biohazard', color: '#b91c1c', fondo: '#fff7ed' };
+    return { icono: 'biohazard', color: '#f87171', fondo: '#2d1515' };
   if (n.includes('medic') || n.includes('ambulancia'))
-    return { icono: 'ambulance', color: '#1976d2', fondo: '#e3f2fd' };
+    return { icono: 'ambulance', color: '#38bdf8', fondo: '#0f2a3a' };
   if (n.includes('estructur'))
-    return { icono: 'office-building', color: '#6d28d9', fondo: '#ede9fe' };
-  return { icono: 'alert-circle', color: '#64748b', fondo: '#f1f5f9' };
+    return { icono: 'office-building', color: '#c084fc', fondo: '#1a0a2e' };
+  return { icono: 'alert-circle', color: '#94a3b8', fondo: '#1b1d24' };
 }
 
 function estadoAKey(estado = '') {
@@ -41,7 +38,6 @@ function estadoAKey(estado = '') {
   if (e === 'PENDIENTE') return 'activa';
   if (e === 'EN CURSO') return 'progreso';
   if (e === 'FINALIZADO') return 'resuelta';
-  // Fallback para otros sistemas de nombres
   if (e.includes('ACTIV')) return 'activa';
   if (e.includes('DESPACH')) return 'despachada';
   if (e.includes('PROGRESO') || e.includes('CURSO')) return 'progreso';
@@ -67,11 +63,45 @@ function tiempoTranscurrido(fechaISO) {
   return `Hace ${Math.floor(hs / 24)} días`;
 }
 
-// ── Componente principal ─────────────────────────────────────────────────────
+// Badge de severidad
+const SEVERIDAD_CONFIG = {
+  critica:    { label: 'CRÍTICA',    color: '#fca5a5', bg: '#2d1515' },
+  alta:       { label: 'ALTA',       color: '#fbbf24', bg: '#271e05' },
+  media:      { label: 'MEDIA',      color: '#38bdf8', bg: '#0f2a3a' },
+  baja:       { label: 'BAJA',       color: '#94a3b8', bg: '#1e293b' },
+  activa:     { label: 'ACTIVA',     color: '#fca5a5', bg: '#2d1515' },
+  progreso:   { label: 'EN CURSO',   color: '#fbbf24', bg: '#271e05' },
+  despachada: { label: 'DESPACHADA', color: '#38bdf8', bg: '#0f2a3a' },
+  resuelta:   { label: 'RESUELTA',   color: '#34d399', bg: '#0a2518' },
+};
 
-const FILTROS = ['Activas', 'Todas', 'Resueltas'];
+function SeveridadBadge({ type }) {
+  const cfg = SEVERIDAD_CONFIG[type] || SEVERIDAD_CONFIG.baja;
+  return (
+    <View style={[badgeStyle.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[badgeStyle.text, { color: cfg.color }]}>{cfg.label}</Text>
+    </View>
+  );
+}
 
-export default function AlertasVisualesScreen({ navigation }) {
+const badgeStyle = StyleSheet.create({
+  badge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  text: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+});
+
+// ── Filtros ─────────────────────────────────────────────────────
+const FILTROS = ['Activas', 'Despachadas', 'Resueltas', 'Todas'];
+
+// ── Componente principal ─────────────────────────────────────────
+export default function AlertasVisualesScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
   const usuarioId = user?.id || '';
@@ -81,6 +111,10 @@ export default function AlertasVisualesScreen({ navigation }) {
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState(null);
   const [filtro, setFiltro] = useState('Activas');
+
+  useEffect(() => {
+    if (route?.params?.filtro) setFiltro(route.params.filtro);
+  }, [route?.params?.filtro]);
 
   async function cargarAlertas(esRefresh = false) {
     if (esRefresh) setRefrescando(true);
@@ -92,60 +126,47 @@ export default function AlertasVisualesScreen({ navigation }) {
     try {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-      const res = await axios.post(`${API_BASE_URL}/alerta/rango`, 
+      const res = await axios.post(
+        `${API_BASE_URL}/alerta/rango`,
         { fecha_desde: desde, fecha_hasta: hasta },
-        { 
-          headers: { 
+        {
+          headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}) 
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          timeout: 3000
+          timeout: 15000,
         }
       );
-
       fetchedData = res.data;
     } catch (err) {
       console.error('Error cargando alertas, usando fallback local:', err);
       fetchedData = [
         {
-          id: '1',
-          tipo: 'Incendio Estructural',
-          estado: 'activa',
-          prioridad: 'critica',
-          ubicacion: 'Av. Siempre Viva 742',
-          observaciones: 'Fuego reportado en la planta baja.',
-          fecha_hora: new Date().toISOString()
+          id: '1', tipo: 'Incendio Estructural', estado: 'activa', prioridad: 'critica',
+          ubicacion: 'Av. Siempre Viva 742', observaciones: 'Fuego en planta baja.',
+          fecha_hora: new Date().toISOString(),
         },
         {
-          id: '2',
-          tipo: 'Rescate Vehicular',
-          estado: 'despachada',
-          prioridad: 'alta',
-          ubicacion: 'Ruta 9, Km 45',
-          observaciones: 'Choque entre dos vehículos.',
-          fecha_hora: new Date(Date.now() - 3600000).toISOString()
+          id: '2', tipo: 'Rescate Vehicular', estado: 'despachada', prioridad: 'alta',
+          ubicacion: 'Ruta 9, Km 45', observaciones: 'Choque entre dos vehículos.',
+          fecha_hora: new Date(Date.now() - 3600000).toISOString(),
         },
         {
-          id: '3',
-          tipo: 'Fuga de Gas',
-          estado: 'resuelta',
-          prioridad: 'media',
-          ubicacion: 'Centro comercial',
-          observaciones: 'Situación controlada por el equipo.',
-          fecha_hora: new Date(Date.now() - 86400000).toISOString()
-        }
+          id: '3', tipo: 'Fuga de Gas', estado: 'resuelta', prioridad: 'media',
+          ubicacion: 'Centro comercial', observaciones: 'Situación controlada.',
+          fecha_hora: new Date(Date.now() - 86400000).toISOString(),
+        },
       ];
     } finally {
       if (fetchedData) {
-        // En caso de que axios retorne el wrapper
-        const lista = Array.isArray(fetchedData?.alertas) ? fetchedData.alertas : Array.isArray(fetchedData) ? fetchedData : [];
+        const lista = Array.isArray(fetchedData?.alertas)
+          ? fetchedData.alertas
+          : Array.isArray(fetchedData) ? fetchedData : [];
 
         const normalizadas = lista.map((item) => {
           const nombre = item.subCategoriaAlerta?.nombre || item.tipo || 'Emergencia';
           const estado = item.estadoAlerta?.nombre || item.estado || '';
           const prioridad = item.prioridad || item.subCategoriaAlerta?.prioridad || '';
-
           return {
             id: item.id,
             nombre,
@@ -158,7 +179,6 @@ export default function AlertasVisualesScreen({ navigation }) {
             raw: item,
           };
         });
-
         setAlertas(normalizadas);
       }
       setCargando(false);
@@ -166,94 +186,95 @@ export default function AlertasVisualesScreen({ navigation }) {
     }
   }
 
-  useEffect(() => {
-    cargarAlertas();
-  }, []);
+  useEffect(() => { cargarAlertas(); }, []);
 
-  // Filtrado local
   const filtradas = alertas.filter((a) => {
-    if (filtro === 'Activas') return ['activa', 'progreso', 'despachada'].includes(a.estado);
+    if (filtro === 'Activas') return ['activa', 'progreso'].includes(a.estado);
+    if (filtro === 'Despachadas') return a.estado === 'despachada';
     if (filtro === 'Resueltas') return a.estado === 'resuelta';
     return true;
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" backgroundColor="#16181d" />
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#f8fafc" />
+      {/* ── Top Bar ────────────────────────────────────── */}
+      <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="arrow-left" size={20} color="#94a3b8" />
         </TouchableOpacity>
-        <Text style={styles.tituloHeader}>Alertas Visuales</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.topBarTitle}>ALERTAS VISUALES</Text>
+        <TouchableOpacity style={styles.refreshBtn} onPress={() => cargarAlertas(true)} disabled={refrescando}>
+          <MaterialCommunityIcons name="refresh" size={18} color={refrescando ? '#334155' : '#64748b'} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.contenido, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refrescando}
             onRefresh={() => cargarAlertas(true)}
-            colors={['#af101a']}
-            tintColor="#af101a"
+            colors={['#dc2626']}
+            tintColor="#dc2626"
           />
         }
       >
-        {/* Filtros */}
-        <View style={styles.filaFiltros}>
+        {/* ── Header ───────────────────────────────────── */}
+        <Text style={styles.pageLabel}>OPERACIONES</Text>
+        <Text style={styles.pageTitle}>HISTORIAL DE{'\n'}ALERTAS</Text>
+
+        {/* ── Filtros ──────────────────────────────────── */}
+        <View style={styles.filtersRow}>
           {FILTROS.map((f) => (
             <TouchableOpacity
               key={f}
               onPress={() => setFiltro(f)}
-              style={[styles.chip, filtro === f ? styles.chipActivo : styles.chipInactivo]}
+              style={[styles.filterChip, filtro === f && styles.filterChipActive]}
             >
-              <Text style={[styles.chipTexto, { color: filtro === f ? '#fff' : '#94a3b8' }]}>
-                {f}
+              <Text style={[styles.filterChipText, filtro === f && styles.filterChipTextActive]}>
+                {f.toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Loading */}
+        {/* ── Loading ───────────────────────────────────── */}
         {cargando && (
-          <View style={styles.centrado}>
-            <ActivityIndicator size="large" color="#af101a" />
-            <Text style={styles.textoEstado}>Cargando alertas...</Text>
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#dc2626" />
+            <Text style={styles.stateText}>Cargando alertas...</Text>
           </View>
         )}
 
-        {/* Error */}
+        {/* ── Error ─────────────────────────────────────── */}
         {!cargando && error && (
-          <View style={styles.centrado}>
-            <MaterialCommunityIcons name="wifi-off" size={48} color="#94a3b8" />
-            <Text style={styles.textoEstado}>{error}</Text>
-            <TouchableOpacity style={styles.botonReintentar} onPress={() => cargarAlertas()}>
-              <Text style={styles.textoReintentar}>Reintentar</Text>
+          <View style={styles.centered}>
+            <MaterialCommunityIcons name="wifi-off" size={48} color="#334155" />
+            <Text style={styles.stateText}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => cargarAlertas()}>
+              <Text style={styles.retryText}>REINTENTAR</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Vacío */}
+        {/* ── Vacío ─────────────────────────────────────── */}
         {!cargando && !error && filtradas.length === 0 && (
-          <View style={styles.centrado}>
-            <MaterialCommunityIcons name="check-circle-outline" size={52} color="#86efac" />
-            <Text style={styles.textoEstado}>Sin alertas {filtro.toLowerCase()}</Text>
+          <View style={styles.centered}>
+            <MaterialCommunityIcons name="check-circle-outline" size={48} color="#052e16" />
+            <Text style={styles.stateText}>Sin alertas {filtro.toLowerCase()}</Text>
           </View>
         )}
 
-        {/* Lista de alertas */}
+        {/* ── Lista de alertas ─────────────────────────── */}
         {!cargando && !error && filtradas.map((alerta) => (
           <TouchableOpacity
             key={alerta.id}
             activeOpacity={0.75}
             onPress={() =>
-              // Cuando toca una alerta, navega a ListaAsistencia para ver quién respondió
               navigation.navigate('ListaAsistencia', {
                 alertaId: alerta.id,
                 token,
@@ -261,34 +282,33 @@ export default function AlertasVisualesScreen({ navigation }) {
               })
             }
           >
-            <TacticalCard elevated style={{ backgroundColor: '#1e293b' }}>
+            <View style={styles.alertCard}>
               {/* Barra lateral de criticidad */}
               {alerta.severidad === 'critica' && <View style={styles.barraRoja} />}
 
-              <View style={styles.filaCard}>
+              <View style={styles.alertRow}>
                 {/* Ícono */}
-                <View style={[styles.iconoAlerta, { backgroundColor: alerta.fondo }]}>
-                  <MaterialCommunityIcons name={alerta.icono} size={28} color={alerta.color} />
+                <View style={[styles.alertIconBox, { backgroundColor: alerta.fondo }]}>
+                  <MaterialCommunityIcons name={alerta.icono} size={24} color={alerta.color} />
                 </View>
 
                 {/* Contenido */}
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
-                    <StatusBadge severity={alerta.severidad} />
-                    <StatusBadge severity={alerta.estado} />
+                  <View style={styles.badgesRow}>
+                    <SeveridadBadge type={alerta.severidad} />
+                    <SeveridadBadge type={alerta.estado} />
                   </View>
-                  <Text style={styles.nombreAlerta} numberOfLines={1}>{alerta.nombre}</Text>
-                  <Text style={styles.direccion} numberOfLines={1}>{alerta.direccion}</Text>
+                  <Text style={styles.alertNombre} numberOfLines={1}>{alerta.nombre}</Text>
+                  <Text style={styles.alertDireccion} numberOfLines={1}>{alerta.direccion}</Text>
                   {alerta.observaciones ? (
-                    <Text style={styles.observaciones} numberOfLines={2}>{alerta.observaciones}</Text>
+                    <Text style={styles.alertObs} numberOfLines={2}>{alerta.observaciones}</Text>
                   ) : null}
-                  <Text style={styles.tiempo}>{alerta.tiempo}</Text>
+                  <Text style={styles.alertTiempo}>{alerta.tiempo}</Text>
                 </View>
 
-                {/* Flecha */}
-                <MaterialIcons name="chevron-right" size={24} color="#64748b" />
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#334155" />
               </View>
-            </TacticalCard>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -297,49 +317,179 @@ export default function AlertasVisualesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  container: { flex: 1, backgroundColor: '#16181d' },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
+  // Top bar
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: '#1a1c23',
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
   },
-  botonVolver: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#1e293b',
-    alignItems: 'center', justifyContent: 'center',
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#26282f',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tituloHeader: { fontSize: 17, fontWeight: '900', color: '#f8fafc', textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  contenido: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
-
-  filaFiltros: { flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  chip: {
-    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14,
-    minWidth: 80, alignItems: 'center', justifyContent: 'center',
+  topBarTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#f8fafc',
+    letterSpacing: 1,
   },
-  chipActivo: { backgroundColor: '#ef4444' },
-  chipInactivo: { backgroundColor: '#1e293b' },
-  chipTexto: { fontSize: 14, fontWeight: '700' },
-
-  centrado: { alignItems: 'center', paddingVertical: 52, gap: 12 },
-  textoEstado: { fontSize: 14, color: '#94a3b8', fontWeight: '600', textAlign: 'center' },
-  botonReintentar: {
-    marginTop: 8, backgroundColor: '#1e293b',
-    paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12,
+  refreshBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#26282f',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  textoReintentar: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-  filaCard: { flexDirection: 'row', alignItems: 'center' },
+  // Content
+  scrollContent: { padding: 24 },
+
+  pageLabel: {
+    fontSize: 10,
+    color: '#fca5a5',
+    letterSpacing: 2,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#f8fafc',
+    letterSpacing: -1,
+    lineHeight: 30,
+    marginBottom: 24,
+  },
+
+  // Filters
+  filtersRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 24,
+  },
+  filterChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  filterChipActive: {
+    backgroundColor: '#dc2626',
+    borderColor: '#dc2626',
+  },
+  filterChipText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 0.6,
+  },
+  filterChipTextActive: {
+    color: '#fff',
+  },
+
+  // States
+  centered: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  stateText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: 8,
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#26282f',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  retryText: {
+    color: '#f8fafc',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+
+  // Alert cards
+  alertCard: {
+    backgroundColor: '#1b1d24',
+    borderRadius: 8,
+    marginBottom: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
   barraRoja: {
-    position: 'absolute', left: 0, top: 0, bottom: 0,
-    width: 4, backgroundColor: '#af101a', borderRadius: 4,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: '#dc2626',
   },
-  iconoAlerta: {
-    width: 52, height: 52, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center', marginRight: 14,
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    gap: 12,
   },
-  nombreAlerta: { fontSize: 15, fontWeight: '800', color: '#f8fafc', marginBottom: 2 },
-  direccion: { fontSize: 12, color: '#94a3b8', fontWeight: '500', marginBottom: 2 },
-  observaciones: { fontSize: 12, color: '#94a3b8', fontWeight: '500', marginBottom: 2, fontStyle: 'italic' },
-  tiempo: { fontSize: 11, color: '#64748b', fontWeight: '600', marginTop: 2 },
+  alertIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  alertNombre: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#f8fafc',
+    marginBottom: 2,
+  },
+  alertDireccion: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  alertObs: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '500',
+    marginBottom: 2,
+    fontStyle: 'italic',
+  },
+  alertTiempo: {
+    fontSize: 10,
+    color: '#334155',
+    fontWeight: '600',
+    marginTop: 2,
+  },
 });

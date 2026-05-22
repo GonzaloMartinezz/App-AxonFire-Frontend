@@ -20,82 +20,116 @@ import { Audio } from 'expo-av';
 import { Vibration } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import ModalRevisionBolsos, { useRevisionBolsos } from '../components/ModalRevisionBolsos';
 
 // ── Local Mock / Storage Helpers ─────────────────────────────────────────────
-async function loadMockResponses(alertaId, currentUserId) {
+async function loadMockResponses(alertaId, currentUserId, token) {
   try {
     const local = await AsyncStorage.getItem(`responses_${alertaId}`);
     if (local) return JSON.parse(local);
 
-    const defaults = [
-      {
-        id: 'res1',
-        alerta_id: alertaId,
-        usuario_id: 'u1',
-        usuarioId: {
-          id: 'u1',
-          nombre_usuario: 'RMENDOZA',
-          bombero: {
-            nombre: 'ROBERTO',
-            apellido: 'MENDOZA',
-            rangoBombero: { nombre_rol: 'CAPITAN' }
+    let realBomberos = [];
+    if (token) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/usuarios/bomberos`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           }
-        },
-        estado_respuesta: 'ACEPTADO',
-        fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'res2',
-        alerta_id: alertaId,
-        usuario_id: 'u2',
-        usuarioId: {
-          id: 'u2',
-          nombre_usuario: 'JESPINOZA',
-          bombero: {
-            nombre: 'JORGE',
-            apellido: 'ESPINOZA',
-            rangoBombero: { nombre_rol: 'SARGENTO' }
-          }
-        },
-        estado_respuesta: 'ACEPTADO',
-        fecha_hora: new Date(Date.now() - 8 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'res3',
-        alerta_id: alertaId,
-        usuario_id: 'u3',
-        usuarioId: {
-          id: 'u3',
-          nombre_usuario: 'LTORRES',
-          bombero: {
-            nombre: 'LAURA',
-            apellido: 'TORRES',
-            rangoBombero: { nombre_rol: 'OFICIAL' }
-          }
-        },
-        estado_respuesta: 'RECHAZADO',
-        fecha_hora: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+        });
+        if (res.ok) {
+          realBomberos = await res.json();
+        }
+      } catch (err) {
+        console.log('Error fetching real bomberos for mock responses:', err);
       }
-    ];
+    }
 
-    // Si el usuario actual no está en los valores por defecto, lo agregamos como PENDIENTE
+    const defaults = [];
+
+    if (realBomberos && realBomberos.length > 0) {
+      realBomberos.forEach((b, idx) => {
+        if (b.usuario_id === currentUserId) return;
+
+        let estado = 'PENDIENTE';
+        if (idx % 3 === 0) estado = 'ACEPTADO';
+        else if (idx % 3 === 1) estado = 'RECHAZADO';
+
+        defaults.push({
+          id: `res_real_${b.id}`,
+          alerta_id: alertaId,
+          usuario_id: b.usuario_id,
+          usuarioId: {
+            id: b.usuario_id,
+            nombre_usuario: b.usuarioId?.nombre_usuario || b.nombre.toLowerCase(),
+            bombero: {
+              nombre: b.nombre,
+              apellido: b.apellido,
+              rangoBombero: { nombre_rol: b.rangoBombero?.nombre_rol || 'BOMBERO' }
+            }
+          },
+          estado_respuesta: estado,
+          fecha_hora: new Date(Date.now() - (10 - idx) * 60 * 1000).toISOString()
+        });
+      });
+    }
+
     if (currentUserId && !defaults.some(r => r.usuario_id === currentUserId)) {
+      const currentUserReal = realBomberos.find(b => b.usuario_id === currentUserId);
       defaults.push({
         id: 'res_current',
         alerta_id: alertaId,
         usuario_id: currentUserId,
         usuarioId: {
           id: currentUserId,
-          nombre_usuario: 'MIUSUARIO',
+          nombre_usuario: currentUserReal?.usuarioId?.nombre_usuario || 'MIUSUARIO',
           bombero: {
-            nombre: 'OPERADOR',
-            apellido: 'AXON-42',
-            rangoBombero: { nombre_rol: 'OFICIAL' }
+            nombre: currentUserReal?.nombre || 'OPERADOR',
+            apellido: currentUserReal?.apellido || 'AXON-42',
+            rangoBombero: { nombre_rol: currentUserReal?.rangoBombero?.nombre_rol || 'OFICIAL' }
           }
         },
         estado_respuesta: 'PENDIENTE',
         fecha_hora: new Date().toISOString()
       });
+    }
+
+    if (defaults.length <= 1) {
+      const fallbackMock = [
+        {
+          id: 'res1',
+          alerta_id: alertaId,
+          usuario_id: 'u1',
+          usuarioId: {
+            id: 'u1',
+            nombre_usuario: 'RMENDOZA',
+            bombero: {
+              nombre: 'ROBERTO',
+              apellido: 'MENDOZA',
+              rangoBombero: { nombre_rol: 'CAPITAN' }
+            }
+          },
+          estado_respuesta: 'ACEPTADO',
+          fecha_hora: new Date(Date.now() - 10 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'res2',
+          alerta_id: alertaId,
+          usuario_id: 'u2',
+          usuarioId: {
+            id: 'u2',
+            nombre_usuario: 'JESPINOZA',
+            bombero: {
+              nombre: 'JORGE',
+              apellido: 'ESPINOZA',
+              rangoBombero: { nombre_rol: 'SARGENTO' }
+            }
+          },
+          estado_respuesta: 'ACEPTADO',
+          fecha_hora: new Date(Date.now() - 8 * 60 * 1000).toISOString()
+        }
+      ];
+      fallbackMock.forEach(f => defaults.push(f));
     }
 
     await AsyncStorage.setItem(`responses_${alertaId}`, JSON.stringify(defaults));
@@ -271,13 +305,18 @@ export default function EmergencyScreen({ route, navigation }) {
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const soundRef  = useRef(null);
   const vibrationRef = useRef(null);
+  const isAlertActiveRef = useRef(false);
+  const soundLoadingRef = useRef(false);
+  const revisionBolsos = useRevisionBolsos();
+  const promptedRef = useRef({});
 
 // ── Siren Sound & Vibration ────────────────────────────────────────────────
   const startEmergencyAlert = async () => {
-    try {
-      // Cláusula de guarda para evitar ejecuciones o duplicaciones simultáneas
-      if (soundRef.current || vibrationRef.current) return;
+    if (soundRef.current || vibrationRef.current || soundLoadingRef.current) return;
 
+    isAlertActiveRef.current = true;
+    soundLoadingRef.current = true;
+    try {
       await Audio.setAudioModeAsync({ 
         playsInSilentModeIOS: true, 
         staysActiveInBackground: true 
@@ -286,19 +325,41 @@ export default function EmergencyScreen({ route, navigation }) {
         require('../../assets/siren.wav'),
         { isLooping: true, volume: 1.0 }
       );
+
+      if (!isAlertActiveRef.current) {
+        await sound.unloadAsync();
+        soundLoadingRef.current = false;
+        return;
+      }
+
       soundRef.current = sound;
       await sound.playAsync();
-      vibrationRef.current = setInterval(() => Vibration.vibrate(1000), 1500);
-    } catch (e) { console.log('Error playing sound:', e); }
+
+      if (!vibrationRef.current) {
+        vibrationRef.current = setInterval(() => Vibration.vibrate(1000), 1500);
+      }
+    } catch (e) { 
+      console.log('Error playing sound:', e); 
+    } finally {
+      soundLoadingRef.current = false;
+    }
   };
 
   const stopEmergencyAlert = async () => {
+    isAlertActiveRef.current = false;
     if (soundRef.current) {
-      await soundRef.current.stopAsync();
-      await soundRef.current.unloadAsync();
+      try {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+      } catch (err) {
+        console.log('Error unloading sound:', err);
+      }
       soundRef.current = null;
     }
-    if (vibrationRef.current) { clearInterval(vibrationRef.current); vibrationRef.current = null; }
+    if (vibrationRef.current) { 
+      clearInterval(vibrationRef.current); 
+      vibrationRef.current = null; 
+    }
     Vibration.cancel();
   };
 
@@ -320,13 +381,13 @@ export default function EmergencyScreen({ route, navigation }) {
       // 1. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
       if (!activeAlertaId) {
         try {
-          const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
-            headers,
-            data: {
+          const resAlertas = await axios.post(`${API_BASE_URL}/alerta/rango`, 
+            {
               fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
               fecha_hasta: new Date().toISOString()
-            }
-          });
+            },
+            { headers }
+          );
           const data = resAlertas.data;
           const alertas = data.alertas || [];
           if (alertas.length > 0) {
@@ -395,13 +456,13 @@ export default function EmergencyScreen({ route, navigation }) {
         if (respuestasRes.ok) {
           respuestas = await respuestasRes.json();
           if (!respuestas || respuestas.length === 0 || respuestas.error) {
-            respuestas = await loadMockResponses(activeAlertaId, usuarioId);
+            respuestas = await loadMockResponses(activeAlertaId, usuarioId, token);
           }
         } else {
-          respuestas = await loadMockResponses(activeAlertaId, usuarioId);
+          respuestas = await loadMockResponses(activeAlertaId, usuarioId, token);
         }
       } catch (err) {
-        respuestas = await loadMockResponses(activeAlertaId, usuarioId);
+        respuestas = await loadMockResponses(activeAlertaId, usuarioId, token);
       }
       
       // Ver si YO ya respondí
@@ -411,6 +472,10 @@ export default function EmergencyScreen({ route, navigation }) {
         setRespuesta('FINALIZADA');
         stopEmergencyAlert();
         animateIn();
+        if (!promptedRef.current[activeAlertaId]) {
+          promptedRef.current[activeAlertaId] = true;
+          revisionBolsos.mostrar({ token, navigation, alertaId: activeAlertaId });
+        }
       } else if (miRespuesta && miRespuesta.estado_respuesta !== 'PENDIENTE') {
         setRespuesta(miRespuesta.estado_respuesta);
         stopEmergencyAlert();
@@ -506,19 +571,20 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
       }
 
       // Sincronización en almacenamiento local AsyncStorage (Garantía Offline)
-      const mockList = await loadMockResponses(targetAlertaId, usuarioId);
+      const mockList = await loadMockResponses(targetAlertaId, usuarioId, token);
       const existingIdx = mockList.findIndex(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
+      const existingUserResponse = existingIdx >= 0 ? mockList[existingIdx] : null;
       const updatedResponse = {
-        id: existingIdx >= 0 ? mockList[existingIdx].id : `res_${Date.now()}`,
+        id: existingUserResponse?.id || `res_${Date.now()}`,
         alerta_id: targetAlertaId,
         usuario_id: usuarioId,
         usuarioId: {
           id: usuarioId,
-          nombre_usuario: user?.nombre_usuario || 'MIUSUARIO',
+          nombre_usuario: existingUserResponse?.usuarioId?.nombre_usuario || user?.nombre_usuario || 'MIUSUARIO',
           bombero: {
-            nombre: user?.nombre || 'OPERADOR',
-            apellido: user?.apellido || 'AXON-42',
-            rangoBombero: { nombre_rol: 'OFICIAL' }
+            nombre: existingUserResponse?.usuarioId?.bombero?.nombre || user?.nombre || 'OPERADOR',
+            apellido: existingUserResponse?.usuarioId?.bombero?.apellido || user?.apellido || 'AXON-42',
+            rangoBombero: { nombre_rol: existingUserResponse?.usuarioId?.bombero?.rangoBombero?.nombre_rol || 'OFICIAL' }
           }
         },
         estado_respuesta: estadoRespuesta,
@@ -625,11 +691,21 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
                 El administrador ya ha dado por finalizada esta alerta.
               </Text>
             </Animated.View>
+            {/* CTA de acceso rápido a revisión de bolsos */}
+            <TouchableOpacity 
+              style={[styles.changeButton, { marginTop: 12, backgroundColor: 'rgba(220, 38, 38, 0.1)', borderColor: 'rgba(220, 38, 38, 0.3)' }]} 
+              onPress={() => navigation.navigate('ChecklistBolsos', { token })}
+            >
+              <MaterialCommunityIcons name="clipboard-check-outline" size={16} color="#dc2626" />
+              <Text style={[styles.changeButtonText, { color: '#fff', fontWeight: 'bold' }]}>CONTROLAR BOLSOS UTILIZADOS</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
               <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
               <Text style={styles.changeButtonText}>Volver al panel principal</Text>
             </TouchableOpacity>
           </SafeAreaView>
+          <ModalRevisionBolsos estado={revisionBolsos} />
         </View>
       );
     }
@@ -788,6 +864,7 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
             <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
           </ScrollView>
         </SafeAreaView>
+        <ModalRevisionBolsos estado={revisionBolsos} />
       </View>
     );
   }
@@ -899,6 +976,7 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
         <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
         </ScrollView>
       </SafeAreaView>
+      <ModalRevisionBolsos estado={revisionBolsos} />
     </View>
   );
 }

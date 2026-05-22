@@ -61,6 +61,15 @@ export default function AlertDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const alertaId = route?.params?.alerta_id ?? null;
   const { token, user } = useAuth();
+  const rol = user?.rol || 'BOMBERO';
+
+  const abrirInforme = () => {
+    navigation.navigate('InformePostEmergencia', {
+      alertaId,
+      token,
+      rol
+    });
+  };
 
   const [alerta, setAlerta] = useState(null);
   const [responders, setResponders] = useState([]);
