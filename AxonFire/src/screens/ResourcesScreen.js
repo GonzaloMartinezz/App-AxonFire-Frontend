@@ -26,7 +26,7 @@ const REINFORCEMENTS = [
 
 export default function ResourcesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   const headers = {
     'Content-Type': 'application/json',
@@ -222,6 +222,47 @@ export default function ResourcesScreen({ navigation }) {
           <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
           <Text style={styles.personalBtnText}>SOLICITAR PERSONAL</Text>
         </TouchableOpacity>
+
+        {/* ── Gestión Administrativa de Recursos (Solo ADMIN) ── */}
+        {user?.rol === 'ADMIN' && (
+          <>
+            <View style={[styles.sectionHeaderRow, { marginTop: 28, marginBottom: 12 }]}>
+              <Text style={styles.sectionTitle}>OPERACIONES DE LOGÍSTICA</Text>
+            </View>
+
+            <View style={styles.adminActionGrid}>
+              <TouchableOpacity
+                style={[styles.adminActionCard, { borderLeftColor: '#f97316' }]}
+                onPress={() => navigation.navigate('AdminEquipment')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.adminActionCardHeader}>
+                  <View style={[styles.adminActionIconBg, { backgroundColor: 'rgba(249, 115, 22, 0.12)' }]}>
+                    <MaterialCommunityIcons name="package-variant-closed" size={18} color="#f97316" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#64748b" />
+                </View>
+                <Text style={styles.adminActionTitle}>Cargar Inventario</Text>
+                <Text style={styles.adminActionSub}>Móviles y herramientas</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.adminActionCard, { borderLeftColor: '#10b981' }]}
+                onPress={() => navigation.navigate('PedidosSuministro')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.adminActionCardHeader}>
+                  <View style={[styles.adminActionIconBg, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+                    <MaterialCommunityIcons name="cart-outline" size={18} color="#10b981" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#64748b" />
+                </View>
+                <Text style={styles.adminActionTitle}>Pedidos Suministro</Text>
+                <Text style={styles.adminActionSub}>Solicitud de insumos</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -451,5 +492,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.8,
+  },
+
+  // ── Admin Logistics Actions ────────────────────────────
+  adminActionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  adminActionCard: {
+    width: '48%',
+    backgroundColor: '#1b1d24',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    borderLeftWidth: 3,
+    gap: 6,
+  },
+  adminActionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  adminActionIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminActionTitle: {
+    color: '#f8fafc',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    marginTop: 2,
+  },
+  adminActionSub: {
+    color: '#64748b',
+    fontSize: 9,
+    fontWeight: '500',
   },
 });

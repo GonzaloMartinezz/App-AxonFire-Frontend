@@ -213,8 +213,8 @@ export default function PanelControlScreen({ navigation }) {
             style={styles.iconBtn} 
             onPress={() => {
               Alert.alert(
-                "Vista Operativa",
-                "¿Deseas visualizar la aplicación con el rol de Bombero Operativo?",
+                "Vista Bombero",
+                "¿Deseas visualizar la aplicación con el rol de Bombero?",
                 [
                   { text: "Cancelar", style: "cancel" },
                   { text: "Cambiar Vista", onPress: () => navigation.navigate('MainApp') }
@@ -378,6 +378,104 @@ export default function PanelControlScreen({ navigation }) {
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
             </TouchableOpacity>
+
+            {/* ── Centro de Acciones y Registro (Grid) ───────────────────── */}
+            <View style={[styles.sectionHeader, { marginTop: 12 }]}>
+              <View style={styles.sectionLine} />
+              <Text style={styles.sectionTitle}>CENTRO DE ACCIONES Y REGISTRO</Text>
+            </View>
+
+            <View style={styles.gridContainer}>
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('NewAlert')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                    <MaterialCommunityIcons name="alarm-light" size={18} color="#ef4444" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Cargar Emergencia</Text>
+                <Text style={styles.gridItemSub}>Iniciar reporte táctico</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('AddFirefighter')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+                    <MaterialCommunityIcons name="account-plus" size={18} color="#3b82f6" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Cargar Bombero</Text>
+                <Text style={styles.gridItemSub}>Registrar nuevo personal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('AdminEquipment')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(249, 115, 22, 0.12)' }]}>
+                    <MaterialCommunityIcons name="package-variant-closed" size={18} color="#f97316" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Cargar Inventario</Text>
+                <Text style={styles.gridItemSub}>Móviles y herramientas</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('PedidosSuministro')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+                    <MaterialCommunityIcons name="cart-outline" size={18} color="#10b981" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Pedidos Suministro</Text>
+                <Text style={styles.gridItemSub}>Solicitud de insumos</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('WeeklyChecklist')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(139, 92, 246, 0.12)' }]}>
+                    <MaterialCommunityIcons name="calendar-check" size={18} color="#8b5cf6" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Checklist Semanal</Text>
+                <Text style={styles.gridItemSub}>Controles de móviles</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('Reports')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
+                    <MaterialCommunityIcons name="file-chart" size={18} color="#94a3b8" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Reportes Legales</Text>
+                <Text style={styles.gridItemSub}>Historial de actas</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* ── Actividad reciente ────────────────────────────────────── */}
             <View style={[styles.sectionHeader, { marginTop: 28 }]}>
@@ -714,5 +812,47 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 11,
     lineHeight: 15,
+  },
+  
+  // ── Action Grid Styles ──────────────────────────────────────────
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 20,
+  },
+  gridItem: {
+    width: '48%',
+    backgroundColor: '#1b1d24',
+    borderRadius: 6,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    gap: 6,
+  },
+  gridItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  gridIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridItemTitle: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    marginTop: 2,
+  },
+  gridItemSub: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '500',
   },
 });

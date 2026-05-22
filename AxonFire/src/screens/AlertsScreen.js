@@ -97,6 +97,7 @@ export default function AlertsScreen({ navigation }) {
   const [activeFilter, setActiveFilter] = useState('Activas');
   const [showMenu, setShowMenu] = useState(false);
   const insets = useSafeAreaInsets();
+  const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
   const { token, user } = useAuth();
   const [alerts, setAlerts] = useState([]);
@@ -162,7 +163,7 @@ export default function AlertsScreen({ navigation }) {
       {/* Top Bar / Header */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <MaterialCommunityIcons name="monitor-dashboard" size={22} color="#e11d48" />
+          <MaterialCommunityIcons name="monitor-dashboard" size={22} color={isCurrentlyAdmin ? "#e11d48" : "#0284c7"} />
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
         <View style={styles.topBarRight}>
@@ -172,7 +173,7 @@ export default function AlertsScreen({ navigation }) {
               onPress={() => setShowMenu(!showMenu)} 
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="menu" size={20} color="#e11d48" />
+              <MaterialCommunityIcons name="menu" size={20} color={isCurrentlyAdmin ? "#e11d48" : "#0284c7"} />
             </TouchableOpacity>
           )}
           <TouchableOpacity 
@@ -184,6 +185,8 @@ export default function AlertsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+
+
 
       <ScrollView 
         style={styles.scrollView}
@@ -642,5 +645,27 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  roleBreadcrumb: {
+    height: 24,
+    backgroundColor: '#1b1d24',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderLeftWidth: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  roleBreadcrumbDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  roleBreadcrumbText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 1.2,
   },
 });

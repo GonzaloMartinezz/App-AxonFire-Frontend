@@ -95,11 +95,18 @@ function getMockBomberos() {
 async function loadMockResponses(alertaId, realBomberos = []) {
   try {
     const local = await AsyncStorage.getItem(`responses_${alertaId}`);
-    if (local) return JSON.parse(local);
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (alertaId !== 'demo-alert-123') {
+        return parsed.filter(r => r.usuario_id !== 'u1' && r.usuario_id !== 'u2' && r.usuario_id !== 'u3' && r.usuario_id !== 'u4' && r.usuario_id !== 'u5');
+      }
+      return parsed;
+    }
 
     const defaults = [];
 
-    if (realBomberos && realBomberos.length > 0) {
+    // ONLY generate simulated responses if it is the demo alert
+    if (alertaId === 'demo-alert-123' && realBomberos && realBomberos.length > 0) {
       realBomberos.forEach((b, idx) => {
         let estado = 'PENDIENTE';
         if (idx % 3 === 0) estado = 'ACEPTADO';
@@ -124,7 +131,7 @@ async function loadMockResponses(alertaId, realBomberos = []) {
       });
     }
 
-    if (defaults.length === 0) {
+    if (defaults.length === 0 && alertaId === 'demo-alert-123') {
       const fallbackMock = [
         {
           id: 'res1',
@@ -188,6 +195,7 @@ async function loadMockResponses(alertaId, realBomberos = []) {
 export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
+  const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
   // Alerta ID recibido por parámetros (flexible snake_case y camelCase)
   const paramAlertaId = route?.params?.alerta_id ?? route?.params?.alertaId ?? null;
@@ -271,14 +279,14 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         if (bomberosRes.status === 200) {
           bomberosData = bomberosRes.data;
           if (!bomberosData || bomberosData.length === 0 || bomberosData.error) {
-            bomberosData = getMockBomberos();
+            bomberosData = activeAlertaId === 'demo-alert-123' ? getMockBomberos() : [];
           }
         } else {
-          bomberosData = getMockBomberos();
+          bomberosData = activeAlertaId === 'demo-alert-123' ? getMockBomberos() : [];
         }
       } catch (err) {
         console.log('Error loading bomberos from server, using local fallback:', err);
-        bomberosData = getMockBomberos();
+        bomberosData = activeAlertaId === 'demo-alert-123' ? getMockBomberos() : [];
       }
 
       // 3. Si tenemos una alerta activa, obtener respuestas (con dual API fallback de contingencia)
@@ -480,7 +488,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       let exitoso = false;
       try {
         const res = await axios.post(
-          `${API_BASE_URL}/respuestas_alertas/responder/${currentAlertaId}/${currentUserId}`,
+          `${API_BASE_URL}/respuestas_alertas/responder/${currentAlertaId}`,
           payload,
           {
             headers: authHeaders(),
@@ -662,6 +670,8 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         </View>
       </View>
 
+
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -692,7 +702,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         </View>
 
         {/* Panel de RSVP interactivo (si está activa y no se ha respondido) */}
-        {activeAlerta && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO' && !miRespuesta && (
+        {activeAlerta && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (!miRespuesta || miRespuesta === 'PENDIENTE') && (
           <View style={styles.rsvpCard}>
             <Text style={styles.rsvpTitle}>🚨 CONVOCATORIA ACTIVA</Text>
             <Text style={styles.rsvpSubtitle}>
@@ -734,7 +744,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         )}
 
         {/* Banner de Respuesta Emitida */}
-        {miRespuesta && (
+        {miRespuesta && miRespuesta !== 'PENDIENTE' && (
           <View
             style={[
               styles.myResponseBanner,
@@ -1086,4 +1096,26 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   myResponseText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, flex: 1 },
+  roleBreadcrumb: {
+    height: 24,
+    backgroundColor: '#1b1d24',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderLeftWidth: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  roleBreadcrumbDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  roleBreadcrumbText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 1.2,
+  },
 });

@@ -26,7 +26,13 @@ import ModalRevisionBolsos, { useRevisionBolsos } from '../components/ModalRevis
 async function loadMockResponses(alertaId, currentUserId, token) {
   try {
     const local = await AsyncStorage.getItem(`responses_${alertaId}`);
-    if (local) return JSON.parse(local);
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (alertaId !== 'demo-alert-123') {
+        return parsed.filter(r => r.usuario_id !== 'u1' && r.usuario_id !== 'u2' && r.usuario_id !== 'u3' && r.usuario_id !== 'u4' && r.usuario_id !== 'u5');
+      }
+      return parsed;
+    }
 
     let realBomberos = [];
     if (token) {
@@ -47,7 +53,8 @@ async function loadMockResponses(alertaId, currentUserId, token) {
 
     const defaults = [];
 
-    if (realBomberos && realBomberos.length > 0) {
+    // ONLY generate simulated responses if it is the demo alert
+    if (alertaId === 'demo-alert-123' && realBomberos && realBomberos.length > 0) {
       realBomberos.forEach((b, idx) => {
         if (b.usuario_id === currentUserId) return;
 
@@ -94,7 +101,7 @@ async function loadMockResponses(alertaId, currentUserId, token) {
       });
     }
 
-    if (defaults.length <= 1) {
+    if (defaults.length <= 1 && alertaId === 'demo-alert-123') {
       const fallbackMock = [
         {
           id: 'res1',
@@ -310,8 +317,9 @@ export default function EmergencyScreen({ route, navigation }) {
   const revisionBolsos = useRevisionBolsos();
   const promptedRef = useRef({});
 
+
 // ── Siren Sound & Vibration ────────────────────────────────────────────────
-  const startEmergencyAlert = async () => {
+  async function startEmergencyAlert() {
     if (soundRef.current || vibrationRef.current || soundLoadingRef.current) return;
 
     isAlertActiveRef.current = true;
@@ -343,10 +351,13 @@ export default function EmergencyScreen({ route, navigation }) {
     } finally {
       soundLoadingRef.current = false;
     }
-  };
+  }
 
-  const stopEmergencyAlert = async () => {
+  async function stopEmergencyAlert() {
     isAlertActiveRef.current = false;
+    if (global.stopAppSiren) {
+      global.stopAppSiren().catch((err) => console.log('Error stopping app siren globally:', err));
+    }
     if (soundRef.current) {
       try {
         await soundRef.current.stopAsync();
@@ -361,11 +372,11 @@ export default function EmergencyScreen({ route, navigation }) {
       vibrationRef.current = null; 
     }
     Vibration.cancel();
-  };
+  }
 
 // ── Control de Ciclo de Vida: Audio y Vibración ───────────────────────────
   useEffect(() => {
-    startEmergencyAlert();
+    // Only cleanup audio on unmount
     return () => { stopEmergencyAlert(); };
   }, []);
 
@@ -378,7 +389,18 @@ export default function EmergencyScreen({ route, navigation }) {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // 1. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
+      // 1. Obtener listado de bomberos reales del sistema para mapeo de nombres robusto
+      let bomberosReal = [];
+      try {
+        const resBomberos = await fetch(`${API_BASE_URL}/usuarios/bomberos`, { headers });
+        if (resBomberos.ok) {
+          bomberosReal = await resBomberos.json();
+        }
+      } catch (err) {
+        console.log('Error fetching real bomberos in fetchEmergencyData:', err);
+      }
+
+      // 2. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
       if (!activeAlertaId) {
         try {
           const resAlertas = await axios.post(`${API_BASE_URL}/alerta/rango`, 
@@ -406,7 +428,7 @@ export default function EmergencyScreen({ route, navigation }) {
       
       setResolvedAlertaId(activeAlertaId);
 
-      // 2. Cargar datos específicos de la alerta
+      // 3. Cargar datos específicos de la alerta
       let alertDataObj = null;
       let isFinalizada = false;
 
@@ -432,6 +454,16 @@ export default function EmergencyScreen({ route, navigation }) {
         }
       }
 
+      // Check local override first
+      const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${activeAlertaId}`);
+      if (isLocallyFinalized === 'true') {
+        isFinalizada = true;
+        if (alertDataObj) {
+          if (!alertDataObj.estadoAlerta) alertDataObj.estadoAlerta = {};
+          alertDataObj.estadoAlerta.nombre_estado = 'FINALIZADO';
+        }
+      }
+
       if (!alertDataObj) {
         alertDataObj = {
           id: activeAlertaId,
@@ -449,24 +481,41 @@ export default function EmergencyScreen({ route, navigation }) {
         setHoraLlamado(formatHora(new Date(alertDataObj.fecha_hora)));
       }
 
-      // 3. Cargar respuestas del personal asignado
+      // 4. Cargar respuestas del personal asignado
       let respuestas = [];
       try {
         const respuestasRes = await fetch(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, { headers });
         if (respuestasRes.ok) {
           respuestas = await respuestasRes.json();
-          if (!respuestas || respuestas.length === 0 || respuestas.error) {
-            respuestas = await loadMockResponses(activeAlertaId, usuarioId, token);
-          }
-        } else {
-          respuestas = await loadMockResponses(activeAlertaId, usuarioId, token);
         }
       } catch (err) {
+        console.log('Error loading responses from backend:', err);
+      }
+
+      if (!respuestas || respuestas.length === 0 || respuestas.error) {
         respuestas = await loadMockResponses(activeAlertaId, usuarioId, token);
+      } else {
+        if (activeAlertaId !== 'demo-alert-123') {
+          // Filtrar mocks hardcodeados heredados en alertas reales
+          respuestas = respuestas.filter(r => {
+            const uid = r.usuario_id || r.usuarioId?.id || r.usuarioId;
+            return uid !== 'u1' && uid !== 'u2' && uid !== 'u3' && uid !== 'u4' && uid !== 'u5';
+          });
+        }
       }
       
-      // Ver si YO ya respondí
-      const miRespuesta = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
+      // Ver si YO ya respondí (primero verificar almacenamiento local persistente para máxima robustez)
+      const localResponse = await AsyncStorage.getItem(`local_response_${activeAlertaId}`);
+      
+      let miRespuestaVal = localResponse;
+      if (!miRespuestaVal) {
+        const miRespuestaObj = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
+        if (miRespuestaObj && miRespuestaObj.estado_respuesta !== 'PENDIENTE') {
+          miRespuestaVal = miRespuestaObj.estado_respuesta;
+          // Guardar localmente para consistencia futura
+          await AsyncStorage.setItem(`local_response_${activeAlertaId}`, miRespuestaVal);
+        }
+      }
       
       if (isFinalizada) {
         setRespuesta('FINALIZADA');
@@ -476,8 +525,8 @@ export default function EmergencyScreen({ route, navigation }) {
           promptedRef.current[activeAlertaId] = true;
           revisionBolsos.mostrar({ token, navigation, alertaId: activeAlertaId });
         }
-      } else if (miRespuesta && miRespuesta.estado_respuesta !== 'PENDIENTE') {
-        setRespuesta(miRespuesta.estado_respuesta);
+      } else if (miRespuestaVal && miRespuestaVal !== 'PENDIENTE') {
+        setRespuesta(miRespuestaVal);
         stopEmergencyAlert();
         animateIn();
       } else {
@@ -494,15 +543,19 @@ export default function EmergencyScreen({ route, navigation }) {
       };
       setRespuestaSummary(counts);
 
-      // Lista de los que aceptaron
+      // Lista de los que aceptaron con resolución de nombres reales de la base de datos
       const aceptados = respuestas
         .filter(r => r.estado_respuesta === 'ACEPTADO')
-        .map(r => ({
-          id: r.id,
-          nombre: r.usuarioId?.bombero?.nombre || 'Bombero',
-          apellido: r.usuarioId?.bombero?.apellido || '',
-          hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'
-        }));
+        .map(r => {
+          const uid = r.usuario_id || r.usuarioId?.id || r.usuarioId;
+          const bReal = bomberosReal.find(b => b.usuario_id === uid || b.usuarioId?.id === uid);
+          return {
+            id: r.id,
+            nombre: bReal?.nombre || r.usuarioId?.bombero?.nombre || 'Bombero',
+            apellido: bReal?.apellido || r.usuarioId?.bombero?.apellido || '',
+            hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'
+          };
+        });
       setResponders(aceptados);
     } catch (err) {
       console.error('Error al cargar datos de emergencia:', err);
@@ -519,23 +572,47 @@ export default function EmergencyScreen({ route, navigation }) {
     }, [fetchEmergencyData])
   );
 
+  // Redirección de Administrador (colocada después de todos los hooks de estado para evitar romper reglas de hooks)
+  useEffect(() => {
+    if (user?.rol === 'ADMIN') {
+      stopEmergencyAlert();
+      const activeAlertaId = route?.params?.alerta_id ?? resolvedAlertaId ?? alertaId;
+      navigation.replace('AttendanceBoard', { alerta_id: activeAlertaId });
+    }
+  }, [user, navigation, resolvedAlertaId, alertaId, route?.params?.alerta_id]);
+
+  if (user?.rol === 'ADMIN') {
+    return (
+      <View style={[styles.container, { flex: 1, backgroundColor: '#0a0f12', justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#dc2626" />
+        <Text style={{ color: '#90a4ae', marginTop: 12, fontWeight: '700' }}>
+          Redireccionando al Tablero de Asistencia...
+        </Text>
+      </View>
+    );
+  }
+
   // ── Animaciones ──────────────────────────────────────────────────────────
-  const animateIn = () => {
+  function animateIn() {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, friction: 5, useNativeDriver: true }),
     ]).start();
-  };
+  }
 
-  const animateOut = (callback) => {
+  function animateOut(callback) {
     Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(callback);
     scaleAnim.setValue(0.8);
-  };
+  }
 
   // ── Confirmar/rechazar asistencia ────────────────────────────────────────
-  const enviarRespuesta = async (estadoRespuesta) => {
-if (!(resolvedAlertaId || alertaId) || !usuarioId) {
+  async function enviarRespuesta(estadoRespuesta) {
+    const targetAlertaId = resolvedAlertaId || alertaId;
+    if (!targetAlertaId || !usuarioId) {
       await stopEmergencyAlert();
+      if (targetAlertaId) {
+        await AsyncStorage.setItem(`local_response_${targetAlertaId}`, estadoRespuesta);
+      }
       // AX-14: capturamos la hora de llamado si no vino del backend
       if (!horaLlamado) setHoraLlamado(formatHora(new Date()));
       setRespuesta(estadoRespuesta);
@@ -549,12 +626,10 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-// ── Mutación y Persistencia de la Respuesta ────────────────────────────
-      const targetAlertaId = resolvedAlertaId || alertaId;
-      
+      // ── Mutación y Persistencia de la Respuesta ────────────────────────────
       try {
         const res = await fetch(
-          `${API_BASE_URL}/respuestas_alertas/responder/${targetAlertaId}/${usuarioId}`,
+          `${API_BASE_URL}/respuestas_alertas/responder/${targetAlertaId}`,
           {
             method: 'POST',
             headers,
@@ -598,6 +673,7 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
       }
       
       await AsyncStorage.setItem(`responses_${targetAlertaId}`, JSON.stringify(mockList));
+      await AsyncStorage.setItem(`local_response_${targetAlertaId}`, estadoRespuesta);
       await stopEmergencyAlert();
       // AX-14: si no se cargó del backend, capturamos ahora
       if (!horaLlamado) setHoraLlamado(formatHora(new Date()));
@@ -610,12 +686,12 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   // ── AX-14: Guardar tiempos críticos ─────────────────────────────────────
   // Usa POST /registros_comunicacion/crear hasta que el backend implemente
   // un endpoint específico de tiempos críticos.
-  const guardarTiempos = async () => {
+  async function guardarTiempos() {
     if (!esHoraValida(horaSalida)) {
       Alert.alert('Hora de Salida requerida', 'Ingresá la hora de salida del móvil (HH:MM).');
       return;
@@ -655,9 +731,17 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
     } finally {
       setGuardandoTiempos(false);
     }
-  };
+  }
 
-  const cambiarRespuesta = () => {
+  async function cambiarRespuesta() {
+    const targetAlertaId = resolvedAlertaId || alertaId;
+    if (targetAlertaId) {
+      try {
+        await AsyncStorage.removeItem(`local_response_${targetAlertaId}`);
+      } catch (e) {
+        console.log('Error clearing local response:', e);
+      }
+    }
     animateOut(() => {
       setRespuesta(null);
       setError(null);
@@ -665,7 +749,7 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
       setHoraRegreso('');
       startEmergencyAlert();
     });
-  };
+  }
 
   const currentTime = formatHora(new Date());
   const currentDate = new Date()
@@ -744,6 +828,16 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
                 <MaterialCommunityIcons name="clock-outline" size={14} color="#90a4ae" />
                 <Text style={styles.confirmationTime}>{currentTime} HS</Text>
               </View>
+
+              {/* Botón premium de acceso al Tablero de Asistencia */}
+              <TouchableOpacity 
+                style={styles.boardAccessButton}
+                onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#fff" />
+                <Text style={styles.boardAccessButtonText}>VER TABLERO DE ASISTENCIA</Text>
+              </TouchableOpacity>
             </Animated.View>
 
             {/* ── AX-14: Formulario de tiempos críticos (solo si aceptó) ─── */}
@@ -970,6 +1064,16 @@ if (!(resolvedAlertaId || alertaId) || !usuarioId) {
               )}
               <Text style={styles.buttonText}>RECHAZAR</Text>
             </TouchableOpacity>
+
+            {/* Acceso siempre disponible al Tablero de Asistencia */}
+            <TouchableOpacity 
+              style={styles.boardAccessButton}
+              onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#fff" />
+              <Text style={styles.boardAccessButtonText}>VER TABLERO DE ASISTENCIA</Text>
+            </TouchableOpacity>
           </View>
 
         {/* FOOTER */}
@@ -1157,5 +1261,31 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 8,
+  },
+  boardAccessButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#0284c7',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 14,
+    width: '100%',
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(2, 132, 199, 0.5)'
+  },
+  boardAccessButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });

@@ -58,6 +58,9 @@ export default function NewAlertScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
 
+  const parentState = navigation.getParent()?.getState();
+  const isCurrentlyAdmin = parentState?.routeNames?.includes('Panel') || navigation.getState()?.routeNames?.includes('Panel') || false;
+
   const tiposIncidente = [
     { label: 'Incendio Estructural', id: '1' },
     { label: 'Incendio Forestal', id: '1' },
@@ -162,6 +165,8 @@ export default function NewAlertScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+
+
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -169,7 +174,7 @@ export default function NewAlertScreen({ navigation }) {
         >
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.headerTitleBox}>
-              <View style={styles.redBorder} />
+              <View style={[styles.redBorder, { backgroundColor: isCurrentlyAdmin ? '#dc2626' : '#0284c7' }]} />
             </View>
 
             <View style={styles.formContainer}>
@@ -235,7 +240,7 @@ export default function NewAlertScreen({ navigation }) {
               />
 
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={[styles.primaryButton, { backgroundColor: isCurrentlyAdmin ? '#dc2626' : '#0284c7' }]}
                 onPress={submitAlertData}
                 disabled={isLoading}
               >
@@ -425,5 +430,29 @@ const styles = StyleSheet.create({
   pickerOptionText: {
     color: '#e2e8f0',
     fontSize: 14,
-  }
+  },
+  roleBreadcrumb: {
+    height: 24,
+    backgroundColor: '#1b1d24',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderLeftWidth: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+    marginTop: 6,
+    borderRadius: 2,
+  },
+  roleBreadcrumbDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  roleBreadcrumbText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 1.2,
+  },
 });

@@ -22,7 +22,7 @@ import ReportsScreen from '../screens/ReportsScreen';
 import AddFirefighterScreen from '../screens/AddFirefighterScreen';
 import AlertDetailScreen from '../screens/AlertDetailScreen';
 import NewAlertScreen from '../screens/NewAlertScreen';
-import PersonnelStatusScreen from '../screens/PersonnelStatusScreen';
+
 import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -47,10 +47,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
 
   // Icon pairs: [inactive (outline), active (filled)]
   const ICON_MAP = {
-    Mapa:      ['map-outline',          'map'],
-    Alertas:   ['bell-outline',         'bell'],
-    Emergencia:['shield-alert-outline', 'shield-alert'],
-    Perfil:    ['account-outline',      'account'],
+    Mapa:       ['map-outline',             'map'],
+    Alertas:    ['bell-outline',            'bell'],
+    Emergencia: ['shield-alert-outline',    'shield-alert'],
+    Perfil:     ['account-outline',         'account'],
   };
 
   return (
@@ -108,7 +108,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
                 <MaterialCommunityIcons
                   name={iconName}
                   size={20}
-                  color={isFocused ? '#fff' : '#64748b'}
+                  color={isFocused ? '#fff' : '#475569'}
                 />
               </View>
               <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>
@@ -128,11 +128,11 @@ function MainTabNavigator() {
       tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Mapa"       component={MapScreen}       options={{ title: 'Mapa' }} />
-      <Tab.Screen name="Alertas"    component={AlertsScreen}    options={{ title: 'Alertas' }} />
-      <Tab.Screen name="SOS"        component={NewAlertScreen}  options={{ title: 'Alerta' }} />
-      <Tab.Screen name="Emergencia" component={EmergencyScreen} options={{ title: 'Emergencia' }} />
-      <Tab.Screen name="Perfil"     component={ProfileScreen}   options={{ title: 'Perfil' }} />
+      <Tab.Screen name="Mapa"       component={MapScreen}                  options={{ title: 'Mapa' }} />
+      <Tab.Screen name="Alertas"    component={AlertsScreen}               options={{ title: 'Alertas' }} />
+      <Tab.Screen name="SOS"        component={NewAlertScreen}             options={{ title: 'Alerta' }} />
+      <Tab.Screen name="Emergencia" component={EmergencyScreen}            options={{ title: 'Emergencia' }} />
+      <Tab.Screen name="Perfil"     component={ProfileScreen}              options={{ title: 'Perfil' }} />
     </Tab.Navigator>
   );
 }
@@ -257,7 +257,7 @@ export default function AppNavigator() {
           <Stack.Screen name="NewAlert" component={NewAlertScreen} />
 
           <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
-          <Stack.Screen name="PersonnelStatus" component={PersonnelStatusScreen} />
+
           <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
           <Stack.Screen name="Emergency" component={EmergencyScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
@@ -282,27 +282,82 @@ export default function AppNavigator() {
 const styles = StyleSheet.create({
   // ── Bombero Tab Bar ──────────────────────────────────────────
   tabBarContainer: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#263238',
-    borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingTop: 12,
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: '#1a1c23', // Matches admin exact background color
+    borderTopWidth: 1,
+    borderTopColor: '#26282f',
+    paddingTop: 10,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.3, shadowRadius: 12 },
       android: { elevation: 20 },
-      web: { boxShadow: '0px -4px 12px rgba(0,0,0,0.2)' },
+      web: { boxShadow: '0px -4px 16px rgba(0,0,0,0.4)' },
     }),
   },
-  tabBarInner: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', paddingHorizontal: 10 },
-  tabItem: { alignItems: 'center', justifyContent: 'center', paddingBottom: 10, flex: 1, maxWidth: 70 },
-  tabLabel: { fontSize: 10, fontWeight: '800', marginTop: 4, textTransform: 'capitalize' },
-  activeDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff', marginTop: 2 },
-  fabContainer: { alignItems: 'center', top: -24 },
+  tabBarInner: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 8,
+    maxWidth: 80,
+  },
+  tabIconPill: {
+    width: 40,
+    height: 32,
+    borderRadius: 8, // squircle radius matching admin
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 3,
+  },
+  tabIconPillActive: {
+    backgroundColor: '#0284c7', // Cian táctico active state
+  },
+  tabLabel: {
+    fontSize: 8, // Matches admin
+    fontWeight: '800',
+    color: '#475569', // Matches admin inactive text color
+    letterSpacing: 0.8,
+  },
+  tabLabelActive: {
+    color: '#f8fafc',
+  },
+  
+  // FAB central bombero
+  fabContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: 80,
+    paddingBottom: 4,
+    top: -10, // Matches admin top offset
+  },
   fab: {
-    width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 14, // squircle FAB
+    backgroundColor: '#0284c7', // Cian táctico
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0369a1', // Darker cian border
     ...Platform.select({
-      ios: { shadowColor: '#dc2626', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
-      android: { elevation: 8 },
-      web: { boxShadow: '0px 4px 12px rgba(220, 38, 38, 0.4)' },
+      ios: { shadowColor: '#0284c7', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.6, shadowRadius: 10 },
+      android: { elevation: 10 },
+      web: { boxShadow: '0px 4px 16px rgba(2, 132, 199, 0.6)' },
     }),
+  },
+  fabLabel: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#e0f2fe', // Very light blue / cian
+    letterSpacing: 1,
+    marginTop: 4,
   },
 
   // ── Admin Tab Bar ────────────────────────────────────────────

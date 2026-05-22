@@ -178,7 +178,7 @@ export default function ProfileScreen({ navigation }) {
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
           <View style={styles.topBarLogo}>
-            <MaterialCommunityIcons name="fire" size={16} color="#e11d48" />
+            <MaterialCommunityIcons name="fire" size={16} color="#0284c7" />
           </View>
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
@@ -193,6 +193,8 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+
+
 
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
@@ -271,14 +273,28 @@ export default function ProfileScreen({ navigation }) {
           <DataRow
             icon={isAdmin ? 'shield-crown' : 'shield-account'}
             label="ROL EN EL SISTEMA"
-            value={isAdmin ? 'Administrador' : 'Bombero Operativo'}
+            value={isAdmin ? 'Admin' : 'Bombero'}
             valueColor={isAdmin ? '#c084fc' : '#38bdf8'}
             noBorder
           />
         </View>
 
+        {/* ── Operaciones ─────────────────────────────────── */}
+        <Text style={styles.sectionTitle}>OPERACIONES</Text>
+        <View style={styles.card}>
+          <ActionRow
+            icon="truck-delivery"
+            iconBg="#2d1515"
+            iconColor="#dc2626"
+            title="Centro Logístico"
+            sub="Acceso a móviles y recursos"
+            onPress={() => navigation.navigate('Logistica')}
+            noBorder
+          />
+        </View>
+
         {/* ── Acciones ─────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>ACCIONES</Text>
+        <Text style={styles.sectionTitle}>ACCIONES DE CUENTA</Text>
 
         <View style={styles.card}>
           <ActionRow
@@ -818,4 +834,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalSaveText: { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 1 },
+  roleBreadcrumb: {
+    height: 24,
+    backgroundColor: '#1b1d24',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderLeftWidth: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  roleBreadcrumbDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  roleBreadcrumbText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 1.2,
+  },
 });
