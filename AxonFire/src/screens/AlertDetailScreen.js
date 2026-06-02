@@ -19,6 +19,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
 
@@ -71,6 +73,219 @@ export default function AlertDetailScreen({ route, navigation }) {
   // Modal Solicitar Recursos
   const [modalVisible, setModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
+
+  const rol = user?.rol;
+
+  const abrirInforme = () => {
+    navigation.navigate('InformePostEmergencia', {
+      alertaId: alertaId,
+      token: token,
+      rol: user?.rol
+    });
+  };
+
+  const generarBorradorLegal = async () => {
+    if (!alerta) return;
+    try {
+      const fechaInicio = new Date(alerta.fecha_hora);
+      // Simular duración estimada si no hay campo duracion
+      const fechaFin = new Date(fechaInicio.getTime() + 2 * 60 * 60 * 1000);
+      
+      const formatFechaHora = (date) => {
+        return date.toLocaleString('es-AR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+      };
+
+      const tableRows = responders.map(r => `
+        <tr>
+          <td>${r.name}</td>
+          <td>${r.role}</td>
+          <td>${r.hora} HS</td>
+        </tr>
+      `).join('');
+
+      const htmlContent = `
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body {
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                color: #1e293b;
+                padding: 40px;
+                line-height: 1.6;
+              }
+              .header {
+                text-align: center;
+                border-bottom: 3px double #0f172a;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+              }
+              .header h1 {
+                font-size: 24px;
+                text-transform: uppercase;
+                margin: 0;
+                color: #7f1d1d;
+                letter-spacing: 1px;
+              }
+              .header h2 {
+                font-size: 14px;
+                margin: 5px 0 0 0;
+                color: #475569;
+                font-weight: normal;
+                letter-spacing: 2px;
+              }
+              .doc-title {
+                text-align: center;
+                text-transform: uppercase;
+                font-size: 18px;
+                font-weight: bold;
+                margin: 20px 0;
+                color: #0f172a;
+                text-decoration: underline;
+              }
+              .section {
+                margin-bottom: 25px;
+              }
+              .section-title {
+                font-size: 14px;
+                text-transform: uppercase;
+                font-weight: bold;
+                border-bottom: 1px solid #cbd5e1;
+                padding-bottom: 5px;
+                margin-bottom: 12px;
+                color: #7f1d1d;
+              }
+              .grid {
+                display: flex;
+                flex-wrap: wrap;
+                margin-bottom: 15px;
+              }
+              .grid-item {
+                width: 50%;
+                margin-bottom: 8px;
+                font-size: 13px;
+              }
+              .grid-item span {
+                font-weight: bold;
+                color: #475569;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                font-size: 13px;
+              }
+              th, td {
+                border: 1px solid #cbd5e1;
+                padding: 10px;
+                text-align: left;
+              }
+              th {
+                background-color: #f1f5f9;
+                color: #0f172a;
+                font-weight: bold;
+              }
+              tr:nth-child(even) {
+                background-color: #f8fafc;
+              }
+              .footer-signature {
+                margin-top: 60px;
+                display: flex;
+                justify-content: space-between;
+              }
+              .signature-box {
+                width: 45%;
+                text-align: center;
+                border-top: 1px solid #94a3b8;
+                padding-top: 10px;
+                font-size: 12px;
+                color: #475569;
+              }
+              .stamp-box {
+                margin-top: 40px;
+                text-align: center;
+                font-size: 11px;
+                color: #64748b;
+                border: 1px dashed #cbd5e1;
+                padding: 15px;
+                border-radius: 6px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Cuerpo de Bomberos Voluntarios</h1>
+              <h2>DOCUMENTO DE CONSTANCIA OFICIAL</h2>
+            </div>
+            
+            <div class="doc-title">Borrador de Informe Legal de Siniestro</div>
+            
+            <div class="section">
+              <div class="section-title">Datos de la Emergencia</div>
+              <div class="grid">
+                <div class="grid-item"><span>ID Alerta:</span> ${alerta.id}</div>
+                <div class="grid-item"><span>Tipo de Siniestro:</span> ${alerta.subCategoriaAlerta?.nombre_sub_categoria || alerta.observaciones || 'Siniestro'}</div>
+                <div class="grid-item"><span>Fecha/Hora Inicio:</span> ${formatFechaHora(fechaInicio)}</div>
+                <div class="grid-item"><span>Fecha/Hora Fin (Est.):</span> ${formatFechaHora(fechaFin)}</div>
+                <div class="grid-item"><span>Ubicación:</span> ${alerta.ubicacion || 'No especificada'}</div>
+                <div class="grid-item"><span>Estado:</span> FINALIZADO</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Descripción y Observaciones</div>
+              <p style="font-size: 13px; margin: 5px 0;">${alerta.observaciones || 'No hay observaciones adicionales registradas para este siniestro.'}</p>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Personal de Asistencia</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nombre y Apellido</th>
+                    <th>Rango</th>
+                    <th>Hora de Respuesta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows || '<tr><td colspan="3" style="text-align:center;">No se registraron asistencias oficiales.</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="stamp-box">
+              <strong>Nota Importante para la Aseguradora / Desarrollo Social:</strong><br>
+              El presente documento constituye un borrador de informe de intervención de emergencia expedido por el sistema digital AxonFire. El informe definitivo con firma digital o sello holográfico del Jefe de Cuerpo debe solicitarse en la sede central del Cuartel de Bomberos Voluntarios correspondiente.
+            </div>
+
+            <div class="footer-signature">
+              <div class="signature-box">
+                Firma y Aclaración<br>
+                Oficial a Cargo del Siniestro
+              </div>
+              <div class="signature-box">
+                Firma y Sello<br>
+                Jefe de Cuerpo / Administración
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Informe_Legal_${alerta.id}.pdf`,
+        UTI: 'com.adobe.pdf'
+      });
+    } catch (err) {
+      console.log('Error generating PDF:', err);
+      Alert.alert('Error', 'No se pudo generar el borrador legal en PDF.');
+    }
+  };
 
   const fetchDetail = useCallback(async () => {
     if (!alertaId) {
@@ -444,6 +659,18 @@ export default function AlertDetailScreen({ route, navigation }) {
               </View>
             )}
           </TouchableOpacity>
+
+          {/* ── AX-15: Botón Borrador Legal PDF ── */}
+          {alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' && (
+            <TouchableOpacity
+              style={styles.legalPDFButton}
+              onPress={generarBorradorLegal}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="file-pdf-box" size={18} color="#fff" />
+              <Text style={styles.legalPDFButtonText}>GENERAR BORRADOR LEGAL</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Live Tracking Map Placeholder */}
@@ -623,6 +850,25 @@ container:         { flex: 1, backgroundColor: '#16181d' },
   informeButtonText: {
     flex: 1, color: '#c4b5fd',
     fontSize: 12, fontWeight: '900', letterSpacing: 0.8,
+  },
+  legalPDFButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#7f1d1d',
+    borderWidth: 1,
+    borderColor: '#991b1b',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+  legalPDFButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   informeBadgeRol: {
     backgroundColor: '#3b1f6e',

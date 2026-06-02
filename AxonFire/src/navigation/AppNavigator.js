@@ -35,7 +35,12 @@ import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
+<<<<<<< Updated upstream
 import ChecklistBolsosScreen from '../screens/Checklistbolsosscreen';
+=======
+import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
+import EstadisticasScreen from '../screens/EstadisticasScreen';
+>>>>>>> Stashed changes
  
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -149,6 +154,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
           else if (route.name === 'Alertas') iconName = 'alert';
           else if (route.name === 'Asistencia') iconName = 'clipboard-check';
           else if (route.name === 'Personal') iconName = 'account-group';
+          else if (route.name === 'Estadisticas') iconName = 'chart-bar';
  
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
@@ -175,6 +181,7 @@ function AdminTabNavigator() {
       <Tab.Screen name="Alertas" component={AlertsScreen} />
       <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} />
       <Tab.Screen name="Personal" component={AdminPersonnelScreen} />
+      <Tab.Screen name="Estadisticas" component={EstadisticasScreen} options={{ title: 'Estadísticas' }} />
     </Tab.Navigator>
   );
 }
@@ -217,6 +224,7 @@ export default function AppNavigator() {
           <Stack.Screen name="AdminEquipment" component={AdminEquipmentScreen} />
           <Stack.Screen name="ChecklistBolsos" component={ChecklistBolsosScreen} />
           <Stack.Screen name="InformePostEmergencia" component={InformePostEmergenciaScreen} />
+          <Stack.Screen name="Estadisticas" component={EstadisticasScreen} />
         </>
       )}
     </Stack.Navigator>
