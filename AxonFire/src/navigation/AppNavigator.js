@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
- 
+
 // Pantallas existentes
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -28,27 +28,24 @@ import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen';
 
- 
+
 // ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
-<<<<<<< Updated upstream
-import ChecklistBolsosScreen from '../screens/Checklistbolsosscreen';
-=======
 import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
->>>>>>> Stashed changes
- 
+
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
- 
+
 // Custom Tab Bar (sin cambios)
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
- 
+
   return (
     <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
       <View style={styles.tabBarInner}>
@@ -56,7 +53,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
           const { options } = descriptors[route.key];
           const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
           const isFocused = state.index === index;
- 
+
           const onPress = () => {
             const event = navigation.emit({
               type: 'tabPress',
@@ -67,7 +64,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
               navigation.navigate(route.name);
             }
           };
- 
+
           if (route.name === 'SOS') {
             return (
               <TouchableOpacity key={route.key} onPress={onPress} style={styles.fabContainer} activeOpacity={0.8}>
@@ -78,7 +75,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
               </TouchableOpacity>
             );
           }
- 
+
           let iconName;
           if (route.name === 'Mapa') iconName = isFocused ? 'map' : 'map-outline';
           else if (route.name === 'Alertas') iconName = isFocused ? 'bell' : 'bell-outline';
@@ -99,7 +96,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
     </View>
   );
 }
- 
+
 function MainTabNavigator() {
   return (
     <Tab.Navigator tabBar={props => <CustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
@@ -113,11 +110,11 @@ function MainTabNavigator() {
     </Tab.Navigator>
   );
 }
- 
+
 // Admin Tab Bar (sin cambios)
 function AdminTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
- 
+
   return (
     <View style={[styles.tabBarContainer, { backgroundColor: '#1a1c23', paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
       <View style={styles.tabBarInner}>
@@ -125,7 +122,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
           const { options } = descriptors[route.key];
           const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
           const isFocused = state.index === index;
- 
+
           const onPress = () => {
             const event = navigation.emit({
               type: 'tabPress',
@@ -136,7 +133,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
               navigation.navigate(route.name);
             }
           };
- 
+
           if (route.name === 'SOS') {
             return (
               <TouchableOpacity key={route.key} onPress={onPress} style={styles.fabContainerAdmin} activeOpacity={0.8}>
@@ -147,7 +144,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
               </TouchableOpacity>
             );
           }
- 
+
           let iconName;
           if (route.name === 'Panel') iconName = 'monitor-dashboard';
           else if (route.name === 'Mapa') iconName = 'map';
@@ -155,7 +152,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
           else if (route.name === 'Asistencia') iconName = 'clipboard-check';
           else if (route.name === 'Personal') iconName = 'account-group';
           else if (route.name === 'Estadisticas') iconName = 'chart-bar';
- 
+
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tabItem} activeOpacity={0.7}>
               <View style={[styles.adminIconBox, isFocused && { backgroundColor: '#dc2626' }]}>
@@ -171,7 +168,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
     </View>
   );
 }
- 
+
 function AdminTabNavigator() {
   return (
     <Tab.Navigator tabBar={props => <AdminTabBar {...props} />} screenOptions={{ headerShown: false }}>
@@ -185,7 +182,7 @@ function AdminTabNavigator() {
     </Tab.Navigator>
   );
 }
- 
+
 export default function AppNavigator() {
   const { token, user } = useAuth();
 
@@ -204,7 +201,7 @@ export default function AppNavigator() {
           {user?.rol === 'ADMIN' && (
             <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
           )}
-          
+
           {/* Pantallas comunes/modales */}
           <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="NewAlert" component={NewAlertScreen} />
@@ -214,7 +211,7 @@ export default function AppNavigator() {
           <Stack.Screen name="Emergency" component={EmergencyScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
           <Stack.Screen name="Personal" component={AdminPersonnelScreen} />
-          
+
           {/* Pantallas nuevas */}
           <Stack.Screen name="PanelControl" component={PanelControlScreen} />
           <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
@@ -230,7 +227,7 @@ export default function AppNavigator() {
     </Stack.Navigator>
   );
 }
- 
+
 // Estilos (sin cambios respecto al original)
 const styles = StyleSheet.create({
   tabBarContainer: {
