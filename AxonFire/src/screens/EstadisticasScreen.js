@@ -107,6 +107,8 @@ export default function EstadisticasScreen({ navigation }) {
       const desde = new Date(selectedAnio, selectedMes, 1).toISOString();
       const hasta = new Date(selectedAnio, selectedMes + 1, 0, 23, 59, 59, 999).toISOString();
 
+      console.log('EstadisticasScreen - Rango de fechas para consulta:', { desde, hasta });
+
       let alertsData = [];
       let responsesData = [];
 

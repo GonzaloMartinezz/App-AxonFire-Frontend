@@ -115,6 +115,8 @@ export default function PanelControlScreen({ navigation }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+      console.log('PanelControlScreen - Rango de fechas para consulta:', { desde, hasta });
+
       const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
         headers: {
           'Content-Type': 'application/json',

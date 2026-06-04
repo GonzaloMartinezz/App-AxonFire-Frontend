@@ -71,6 +71,8 @@ export default function ReportsScreen({ navigation }) {
       const desde = new Date(selectedAnio, selectedMes, 1).toISOString();
       const hasta = new Date(selectedAnio, selectedMes + 1, 0, 23, 59, 59, 999).toISOString();
 
+      console.log('ReportsScreen - Rango de fechas para consulta:', { desde, hasta });
+
       let alertsData = [];
 
       // 2. Fetch Alertas por rango

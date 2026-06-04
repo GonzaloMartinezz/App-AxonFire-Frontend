@@ -320,11 +320,14 @@ export default function EmergencyScreen({ route, navigation }) {
       // 1. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
       if (!activeAlertaId) {
         try {
+          const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const hasta = new Date().toISOString();
+          console.log('EmergencyScreen - Rango de fechas para consulta:', { desde, hasta });
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
             headers,
             data: {
-              fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-              fecha_hasta: new Date().toISOString()
+              fecha_desde: desde,
+              fecha_hasta: hasta
             }
           });
           const data = resAlertas.data;

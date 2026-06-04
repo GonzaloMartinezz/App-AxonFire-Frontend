@@ -190,6 +190,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         try {
           const hasta = new Date().toISOString();
           const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          console.log('AdminAttendanceBoardScreen - Rango de fechas para consulta:', { desde, hasta });
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
             headers: authHeaders(),
             data: { fecha_desde: desde, fecha_hasta: hasta },
