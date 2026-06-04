@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,269 +9,809 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Modal,
+  FlatList,
+  Dimensions,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius } from '../theme';
-import TacticalCard from '../components/TacticalCard';
-import StatusBadge from '../components/StatusBadge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import axios from 'axios';
 
-const TIMELINE = [
-  { label: 'LLAMADA RECIBIDA', time: '02:14', date: '12 Oct 2023', delta: null },
-  { label: 'DESPACHO', time: '02:16', date: null, delta: '+2m 14s', deltaColor: Colors.success },
-  { label: 'EN ESCENA', time: '02:22', date: null, delta: '8m Total', deltaColor: Colors.alertBlue },
-  { label: 'RESUELTO', time: '04:45', date: 'Operación Cerrada', delta: null },
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
+
+const { width } = Dimensions.get('window');
+
+const MESES = [
+  { value: 0, label: 'Enero' },
+  { value: 1, label: 'Febrero' },
+  { value: 2, label: 'Marzo' },
+  { value: 3, label: 'Abril' },
+  { value: 4, label: 'Mayo' },
+  { value: 5, label: 'Junio' },
+  { value: 6, label: 'Julio' },
+  { value: 7, label: 'Agosto' },
+  { value: 8, label: 'Septiembre' },
+  { value: 9, label: 'Octubre' },
+  { value: 10, label: 'Noviembre' },
+  { value: 11, label: 'Diciembre' }
 ];
 
-const INVENTORY_ITEMS = [
-  { name: 'Equipos SCBA (6)', status: 'DEVUELTO', ok: true },
-  { name: 'Herramientas Hidráulicas', status: 'ASEGURADO', ok: true },
-  { name: 'Manguera LDR 50\'', status: 'DAÑADA', ok: false },
-  { name: 'Cámara Térmica', status: 'DEVUELTO', ok: true },
-];
+const ANIOS = [2024, 2025, 2026, 2027];
 
 export default function ReportsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  // Legal Draft generation removed
+  const { token } = useAuth();
 
-  // PDF and Legal Draft functionality removed
+  const [loading, setLoading] = useState(true);
+  const [selectedMes, setSelectedMes] = useState(new Date().getMonth());
+  const [selectedAnio, setSelectedAnio] = useState(new Date().getFullYear());
+  const [mesModalVisible, setMesModalVisible] = useState(false);
+  const [anioModalVisible, setAnioModalVisible] = useState(false);
+  const [searchText, setSearchText] = useState('');
+
+  const [finalizedAlerts, setFinalizedAlerts] = useState([]);
+  const [generatingPdfId, setGeneratingPdfId] = useState(null);
+
+  // Cargar alertas finalizadas
+  const loadReports = useCallback(async () => {
+    setLoading(true);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      // 1. Obtener límites mensuales
+      const desde = new Date(selectedAnio, selectedMes, 1).toISOString();
+      const hasta = new Date(selectedAnio, selectedMes + 1, 0, 23, 59, 59, 999).toISOString();
+
+      let alertsData = [];
+
+      // 2. Fetch Alertas por rango
+      try {
+        const resAlerts = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          headers,
+          data: { fecha_desde: desde, fecha_hasta: hasta },
+          timeout: 5000
+        });
+        alertsData = resAlerts.data?.alertas || [];
+      } catch (err) {
+        console.log('Error loading range alerts for reports:', err?.message || err);
+      }
+
+      // 3. Filtrar alertas finalizadas
+      // Chequear si el estado de la alerta es FINALIZADO, o si tiene fecha de finalización,
+      // o si está marcada como finalizada de forma local en AsyncStorage.
+      const filtered = [];
+      for (const alert of alertsData) {
+        const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${alert.id}`);
+        const isFinalized = 
+          alert.estadoAlerta?.nombre_estado === 'FINALIZADO' || 
+          alert.fecha_hora_finalizacion !== null ||
+          isLocallyFinalized === 'true';
+
+        if (isFinalized) {
+          filtered.push({
+            ...alert,
+            // Normalizar el estado a finalizado para la UI
+            estadoAlerta: { 
+              ...alert.estadoAlerta, 
+              nombre_estado: 'FINALIZADO' 
+            }
+          });
+        }
+      }
+
+      // Ordenar por fecha decreciente
+      filtered.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+      setFinalizedAlerts(filtered);
+
+    } catch (err) {
+      console.log('Error calculating reports:', err);
+      Alert.alert('Error', 'No se pudieron cargar los reportes legales.');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMes, selectedAnio, token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadReports();
+    }, [loadReports])
+  );
+
+  // Generación de PDF Legal
+  const generateLegalReportPDF = async (alerta) => {
+    setGeneratingPdfId(alerta.id);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      // 1. Obtener todas las respuestas para poder cruzar los bomberos aceptados
+      let responsesData = [];
+      try {
+        const resResp = await axios.get(`${API_BASE_URL}/respuestas_alertas/`, {
+          headers,
+          timeout: 5000
+        });
+        responsesData = Array.isArray(resResp.data) ? resResp.data : [];
+      } catch (err) {
+        console.log('Error loading responses:', err?.message || err);
+      }
+
+      // Filtrar las respuestas correspondientes a esta alerta específica
+      let alertResponses = responsesData.filter(r => {
+        const rAlertaId = r.alerta_id || r.alertaId?.id || r.alertaId;
+        return rAlertaId === alerta.id;
+      });
+
+      // Combinar con respuestas locales de AsyncStorage si las hubiera
+      try {
+        const storedResponses = await AsyncStorage.getItem('local_alert_responses');
+        if (storedResponses) {
+          const parsed = JSON.parse(storedResponses);
+          const filteredLocal = parsed.filter(r => r.alerta_id === alerta.id || r.alertaId?.id === alerta.id);
+          const combined = [...alertResponses];
+          filteredLocal.forEach(fl => {
+            const uId = fl.usuario_id || fl.usuarioId?.id;
+            if (uId && !combined.some(c => (c.usuario_id || c.usuarioId?.id) === uId)) {
+              combined.push(fl);
+            }
+          });
+          alertResponses = combined;
+        }
+      } catch (e) {
+        console.log('Error reading local responses:', e);
+      }
+
+
+
+      const aceptados = alertResponses
+        .filter(r => r.estado_respuesta === 'ACEPTADO')
+        .map((r, i) => {
+          const b = r.usuarioId?.bombero || r.bombero || {};
+          const nombreUsuario = r.usuarioId?.nombre_usuario || r.usuarioId?.nombre || '';
+          const name = b.nombre ? `${b.nombre} ${b.apellido || ''}` : nombreUsuario;
+          return {
+            name: (name || 'BOMBERO').toUpperCase(),
+            role: b.rangoBombero?.nombre_rol || b.rango || 'BOMBERO',
+            hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
+          };
+        });
+
+      const fechaInicio = new Date(alerta.fecha_hora);
+      // Estimar 2 horas o usar duración si existe duracion_total_alerta
+      const duracionMs = (alerta.duracion_total_alerta || 2) * 60 * 60 * 1000;
+      const fechaFin = new Date(fechaInicio.getTime() + duracionMs);
+
+      const formatFechaHora = (date) => {
+        return date.toLocaleString('es-AR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+      };
+
+      const tableRows = aceptados.map(r => `
+        <tr>
+          <td>${r.name}</td>
+          <td>${r.role}</td>
+          <td>${r.hora} HS</td>
+        </tr>
+      `).join('');
+
+      const htmlContent = `
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body {
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                color: #1e293b;
+                padding: 40px;
+                line-height: 1.6;
+              }
+              .header {
+                text-align: center;
+                border-bottom: 3px double #0f172a;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+              }
+              .header h1 {
+                font-size: 24px;
+                text-transform: uppercase;
+                margin: 0;
+                color: #7f1d1d;
+                letter-spacing: 1px;
+              }
+              .header h2 {
+                font-size: 14px;
+                margin: 5px 0 0 0;
+                color: #475569;
+                font-weight: normal;
+                letter-spacing: 2px;
+              }
+              .doc-title {
+                text-align: center;
+                text-transform: uppercase;
+                font-size: 18px;
+                font-weight: bold;
+                margin: 20px 0;
+                color: #0f172a;
+                text-decoration: underline;
+              }
+              .section {
+                margin-bottom: 25px;
+              }
+              .section-title {
+                font-size: 14px;
+                text-transform: uppercase;
+                font-weight: bold;
+                border-bottom: 1px solid #cbd5e1;
+                padding-bottom: 5px;
+                margin-bottom: 12px;
+                color: #7f1d1d;
+              }
+              .grid {
+                display: flex;
+                flex-wrap: wrap;
+                margin-bottom: 15px;
+              }
+              .grid-item {
+                width: 50%;
+                margin-bottom: 8px;
+                font-size: 13px;
+              }
+              .grid-item span {
+                font-weight: bold;
+                color: #475569;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                font-size: 13px;
+              }
+              th, td {
+                border: 1px solid #cbd5e1;
+                padding: 10px;
+                text-align: left;
+              }
+              th {
+                background-color: #f1f5f9;
+                color: #0f172a;
+                font-weight: bold;
+              }
+              tr:nth-child(even) {
+                background-color: #f8fafc;
+              }
+              .footer-signature {
+                margin-top: 60px;
+                display: flex;
+                justify-content: space-between;
+              }
+              .signature-box {
+                width: 45%;
+                text-align: center;
+                border-top: 1px solid #94a3b8;
+                padding-top: 10px;
+                font-size: 12px;
+                color: #475569;
+              }
+              .stamp-box {
+                margin-top: 40px;
+                text-align: center;
+                font-size: 11px;
+                color: #64748b;
+                border: 1px dashed #cbd5e1;
+                padding: 15px;
+                border-radius: 6px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Cuerpo de Bomberos Voluntarios</h1>
+              <h2>DOCUMENTO DE CONSTANCIA OFICIAL</h2>
+            </div>
+            
+            <div class="doc-title">Borrador de Informe Legal de Siniestro</div>
+            
+            <div class="section">
+              <div class="section-title">Datos de la Emergencia</div>
+              <div class="grid">
+                <div class="grid-item"><span>ID Alerta:</span> ${alerta.id}</div>
+                <div class="grid-item"><span>Tipo de Siniestro:</span> ${alerta.subCategoriaAlerta?.nombre_sub_categoria || alerta.observaciones || 'Siniestro'}</div>
+                <div class="grid-item"><span>Fecha/Hora Inicio:</span> ${formatFechaHora(fechaInicio)}</div>
+                <div class="grid-item"><span>Fecha/Hora Fin (Est.):</span> ${formatFechaHora(fechaFin)}</div>
+                <div class="grid-item"><span>Ubicación:</span> ${alerta.ubicacion || 'No especificada'}</div>
+                <div class="grid-item"><span>Estado:</span> FINALIZADO</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Descripción y Observaciones</div>
+              <p style="font-size: 13px; margin: 5px 0;">${alerta.observaciones || 'No hay observaciones adicionales registradas para este siniestro.'}</p>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Personal de Asistencia</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nombre y Apellido</th>
+                    <th>Rango</th>
+                    <th>Hora de Respuesta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows || '<tr><td colspan="3" style="text-align:center;">No se registraron asistencias oficiales.</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="stamp-box">
+              <strong>Nota Importante para la Aseguradora / Desarrollo Social:</strong><br>
+              El presente documento constituye un borrador de informe de intervención de emergencia expedido por el sistema digital AxonFire. El informe definitivo con firma digital o sello holográfico del Jefe de Cuerpo debe solicitarse en la sede central del Cuartel de Bomberos Voluntarios correspondiente.
+            </div>
+
+            <div class="footer-signature">
+              <div class="signature-box">
+                Firma y Aclaración<br>
+                Oficial a Cargo del Siniestro
+              </div>
+              <div class="signature-box">
+                Firma y Sello<br>
+                Jefe de Cuerpo / Administración
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Informe_Legal_${alerta.id}.pdf`,
+        UTI: 'com.adobe.pdf'
+      });
+    } catch (err) {
+      console.log('Error generating PDF:', err);
+      Alert.alert('Error', 'No se pudo generar el borrador legal en PDF.');
+    } finally {
+      setGeneratingPdfId(null);
+    }
+  };
+
+  // Filtrado de la lista por texto de búsqueda
+  const filteredAlertsList = finalizedAlerts.filter(a => {
+    const query = searchText.toLowerCase();
+    const obsMatch = (a.observaciones || '').toLowerCase().includes(query);
+    const locMatch = (a.ubicacion || '').toLowerCase().includes(query);
+    const idMatch = (a.id || '').toLowerCase().includes(query);
+    const catMatch = (a.subCategoriaAlerta?.nombre_sub_categoria || '').toLowerCase().includes(query);
+    return obsMatch || locMatch || idMatch || catMatch;
+  });
+
+  const currentMesLabel = MESES.find(m => m.value === selectedMes)?.label || '';
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+      <StatusBar barStyle="light-content" backgroundColor="#121417" />
 
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => navigation?.navigate('MainApp')} style={styles.avatar}>
-            <MaterialCommunityIcons name="home" size={18} color="#fff" />
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#e11d48" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>AXON FIRE</Text>
+          <Text style={styles.headerTitle}>REPORTES LEGALES</Text>
         </View>
-        <TouchableOpacity style={styles.emergencyBtn}>
-          <MaterialCommunityIcons name="asterisk" size={18} color={Colors.primary} />
-        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.contentScroll} 
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.overline}>REVISIÓN POST-INCIDENTE</Text>
-        <Text style={styles.incidentId}>INCIDENTE #4409-B</Text>
-        <Text style={styles.incidentDesc}>
-          Respuesta ante Incendio Estructural - Sector Centro
+        {/* Subtítulo informativo */}
+        <Text style={styles.screenDesc}>
+          Historial de siniestros finalizados y emisión de constancias legales en PDF para aseguradoras.
         </Text>
 
-        {/* ── Timeline ── */}
-        <View style={styles.timeline}>
-          {TIMELINE.map((item, idx) => (
-            <View key={idx} style={styles.timelineItem}>
-              <View style={styles.timelineLine}>
-                <View style={[
-                  styles.timelineDot,
-                  idx === TIMELINE.length - 1 && styles.timelineDotLast,
-                ]} />
-                {idx < TIMELINE.length - 1 && <View style={styles.timelineConnector} />}
-              </View>
-              <View style={styles.timelineContent}>
-                <Text style={styles.timelineLabel}>{item.label}</Text>
-                <Text style={styles.timelineTime}>{item.time}</Text>
-                {item.date && <Text style={styles.timelineDate}>{item.date}</Text>}
-                {item.delta && (
-                  <View style={[styles.deltaBadge, { backgroundColor: `${item.deltaColor}20` }]}>
-                    <Text style={[styles.deltaText, { color: item.deltaColor }]}>{item.delta}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          ))}
+        {/* Barra de Filtros */}
+        <View style={styles.filtersContainer}>
+          <TouchableOpacity style={styles.filterSelector} onPress={() => setMesModalVisible(true)}>
+            <MaterialCommunityIcons name="calendar-month" size={18} color="#cbd5e1" />
+            <Text style={styles.filterText}>{currentMesLabel.toUpperCase()}</Text>
+            <MaterialCommunityIcons name="chevron-down" size={18} color="#94a3b8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.filterSelector} onPress={() => setAnioModalVisible(true)}>
+            <MaterialCommunityIcons name="calendar-today" size={18} color="#cbd5e1" />
+            <Text style={styles.filterText}>{selectedAnio}</Text>
+            <MaterialCommunityIcons name="chevron-down" size={18} color="#94a3b8" />
+          </TouchableOpacity>
         </View>
 
-        {/* ── Incident Notes ── */}
-        <TacticalCard elevated>
-          <View style={styles.noteHeader}>
-            <View style={styles.noteIconRow}>
-              <MaterialCommunityIcons name="file-document-outline" size={18} color={Colors.primary} />
-              <Text style={styles.noteTitle}>Notas del Incidente</Text>
-            </View>
-            <StatusBadge severity="activa" label="VERIFICADO" />
+        {/* Buscador */}
+        <View style={styles.searchRow}>
+          <MaterialCommunityIcons name="magnify" size={20} color="#94a3b8" style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="BUSCAR POR PALABRA CLAVE O UBICACIÓN"
+            placeholderTextColor="#64748b"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText('')}>
+              <MaterialCommunityIcons name="close" size={18} color="#94a3b8" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Cuerpo / Listado */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#e11d48" />
+            <Text style={styles.loadingText}>Cargando reportes del mes...</Text>
           </View>
+        ) : filteredAlertsList.length > 0 ? (
+          filteredAlertsList.map((item) => (
+            <TouchableOpacity 
+              key={item.id} 
+              style={styles.alertCard}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('AlertDetail', { alerta_id: item.id })}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardId}>SINIESTRO #{item.id.slice(0, 8).toUpperCase()}</Text>
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusText}>FINALIZADO</Text>
+                </View>
+              </View>
 
-          <Text style={styles.noteBody}>
-            Al llegar a las 02:22, se observó humo denso desde las ventanas del segundo piso. Motor 4 desplegó dos líneas de 1.75" para ataque interior.
-          </Text>
+              <Text style={styles.cardTitle}>
+                {item.subCategoriaAlerta?.nombre_sub_categoria || item.observaciones || 'Incidente'}
+              </Text>
 
-          <View style={styles.quoteBlock}>
-            <Text style={styles.quoteText}>
-              "La estructura 4409-B mostró daño térmico significativo en vigas principales."
+              <View style={styles.metaRow}>
+                <MaterialCommunityIcons name="map-marker-outline" size={15} color="#94a3b8" />
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {item.ubicacion || 'Ubicación no especificada'}
+                </Text>
+              </View>
+
+              <View style={styles.metaRow}>
+                <MaterialCommunityIcons name="clock-outline" size={15} color="#94a3b8" />
+                <Text style={styles.metaText}>
+                  {new Date(item.fecha_hora).toLocaleDateString('es-AR')} • {new Date(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
+                </Text>
+              </View>
+
+              <TouchableOpacity 
+                style={[
+                  styles.pdfButton,
+                  generatingPdfId === item.id && styles.pdfButtonDisabled
+                ]}
+                onPress={() => generateLegalReportPDF(item)}
+                disabled={generatingPdfId !== null}
+                activeOpacity={0.8}
+              >
+                {generatingPdfId === item.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="file-pdf-box" size={18} color="#fff" />
+                    <Text style={styles.pdfButtonText}>GENERAR BORRADOR LEGAL PDF</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name="file-cancel-outline" size={48} color="#334155" />
+            <Text style={styles.emptyText}>
+              No hay emergencias finalizadas registradas en este período.
             </Text>
           </View>
+        )}
 
-          <Text style={styles.noteBody}>
-            Todo el personal contabilizado. Sin lesiones reportadas.
-          </Text>
-        </TacticalCard>
-
-        {/* ── Command Validation ── */}
-        <TacticalCard>
-          <Text style={styles.validationLabel}>VALIDACIÓN DE COMANDO</Text>
-          <View style={styles.validationRow}>
-            <View style={styles.validationAvatar}>
-              <MaterialCommunityIcons name="account-check" size={16} color={Colors.primary} />
-            </View>
-            <View>
-              <Text style={styles.validationName}>Cap. Marcus Thorne</Text>
-              <Text style={styles.validationDate}>Firmado @ 05:02</Text>
-            </View>
-          </View>
-        </TacticalCard>
-
-        {/* ── Inventory ── */}
-        <TacticalCard elevated>
-          <View style={styles.inventoryHeader}>
-            <MaterialCommunityIcons name="fire-truck" size={18} color={Colors.onSurface} />
-            <Text style={styles.inventoryTitle}>Inventario del Camión</Text>
-          </View>
-          {INVENTORY_ITEMS.map((item, idx) => (
-            <View key={idx} style={styles.inventoryRow}>
-              <MaterialCommunityIcons
-                name={item.ok ? 'check-circle' : 'alert-circle'}
-                size={15}
-                color={item.ok ? Colors.success : Colors.primary}
-              />
-              <Text style={styles.inventoryName} numberOfLines={1}>{item.name}</Text>
-              <Text style={[styles.inventoryStatus, { color: item.ok ? Colors.success : Colors.primary }]}>
-                {item.status}
-              </Text>
-            </View>
-          ))}
-        </TacticalCard>
-
-        <View style={{ height: 100 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Mes Modal Selector */}
+      <Modal visible={mesModalVisible} transparent animationType="fade" onRequestClose={() => setMesModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>SELECCIONAR MES</Text>
+              <TouchableOpacity onPress={() => setMesModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={MESES}
+              keyExtractor={(item) => String(item.value)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.modalItem, selectedMes === item.value && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedMes(item.value);
+                    setMesModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.modalItemText, selectedMes === item.value && styles.modalItemTextActive]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Anio Modal Selector */}
+      <Modal visible={anioModalVisible} transparent animationType="fade" onRequestClose={() => setAnioModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>SELECCIONAR AÑO</Text>
+              <TouchableOpacity onPress={() => setAnioModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={ANIOS}
+              keyExtractor={(item) => String(item)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.modalItem, selectedAnio === item && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedAnio(item);
+                    setAnioModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.modalItemText, selectedAnio === item && styles.modalItemTextActive]}>
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
+  container: {
+    flex: 1,
+    backgroundColor: '#16181d'
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Colors.primaryFixed,
-    alignItems: 'center', justifyContent: 'center',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+    backgroundColor: '#1a1c23'
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
   },
   headerTitle: {
-    fontSize: 16, fontWeight: '900', letterSpacing: -0.5,
-    color: Colors.onSurface, textTransform: 'uppercase',
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#e11d48',
+    letterSpacing: 0.5
   },
-  emergencyBtn: {
-    width: 36, height: 36, borderRadius: Radius.lg,
-    backgroundColor: Colors.surfaceContainerLow,
-    alignItems: 'center', justifyContent: 'center',
+  screenDesc: {
+    color: '#94a3b8',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 20
   },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.lg },
-  overline: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 1.2,
-    color: Colors.primary, textTransform: 'uppercase',
-    marginBottom: 3,
+  scrollView: {
+    flex: 1
   },
-  incidentId: {
-    fontSize: 26, fontWeight: '900', letterSpacing: -0.4,
-    color: Colors.onSurface, marginBottom: 3,
+  contentScroll: {
+    paddingHorizontal: 24,
+    paddingTop: 20
   },
-  incidentDesc: {
-    fontSize: 13, color: Colors.onSurfaceVariant,
-    marginBottom: Spacing.md,
+  filtersContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16
   },
-
-  timeline: { marginBottom: Spacing.lg, paddingLeft: 2 },
-  timelineItem: { flexDirection: 'row' },
-  timelineLine: { alignItems: 'center', width: 16, marginRight: Spacing.md },
-  timelineDot: {
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: Colors.surfaceContainerHighest,
-    borderWidth: 2, borderColor: Colors.surfaceContainerHigh,
+  filterSelector: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#26282f',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12
   },
-  timelineDotLast: {
-    backgroundColor: Colors.primary, borderColor: Colors.primaryFixed,
+  filterText: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5
   },
-  timelineConnector: {
-    width: 2, flex: 1, backgroundColor: Colors.surfaceContainerHighest, minHeight: 30,
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1b1d24',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    height: 46,
+    paddingHorizontal: 14,
+    marginBottom: 20
   },
-  timelineContent: { flex: 1, paddingBottom: Spacing.lg },
-  timelineLabel: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 1,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase',
-    marginBottom: 2,
+  searchInput: {
+    flex: 1,
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5
   },
-  timelineTime: {
-    fontSize: 24, fontWeight: '900', color: Colors.onSurface, letterSpacing: -0.5,
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60
   },
-  timelineDate: {
-    fontSize: 11, color: Colors.onSurfaceVariant, marginTop: 1,
+  loadingText: {
+    color: '#94a3b8',
+    marginTop: 16,
+    fontSize: 13,
+    letterSpacing: 0.5
   },
-  deltaBadge: {
-    alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 9999, marginTop: 4,
+  alertCard: {
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#26282f',
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 16
   },
-  deltaText: { fontSize: 10, fontWeight: '700' },
-  noteHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: Spacing.md,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
   },
-  noteIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  noteTitle: { fontSize: 14, fontWeight: '600', color: Colors.onSurface },
-  noteBody: {
-    fontSize: 13, color: Colors.onSurface, lineHeight: 20, marginBottom: Spacing.sm,
+  cardId: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5
   },
-  quoteBlock: {
-    borderLeftWidth: 3, borderLeftColor: Colors.primary,
-    paddingLeft: Spacing.md, paddingVertical: Spacing.xs,
-    marginVertical: Spacing.sm,
-    backgroundColor: Colors.surfaceContainerLow,
-    borderRadius: Radius.md, padding: Spacing.md,
+  statusBadge: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4
   },
-  quoteText: {
-    fontSize: 12, fontStyle: 'italic',
-    color: Colors.onSurfaceVariant, lineHeight: 18,
+  statusText: {
+    color: '#94a3b8',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5
   },
-  validationLabel: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 1,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
+  cardTitle: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 12
   },
-  validationRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  validationAvatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Colors.primaryFixed,
-    alignItems: 'center', justifyContent: 'center',
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8
   },
-  validationName: {
-    fontSize: 13, fontWeight: '700', color: Colors.onSurface,
+  metaText: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1
   },
-  validationDate: {
-    fontSize: 11, color: Colors.onSurfaceVariant, marginTop: 1,
+  pdfButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#dc2626',
+    borderRadius: 6,
+    paddingVertical: 12,
+    marginTop: 16
   },
-  inventoryHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md,
+  pdfButtonDisabled: {
+    backgroundColor: '#991b1b',
+    opacity: 0.6
   },
-  inventoryTitle: { fontSize: 14, fontWeight: '600', color: Colors.onSurface },
-  inventoryRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: Spacing.sm, gap: 8,
+  pdfButtonText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5
   },
-  inventoryName: {
-    flex: 1, fontSize: 13, fontWeight: '600', color: Colors.onSurface,
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 12
   },
-  inventoryStatus: {
-    fontSize: 10, fontWeight: '700', textTransform: 'uppercase',
+  emptyText: {
+    color: '#64748b',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 20
   },
-  // Removed legalBtn styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: 400,
+    backgroundColor: '#1b1d24',
+    borderRadius: 12,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#26282f'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  modalTitle: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1
+  },
+  modalItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f'
+  },
+  modalItemActive: {
+    backgroundColor: '#af101a20'
+  },
+  modalItemText: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  modalItemTextActive: {
+    color: '#e11d48',
+    fontWeight: '800'
+  }
 });
