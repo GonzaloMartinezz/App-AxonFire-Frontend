@@ -181,6 +181,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
 
   // Fetch de datos ───────────────────────────────────────────
   const fetchData = useCallback(async () => {
+    if (!token) return;
     setErrorMsg(null);
     try {
       let activeAlertaId = alertaId;
@@ -193,7 +194,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           console.log('AdminAttendanceBoardScreen - Rango de fechas para consulta:', { desde, hasta });
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
             headers: authHeaders(),
-            data: { fecha_desde: desde, fecha_hasta: hasta },
+            params: { fecha_desde: desde, fecha_hasta: hasta },
             timeout: 1500
           });
           const data = resAlertas.data;

@@ -78,6 +78,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
   const [filtro, setFiltro] = useState('Activas');
 
   async function cargarAlertas(esRefresh = false) {
+    if (!token) return;
     if (esRefresh) setRefrescando(true);
     else setCargando(true);
     setError(null);
@@ -95,7 +96,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        data: { fecha_desde: desde, fecha_hasta: hasta },
+        params: { fecha_desde: desde, fecha_hasta: hasta },
         timeout: 3000,
       });
 
@@ -163,7 +164,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
 
   useEffect(() => {
     cargarAlertas();
-  }, []);
+  }, [token]);
 
   // Filtrado local
   const filtradas = alertas.filter((a) => {

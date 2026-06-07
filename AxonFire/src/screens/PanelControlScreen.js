@@ -107,6 +107,7 @@ export default function PanelControlScreen({ navigation }) {
   const [error, setError] = useState(null);
 
   async function cargarDatos(esRefresh = false) {
+    if (!token) return;
     if (esRefresh) setRefrescando(true);
     else setCargando(true);
     setError(null);
@@ -122,7 +123,7 @@ export default function PanelControlScreen({ navigation }) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        data: { fecha_desde: desde, fecha_hasta: hasta },
+        params: { fecha_desde: desde, fecha_hasta: hasta },
         timeout: 3000,
       });
 
@@ -143,7 +144,7 @@ export default function PanelControlScreen({ navigation }) {
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [token]);
 
   // ── Cálculo de estadísticas ───────────────────────────────────────────────
 
