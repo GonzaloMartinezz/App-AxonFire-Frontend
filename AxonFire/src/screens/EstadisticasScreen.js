@@ -96,6 +96,7 @@ export default function EstadisticasScreen({ navigation }) {
   const [participationList, setParticipationList] = useState([]);
 
   const loadData = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     try {
       const headers = {
@@ -107,6 +108,8 @@ export default function EstadisticasScreen({ navigation }) {
       const desde = new Date(selectedAnio, selectedMes, 1).toISOString();
       const hasta = new Date(selectedAnio, selectedMes + 1, 0, 23, 59, 59, 999).toISOString();
 
+      console.log('EstadisticasScreen - Rango de fechas para consulta:', { desde, hasta });
+
       let alertsData = [];
       let responsesData = [];
 
@@ -114,7 +117,7 @@ export default function EstadisticasScreen({ navigation }) {
       try {
         const resAlerts = await axios.get(`${API_BASE_URL}/alerta/rango`, {
           headers,
-          data: { fecha_desde: desde, fecha_hasta: hasta },
+          params: { fecha_desde: desde, fecha_hasta: hasta },
           timeout: 5000
         });
         alertsData = resAlerts.data?.alertas || [];

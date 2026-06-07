@@ -107,6 +107,7 @@ export default function PanelControlScreen({ navigation }) {
   const [error, setError] = useState(null);
 
   async function cargarDatos(esRefresh = false) {
+    if (!token) return;
     if (esRefresh) setRefrescando(true);
     else setCargando(true);
     setError(null);
@@ -115,12 +116,14 @@ export default function PanelControlScreen({ navigation }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+      console.log('PanelControlScreen - Rango de fechas para consulta:', { desde, hasta });
+
       const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        data: { fecha_desde: desde, fecha_hasta: hasta },
+        params: { fecha_desde: desde, fecha_hasta: hasta },
         timeout: 3000,
       });
 
@@ -141,7 +144,7 @@ export default function PanelControlScreen({ navigation }) {
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [token]);
 
   // ── Cálculo de estadísticas ───────────────────────────────────────────────
 

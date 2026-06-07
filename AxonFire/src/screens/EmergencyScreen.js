@@ -283,7 +283,7 @@ export default function EmergencyScreen({ route, navigation }) {
         staysActiveInBackground: true 
       });
       const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/siren.wav'),
+        require('../../assets/siren.mp3'),
         { isLooping: true, volume: 1.0 }
       );
       soundRef.current = sound;
@@ -310,6 +310,7 @@ export default function EmergencyScreen({ route, navigation }) {
 
   // ── Cargar detalles de la alerta y respuestas unificadas ───────────────────
   const fetchEmergencyData = useCallback(async () => {
+    if (!token) return;
     let activeAlertaId = resolvedAlertaId || alertaId;
 
     setLoadingAlerta(true);
@@ -320,11 +321,14 @@ export default function EmergencyScreen({ route, navigation }) {
       // 1. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
       if (!activeAlertaId) {
         try {
+          const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const hasta = new Date().toISOString();
+          console.log('EmergencyScreen - Rango de fechas para consulta:', { desde, hasta });
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
             headers,
-            data: {
-              fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-              fecha_hasta: new Date().toISOString()
+            params: {
+              fecha_desde: desde,
+              fecha_hasta: hasta
             }
           });
           const data = resAlertas.data;

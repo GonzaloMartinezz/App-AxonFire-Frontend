@@ -23,10 +23,14 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     const fetchLatestAlert = async () => {
+      if (!token) return;
       try {
+        const desde = "2020-01-01";
+        const hasta = "2030-01-01";
+        console.log('HomeScreen - Rango de fechas para consulta:', { desde, hasta });
         const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
           headers: { Authorization: `Bearer ${token}` },
-          data: { fecha_desde: "2020-01-01", fecha_hasta: "2030-01-01" }
+          params: { fecha_desde: desde, fecha_hasta: hasta }
         });
         if (res.data && res.data.alertas && res.data.alertas.length > 0) {
           const sorted = res.data.alertas.sort((a,b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));

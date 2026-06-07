@@ -78,6 +78,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
   const [filtro, setFiltro] = useState('Activas');
 
   async function cargarAlertas(esRefresh = false) {
+    if (!token) return;
     if (esRefresh) setRefrescando(true);
     else setCargando(true);
     setError(null);
@@ -88,12 +89,14 @@ export default function AlertasVisualesScreen({ navigation, route }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+      console.log('AlertasVisualesScreen - Rango de fechas para consulta:', { desde, hasta });
+
       const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        data: { fecha_desde: desde, fecha_hasta: hasta },
+        params: { fecha_desde: desde, fecha_hasta: hasta },
         timeout: 3000,
       });
 
@@ -161,7 +164,7 @@ export default function AlertasVisualesScreen({ navigation, route }) {
 
   useEffect(() => {
     cargarAlertas();
-  }, []);
+  }, [token]);
 
   // Filtrado local
   const filtradas = alertas.filter((a) => {
