@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -103,6 +104,22 @@ function getMockTools() {
   ];
 }
 
+function groupDetailsBySector(detalles) {
+  const groups = {};
+  if (!Array.isArray(detalles)) return [];
+  detalles.forEach(d => {
+    const sectorName = d.inventarioId?.sectorId?.nombre_sector || d.inventarioId?.sector?.nombre_sector || 'SIN SECTOR';
+    if (!groups[sectorName]) {
+      groups[sectorName] = [];
+    }
+    groups[sectorName].push(d);
+  });
+  return Object.entries(groups).map(([nombre_sector, items]) => ({
+    nombre_sector,
+    items
+  }));
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function WeeklyChecklistScreen({ navigation, route }) {
@@ -137,7 +154,14 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   // ── State for Inventory Tab ─────────────────────────────────────────────
   const [herramientas, setHerramientas] = useState([]);
   const [inventoryItems, setInventoryItems] = useState({}); // { [id]: { status, justification } }
+  const [forceShowBaseInventoryList, setForceShowBaseInventoryList] = useState(false);
   const [submittingInventory, setSubmittingInventory] = useState(false);
+  const [historialCuartel, setHistorialCuartel] = useState([]);
+  const [ultimoCheckCuartel, setUltimoCheckCuartel] = useState(null);
+  const [cargandoHistorialCuartel, setCargandoHistorialCuartel] = useState(false);
+  const [auditCuartelModalVisible, setAuditCuartelModalVisible] = useState(false);
+  const [checklistCuartelSeleccionado, setChecklistCuartelSeleccionado] = useState(null);
+  const [historialModalVisible, setHistorialModalVisible] = useState(false);
 
   // ── State for Maintenance Tab ───────────────────────────────────────────
   const [maintenance, setMaintenance] = useState({
@@ -153,6 +177,9 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   const [lastCheckDate, setLastCheckDate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submittingMaint, setSubmittingMaint] = useState(false);
+  const [maintBypassed, setMaintBypassed] = useState(false);
+
+  const isMaintBlocked = blocked && !maintBypassed;
 
   // ── State for Daily Checklist Tab ───────────────────────────────────────
   const [sectores, setSectores]           = useState([]);
@@ -171,11 +198,38 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   );
   const [cargandoCamiones, setCargandoCamiones] = useState(false);
 
+  // Modal de auditoría del último chequeo
+  const [ultimoCheckModalVisible, setUltimoCheckModalVisible] = useState(false);
+  const [ultimoCheckSeleccionado, setUltimoCheckSeleccionado] = useState(null);
+
   // ── Load data on mount ──────────────────────────────────────────────────
 
   useEffect(() => {
     loadData();
   }, []);
+
+  const fetchHistorialCuartel = async () => {
+    setCargandoHistorialCuartel(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/checklist_cuartel/?t=${Date.now()}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.sort((a, b) => new Date(b.fecha_control) - new Date(a.fecha_control));
+          setHistorialCuartel(data);
+          if (data.length > 0) {
+            setUltimoCheckCuartel(data[0]);
+          } else {
+            setUltimoCheckCuartel(null);
+          }
+        }
+      }
+    } catch (err) {
+      console.log('Error al cargar historial de cuartel:', err);
+    } finally {
+      setCargandoHistorialCuartel(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -183,7 +237,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       // 1. Fetch tools (ensuring base items like radios and chainsaw are loaded)
       let tools = [];
       try {
-        const toolsRes = await fetch(`${API_BASE_URL}/herramientas/`, { headers });
+        const toolsRes = await fetch(`${API_BASE_URL}/herramientas/?t=${Date.now()}`, { headers });
         if (toolsRes.ok) {
           const data = await toolsRes.json();
           tools = Array.isArray(data) ? data : [];
@@ -213,6 +267,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         initialInv[tool.id] = { status: null, justification: '' };
       });
       setInventoryItems(initialInv);
+      setForceShowBaseInventoryList(false);
 
       // 2. Check 7-day lockout for Maintenance Tab
       let mHist = [];
@@ -246,6 +301,9 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       // 3. Load available trucks for Daily tab selector
       await cargarCamionesDisponibles();
 
+      // 4. Load base inventory history
+      await fetchHistorialCuartel();
+
     } catch (err) {
       console.warn('Error loading checklist data:', err);
     } finally {
@@ -258,10 +316,31 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   async function cargarCamionesDisponibles() {
     setCargandoCamiones(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/camiones/activos`, { headers });
+      const res = await fetch(`${API_BASE_URL}/camiones/activos?t=${Date.now()}`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setCamionesDisponibles(Array.isArray(data) ? data : []);
+        const camiones = Array.isArray(data) ? data : [];
+        
+        // Cargar en paralelo el historial más reciente para cada camión
+        const camionesConHistorial = await Promise.all(
+          camiones.map(async (camion) => {
+            try {
+              const histRes = await fetch(`${API_BASE_URL}/checklist/historial/${camion.id}?t=${Date.now()}`, { headers });
+              if (histRes.ok) {
+                const histData = await histRes.json();
+                if (Array.isArray(histData) && histData.length > 0) {
+                  // Guardar el chequeo más reciente
+                  return { ...camion, ultimoCheck: histData[0] };
+                }
+              }
+            } catch (histErr) {
+              console.log('Error cargando historial de camión:', camion.id, histErr);
+            }
+            return { ...camion, ultimoCheck: null };
+          })
+        );
+        
+        setCamionesDisponibles(camionesConHistorial);
       }
     } catch (err) {
       console.log('Error cargando camiones para tab diario:', err);
@@ -273,6 +352,35 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   // ── Daily Checklist: Select truck and load its inventory ────────────────
 
   async function seleccionarCamion(camion) {
+    const tieneControlHoy = camion.ultimoCheck && esDeHoy(camion.ultimoCheck.fecha_control);
+    if (tieneControlHoy) {
+      const bomberoNombre = camion.ultimoCheck.usuarioId?.bombero 
+        ? `${camion.ultimoCheck.usuarioId.bombero.nombre} ${camion.ultimoCheck.usuarioId.bombero.apellido}`
+        : camion.ultimoCheck.usuarioId?.nombre_usuario || 'un bombero';
+      
+      const horaText = new Date(camion.ultimoCheck.fecha_control).toLocaleTimeString('es-AR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      if (Platform.OS === 'web') {
+        const confirmar = window.confirm(
+          `¡Atención! El ${camion.nombre_camion?.toUpperCase()} ya fue controlado hoy a las ${horaText} por ${bomberoNombre}.\n\n¿Deseas iniciar un nuevo control de inventario de todas formas?`
+        );
+        if (!confirmar) return;
+      } else {
+        Alert.alert(
+          '⚠️ Móvil ya Controlado',
+          `El ${camion.nombre_camion?.toUpperCase()} ya fue controlado hoy a las ${horaText} por ${bomberoNombre}.\n\n¿Deseas iniciar un nuevo control de inventario de todas formas?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Iniciar Nuevo Control', style: 'destructive', onPress: () => setCamionSeleccionado(camion) }
+          ]
+        );
+        return;
+      }
+    }
+    
     setCamionSeleccionado(camion);
   }
 
@@ -300,12 +408,27 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
   async function cargarInventarioDiario(idCamion) {
     const res = await fetch(
-      `${API_BASE_URL}/camiones_inventario/camion/${idCamion}/agrupado`,
+      `${API_BASE_URL}/camiones_inventario/camion/${idCamion}/agrupado?t=${Date.now()}`,
       { headers }
     );
     if (!res.ok) throw new Error(`Error ${res.status}`);
     const data = await res.json();
-    const lista = Array.isArray(data) ? data : [];
+    
+    // Transform Record<string, InventarioItem[]> to Array of sectors
+    let lista = [];
+    if (Array.isArray(data)) {
+      lista = data;
+    } else if (data && typeof data === 'object') {
+      lista = Object.entries(data).map(([nombre_sector, herramientas]) => ({
+        nombre_sector,
+        herramientas: (herramientas || []).map(item => ({
+          id: item.inventarioId,
+          herramienta: item.herramienta,
+          cantidad_herramienta: item.cantidad
+        }))
+      }));
+    }
+    
     setSectores(lista);
 
     const estadoInicial = {};
@@ -317,7 +440,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
   async function cargarFaltantesAyer(idCamion) {
     try {
-      const res = await fetch(`${API_BASE_URL}/checklist/historial/${idCamion}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/checklist/historial/${idCamion}?t=${Date.now()}`, { headers });
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const historial = await res.json();
       if (!Array.isArray(historial) || historial.length === 0) return;
@@ -402,12 +525,75 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         console.log('Error guardando copia de respaldo local:', e);
       }
 
+      // ── OPTIMISTIC UPDATE: Actualizar la interfaz de manera inmediata ──
+      const nuevoCheck = {
+        fecha_control: new Date().toISOString(),
+        usuarioId: {
+          id: userId,
+          nombre_usuario: user?.nombre_usuario || 'Bombero',
+          bombero: user?.bombero ? {
+            nombre: user.bombero.nombre,
+            apellido: user.bombero.apellido
+          } : null
+        },
+        detalles: Object.entries(estadoItemsDiario).map(([inventarioId, controlado]) => {
+          let toolObj = null;
+          let sectorObj = null;
+          for (const sector of sectores) {
+            const found = sector.herramientas?.find(h => h.id === inventarioId);
+            if (found) {
+              toolObj = found;
+              sectorObj = sector;
+              break;
+            }
+          }
+          return {
+            id: Math.random().toString(),
+            controlado,
+            observaciones: controlado === 'FALTANTE' ? observacionesDiario[inventarioId] : null,
+            inventarioId: {
+              id: inventarioId,
+              herramientaId: toolObj ? {
+                id: toolObj.id,
+                nombre_herramienta: toolObj.herramienta?.nombre_herramienta || 'Herramienta'
+              } : null,
+              herramienta: toolObj ? {
+                nombre_herramienta: toolObj.herramienta?.nombre_herramienta || 'Herramienta'
+              } : { nombre_herramienta: 'Herramienta' },
+              sectorId: sectorObj ? {
+                id: sectorObj.nombre_sector,
+                nombre_sector: sectorObj.nombre_sector
+              } : null,
+              sector: sectorObj ? {
+                nombre_sector: sectorObj.nombre_sector
+              } : { nombre_sector: 'Sector' }
+            }
+          };
+        })
+      };
+
+      setCamionesDisponibles(prev => prev.map(c => {
+        if (c.id === camionSeleccionado.id) {
+          return { ...c, ultimoCheck: nuevoCheck };
+        }
+        return c;
+      }));
+
+      // Refrescar camiones desde la API en segundo plano con cache-buster
+      cargarCamionesDisponibles().catch(err => console.log('Error refreshing backend checklist state:', err));
+
       if (Platform.OS === 'web') {
         alert('El checklist diario fue guardado correctamente.');
+        // Reset para volver al grid con los datos actualizados
+        setCamionSeleccionado(null);
+        setSectores([]);
+        setEstadoItemsDiario({});
+        setObservacionesDiario({});
+        setAcompanantes([]);
       } else {
         Alert.alert('✅ Guardado', 'El checklist diario fue guardado correctamente.', [
           { text: 'OK', onPress: () => {
-            // Reset para permitir otro checklist
+            // Reset para volver al grid con los datos actualizados
             setCamionSeleccionado(null);
             setSectores([]);
             setEstadoItemsDiario({});
@@ -447,6 +633,30 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       [id]: { ...prev[id], justification: text },
     }));
   }, []);
+
+  const prefillBaseInventoryFromLastCheck = useCallback(() => {
+    if (!ultimoCheckCuartel || !Array.isArray(ultimoCheckCuartel.detalles)) return;
+
+    const prefilledInv = {};
+    // First, populate all tools with null state
+    herramientas.forEach(tool => {
+      prefilledInv[tool.id] = { status: null, justification: '' };
+    });
+
+    // Then overwrite with values from the last check details
+    ultimoCheckCuartel.detalles.forEach(d => {
+      const toolId = d.herramienta_id || d.herramientaId || (d.herramienta && d.herramienta.id);
+      if (toolId && prefilledInv[toolId] !== undefined) {
+        prefilledInv[toolId] = {
+          status: d.controlado === 'CHEQUEADO' ? 'ok' : 'fail',
+          justification: d.observaciones || ''
+        };
+      }
+    });
+
+    setInventoryItems(prefilledInv);
+    setForceShowBaseInventoryList(true);
+  }, [ultimoCheckCuartel, herramientas]);
 
   // ── Inventory Submit Validation ──────────────────────────────────────────
 
@@ -494,11 +704,14 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       });
       await AsyncStorage.setItem('weekly_checklist_history', JSON.stringify(history));
 
+      // Refresh base inventory history immediately
+      await fetchHistorialCuartel();
+      setForceShowBaseInventoryList(false);
+
       if (Platform.OS === 'web') {
         alert('Inventario de base guardado correctamente.');
-        navigation?.goBack();
       } else {
-        Alert.alert('Éxito', 'Inventario de base guardado correctamente.', [{ text: 'Aceptar', onPress: () => navigation?.goBack() }]);
+        Alert.alert('Éxito', 'Inventario de base guardado correctamente.');
       }
     } catch (err) {
       console.error('Error saving inventory:', err);
@@ -530,7 +743,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
     (maintenance.combustible !== 'fail' || isDamageReportComplete(maintenance.combustibleJustification)) &&
     (maintenance.aceite !== 'fail' || isDamageReportComplete(maintenance.aceiteJustification));
 
-  const canSubmitMaint = allMaintChecked && allMaintJustified && !blocked && !submittingMaint;
+  const canSubmitMaint = allMaintChecked && allMaintJustified && !isMaintBlocked && !submittingMaint;
 
   const handleSubmitMaintenance = async () => {
     if (!canSubmitMaint) return;
@@ -569,6 +782,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
       // Lockout state update
       setBlocked(true);
+      setMaintBypassed(false); // Reset extraordinary bypass
       setDaysRemaining(7);
       setLastCheckDate(payload.fecha_control);
 
@@ -591,6 +805,8 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   const totalInvItems = Object.keys(inventoryItems).length;
   const checkedInvItems = Object.values(inventoryItems).filter(i => i.status !== null).length;
   const progressPercent = totalInvItems > 0 ? Math.round((checkedInvItems / totalInvItems) * 100) : 0;
+  const baseControladoHoy = ultimoCheckCuartel && esDeHoy(ultimoCheckCuartel.fecha_control);
+  const showBaseInventoryList = !baseControladoHoy || forceShowBaseInventoryList;
 
   // Daily tab
   const totalItemsDiario = Object.keys(estadoItemsDiario).length;
@@ -665,106 +881,236 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         {/* ════════════════════════════════════════════════════════════════ */}
         {activeTab === 'inventario' && (
           <>
-            {/* Inventory Progress Bar */}
-            <View style={styles.progressContainer}>
-              <View style={styles.progressHeader}>
-                <Text style={styles.progressLabel}>PROGRESO DE INVENTARIO</Text>
-                <Text style={styles.progressValue}>{checkedInvItems}/{totalInvItems} ({progressPercent}%)</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-              </View>
-            </View>
+            {/* Último control semanal de base */}
+            {ultimoCheckCuartel ? (
+              <View style={styles.lastCheckBaseCard}>
+                <View style={styles.lastCheckBaseHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <MaterialCommunityIcons name="clipboard-check-multiple-outline" size={18} color="#22c55e" />
+                    <Text style={styles.lastCheckBaseTitle}>ÚLTIMO CONTROL DE INVENTARIO BASE</Text>
+                  </View>
+                  {esDeHoy(ultimoCheckCuartel.fecha_control) ? (
+                    <View style={styles.controlledTodayBadge}>
+                      <Text style={styles.controlledTodayText}>CONTROLADO HOY</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.daysSinceBadge}>
+                      <Text style={styles.daysSinceText}>
+                        {daysSinceDate(ultimoCheckCuartel.fecha_control) === 0
+                          ? 'HACE HORAS'
+                          : daysSinceDate(ultimoCheckCuartel.fecha_control) === 1
+                          ? 'AYER'
+                          : `HACE ${daysSinceDate(ultimoCheckCuartel.fecha_control)} DÍAS`}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                
+                <View style={styles.lastCheckBaseBody}>
+                  <View style={styles.lastCheckBaseInfoRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.lastCheckBaseLabel}>AUDITOR RESPONSABLE</Text>
+                      <Text style={styles.lastCheckBaseVal} numberOfLines={1}>
+                        {ultimoCheckCuartel.usuario?.bombero
+                          ? `${ultimoCheckCuartel.usuario.bombero.nombre} ${ultimoCheckCuartel.usuario.bombero.apellido}`
+                          : ultimoCheckCuartel.usuario?.nombre_usuario || 'Bombero de Guardia'}
+                      </Text>
+                    </View>
+                    <View style={{ width: 1, backgroundColor: '#26282f', marginHorizontal: 12 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.lastCheckBaseLabel}>FECHA Y HORA</Text>
+                      <Text style={styles.lastCheckBaseVal}>
+                        {new Date(ultimoCheckCuartel.fecha_control).toLocaleDateString('es-AR')} - {new Date(ultimoCheckCuartel.fecha_control).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                      </Text>
+                    </View>
+                  </View>
 
-            {/* Tools List */}
-            {herramientas.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <MaterialCommunityIcons name="package-variant" size={48} color="#334155" />
-                <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, fontWeight: '600' }}>
-                  No hay herramientas registradas en el cuartel.
-                </Text>
+                  <View style={styles.lastCheckBaseActions}>
+                    <TouchableOpacity
+                      style={styles.lastCheckBaseBtn}
+                      onPress={() => {
+                        setChecklistCuartelSeleccionado(ultimoCheckCuartel);
+                        setAuditCuartelModalVisible(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="eye-outline" size={14} color="#fff" />
+                      <Text style={styles.lastCheckBaseBtnText}>VER DETALLES</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.lastCheckBaseBtn, { backgroundColor: '#26282f' }]}
+                      onPress={() => {
+                        setHistorialModalVisible(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialCommunityIcons name="history" size={14} color="#94a3b8" />
+                      <Text style={[styles.lastCheckBaseBtnText, { color: '#94a3b8' }]}>HISTORIAL COMPLETO</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {baseControladoHoy && !forceShowBaseInventoryList && (
+                    <TouchableOpacity
+                      style={styles.modifyControlBtn}
+                      onPress={prefillBaseInventoryFromLastCheck}
+                      activeOpacity={0.75}
+                    >
+                      <MaterialCommunityIcons name="pencil-box-multiple-outline" size={14} color="#22c55e" />
+                      <Text style={styles.modifyControlBtnText}>MODIFICAR O REALIZAR NUEVO CONTROL</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             ) : (
-              <>
-                <View style={styles.sectionHeader}>
-                  <MaterialCommunityIcons name="package-variant-closed" size={18} color="#dc2626" />
-                  <Text style={styles.sectionTitle}>EQUIPOS E INVENTARIO DE LA BASE</Text>
-                  <View style={styles.sectionLine} />
+              <View style={[styles.lastCheckBaseCard, { borderLeftWidth: 3, borderLeftColor: '#dc2626' }]}>
+                <View style={styles.lastCheckBaseHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#dc2626" />
+                    <Text style={[styles.lastCheckBaseTitle, { color: '#dc2626' }]}>SIN CONTROL REGISTRADO</Text>
+                  </View>
                 </View>
-
-                {herramientas.map((tool) => {
-                  const data = inventoryItems[tool.id] || { status: null, justification: '' };
-                  const iconName = getToolIcon(tool.nombre_herramienta);
-                  return (
-                    <View key={tool.id}>
-                      <View style={[
-                        styles.cardItem,
-                        data.status === 'ok' && { borderLeftColor: '#22c55e' },
-                        data.status === 'fail' && { borderLeftColor: '#dc2626' },
-                      ]}>
-                        <View style={styles.cardItemLeft}>
-                          <View style={styles.toolRow}>
-                            <View style={styles.toolIconCircle}>
-                              <MaterialCommunityIcons name={iconName} size={16} color="#fca5a5" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.itemTitle}>{(tool.nombre_herramienta || '').toUpperCase()}</Text>
-                              <Text style={styles.itemSubtitle}>Stock disponible: {tool.cantidad_disponible ?? 0} uds</Text>
-                            </View>
-                          </View>
-                        </View>
-                        <View style={styles.actionButtons}>
-                          <TouchableOpacity
-                            style={[styles.iconButton, data.status === 'ok' && styles.iconButtonActive]}
-                            onPress={() => setInventoryStatus(tool.id, 'ok')}
-                          >
-                            <MaterialCommunityIcons name="check" size={18} color={data.status === 'ok' ? '#fff' : '#e2e8f0'} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.iconButton, data.status === 'fail' && styles.iconButtonFail]}
-                            onPress={() => setInventoryStatus(tool.id, 'fail')}
-                          >
-                            <MaterialCommunityIcons name="close" size={18} color={data.status === 'fail' ? '#fff' : '#e2e8f0'} />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-
-                      {/* Damage report field (mandatory justification) */}
-                      <DamageReportField
-                        visible={data.status === 'fail'}
-                        justification={data.justification}
-                        onJustificationChange={(text) => updateInventoryJustification(tool.id, text)}
-                        theme="dark"
-                      />
-                    </View>
-                  );
-                })}
-              </>
-            )}
-
-            {/* Validation warning */}
-            {!canSubmitInventory && checkedInvItems > 0 && !allInvJustified && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 }}>
-                <MaterialCommunityIcons name="alert-circle" size={14} color="#fca5a5" />
-                <Text style={{ color: '#fca5a5', fontSize: 11, fontWeight: '700' }}>
-                  Completar justificación de los ítems marcados como Falta/Roto para poder guardar.
-                </Text>
+                <View style={styles.lastCheckBaseBody}>
+                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '500' }}>
+                    Aún no se ha registrado ningún control de inventario de la base. Realiza el primer control para iniciar el historial operativo.
+                  </Text>
+                </View>
               </View>
             )}
 
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.saveButton, !canSubmitInventory && styles.saveButtonDisabled]}
-              onPress={handleSubmitInventory}
-              disabled={!canSubmitInventory}
-              activeOpacity={0.7}
-            >
-              {submittingInventory ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.saveButtonText}>GUARDAR INVENTARIO BASE</Text>
-              )}
-            </TouchableOpacity>
+            {/* Warning banner when modifying today's control */}
+            {baseControladoHoy && forceShowBaseInventoryList && (
+              <View style={styles.editModeWarningCard}>
+                <View style={styles.editModeWarningHeader}>
+                  <MaterialCommunityIcons name="alert-decagram-outline" size={20} color="#fbbf24" />
+                  <Text style={styles.editModeWarningTitle}>MODIFICANDO CONTROL DE HOY</Text>
+                </View>
+                <Text style={styles.editModeWarningText}>
+                  Estás modificando el control de inventario base registrado hoy. Puedes cambiar los estados de las herramientas y volver a guardar para actualizar el control.
+                </Text>
+                <TouchableOpacity
+                  style={styles.cancelEditBtn}
+                  onPress={() => {
+                    setForceShowBaseInventoryList(false);
+                    // Discard changes and restore state
+                    const initialInv = {};
+                    herramientas.forEach(tool => {
+                      initialInv[tool.id] = { status: null, justification: '' };
+                    });
+                    setInventoryItems(initialInv);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons name="close-circle-outline" size={14} color="#fca5a5" />
+                  <Text style={styles.cancelEditBtnText}>CANCELAR MODIFICACIÓN</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Inventory Progress Bar & Tools List & Save Button (Hidden if controlled today and not forcing edit) */}
+            {showBaseInventoryList && (
+              <>
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressHeader}>
+                    <Text style={styles.progressLabel}>PROGRESO DE INVENTARIO</Text>
+                    <Text style={styles.progressValue}>{checkedInvItems}/{totalInvItems} ({progressPercent}%)</Text>
+                  </View>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+                  </View>
+                </View>
+
+                {/* Tools List */}
+                {herramientas.length === 0 ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                    <MaterialCommunityIcons name="package-variant" size={48} color="#334155" />
+                    <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, fontWeight: '600' }}>
+                      No hay herramientas registradas en el cuartel.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.sectionHeader}>
+                      <MaterialCommunityIcons name="package-variant-closed" size={18} color="#dc2626" />
+                      <Text style={styles.sectionTitle}>EQUIPOS E INVENTARIO DE LA BASE</Text>
+                      <View style={styles.sectionLine} />
+                    </View>
+
+                    {herramientas.map((tool) => {
+                      const data = inventoryItems[tool.id] || { status: null, justification: '' };
+                      const iconName = getToolIcon(tool.nombre_herramienta);
+                      return (
+                        <View key={tool.id}>
+                          <View style={[
+                            styles.cardItem,
+                            data.status === 'ok' && { borderLeftColor: '#22c55e' },
+                            data.status === 'fail' && { borderLeftColor: '#dc2626' },
+                          ]}>
+                            <View style={styles.cardItemLeft}>
+                              <View style={styles.toolRow}>
+                                <View style={styles.toolIconCircle}>
+                                  <MaterialCommunityIcons name={iconName} size={16} color="#fca5a5" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.itemTitle}>{(tool.nombre_herramienta || '').toUpperCase()}</Text>
+                                  <Text style={styles.itemSubtitle}>Stock disponible: {tool.cantidad_disponible ?? 0} uds</Text>
+                                </View>
+                              </View>
+                            </View>
+                            <View style={styles.actionButtons}>
+                              <TouchableOpacity
+                                style={[styles.iconButton, data.status === 'ok' && styles.iconButtonActive]}
+                                onPress={() => setInventoryStatus(tool.id, 'ok')}
+                              >
+                                <MaterialCommunityIcons name="check" size={18} color={data.status === 'ok' ? '#fff' : '#e2e8f0'} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.iconButton, data.status === 'fail' && styles.iconButtonFail]}
+                                onPress={() => setInventoryStatus(tool.id, 'fail')}
+                              >
+                                <MaterialCommunityIcons name="close" size={18} color={data.status === 'fail' ? '#fff' : '#e2e8f0'} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+
+                          {/* Damage report field (mandatory justification) */}
+                          <DamageReportField
+                            visible={data.status === 'fail'}
+                            justification={data.justification}
+                            onJustificationChange={(text) => updateInventoryJustification(tool.id, text)}
+                            theme="dark"
+                          />
+                        </View>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Validation warning */}
+                {!canSubmitInventory && checkedInvItems > 0 && !allInvJustified && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 }}>
+                    <MaterialCommunityIcons name="alert-circle" size={14} color="#fca5a5" />
+                    <Text style={{ color: '#fca5a5', fontSize: 11, fontWeight: '700' }}>
+                      Completar justificación de los ítems marcados como Falta/Roto para poder guardar.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[styles.saveButton, !canSubmitInventory && styles.saveButtonDisabled]}
+                  onPress={handleSubmitInventory}
+                  disabled={!canSubmitInventory}
+                  activeOpacity={0.7}
+                >
+                  {submittingInventory ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>GUARDAR INVENTARIO BASE</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </>
         )}
 
@@ -775,16 +1121,36 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           <>
             {/* Maintenance lockout state */}
             {blocked ? (
-              <View style={styles.blockedBanner}>
-                <View style={styles.blockedIconRow}>
-                  <MaterialCommunityIcons name="lock-clock" size={22} color="#fbbf24" />
-                  <Text style={styles.blockedTitle}>CONTROL NO DISPONIBLE</Text>
+              maintBypassed ? (
+                <View style={[styles.blockedBanner, { borderColor: '#f59e0b', backgroundColor: '#f59e0b10' }]}>
+                  <View style={styles.blockedIconRow}>
+                    <MaterialCommunityIcons name="alert-decagram-outline" size={22} color="#f59e0b" />
+                    <Text style={[styles.blockedTitle, { color: '#f59e0b' }]}>CONTROL EXTRAORDINARIO</Text>
+                  </View>
+                  <Text style={[styles.blockedText, { color: '#f59e0b' }]}>
+                    Aún no han transcurrido 7 días desde el último control semanal ({lastCheckDate ? new Date(lastCheckDate).toLocaleDateString('es-AR') : '—'}). Estás realizando una inspección excepcional fuera de término.
+                  </Text>
                 </View>
-                <Text style={styles.blockedText}>
-                  El último control semanal de mantenimiento fue registrado el {lastCheckDate ? new Date(lastCheckDate).toLocaleDateString('es-AR') : '—'}.
-                  {'\n'}Faltan <Text style={{ color: '#fbbf24', fontWeight: '900' }}>{daysRemaining} días</Text> para habilitar el próximo checklist.
-                </Text>
-              </View>
+              ) : (
+                <View style={styles.blockedBanner}>
+                  <View style={styles.blockedIconRow}>
+                    <MaterialCommunityIcons name="lock-clock" size={22} color="#fbbf24" />
+                    <Text style={styles.blockedTitle}>CONTROL NO DISPONIBLE</Text>
+                  </View>
+                  <Text style={styles.blockedText}>
+                    El último control semanal de mantenimiento fue registrado el {lastCheckDate ? new Date(lastCheckDate).toLocaleDateString('es-AR') : '—'}.
+                    {'\n'}Faltan <Text style={{ color: '#fbbf24', fontWeight: '900' }}>{daysRemaining} días</Text> para habilitar el próximo checklist.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.bypassButton}
+                    onPress={() => setMaintBypassed(true)}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#0f172a" />
+                    <Text style={styles.bypassButtonText}>FORZAR CONTROL EXTRAORDINARIO</Text>
+                  </TouchableOpacity>
+                </View>
+              )
             ) : (
               <View style={[styles.blockedBanner, { borderColor: '#15803d', backgroundColor: '#14532d20' }]}>
                 <View style={styles.blockedIconRow}>
@@ -825,15 +1191,15 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
                     style={[styles.iconButton, maintenance.encendido === 'ok' && styles.iconButtonActive]}
-                    onPress={() => !blocked && setMaintField('encendido', 'ok')}
-                    disabled={blocked}
+                    onPress={() => !isMaintBlocked && setMaintField('encendido', 'ok')}
+                    disabled={isMaintBlocked}
                   >
                     <Text style={[styles.btnText, maintenance.encendido === 'ok' && styles.btnTextActive]}>OK</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.iconButton, maintenance.encendido === 'fail' && styles.iconButtonFail, { width: 70 }]}
-                    onPress={() => !blocked && setMaintField('encendido', 'fail')}
-                    disabled={blocked}
+                    onPress={() => !isMaintBlocked && setMaintField('encendido', 'fail')}
+                    disabled={isMaintBlocked}
                   >
                     <Text style={[styles.btnText, maintenance.encendido === 'fail' && styles.btnTextActive]}>Fallo</Text>
                   </TouchableOpacity>
@@ -866,15 +1232,15 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
                     style={[styles.iconButton, maintenance.combustible === 'ok' && styles.iconButtonActive]}
-                    onPress={() => !blocked && setMaintField('combustible', 'ok')}
-                    disabled={blocked}
+                    onPress={() => !isMaintBlocked && setMaintField('combustible', 'ok')}
+                    disabled={isMaintBlocked}
                   >
                     <Text style={[styles.btnText, maintenance.combustible === 'ok' && styles.btnTextActive]}>OK</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.iconButton, maintenance.combustible === 'fail' && styles.iconButtonFail, { width: 70 }]}
-                    onPress={() => !blocked && setMaintField('combustible', 'fail')}
-                    disabled={blocked}
+                    onPress={() => !isMaintBlocked && setMaintField('combustible', 'fail')}
+                    disabled={isMaintBlocked}
                   >
                     <Text style={[styles.btnText, maintenance.combustible === 'fail' && styles.btnTextActive]}>Bajo</Text>
                   </TouchableOpacity>
@@ -907,15 +1273,15 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
                     style={[styles.iconButton, maintenance.aceite === 'ok' && styles.iconButtonActive]}
-                    onPress={() => !blocked && setMaintField('aceite', 'ok')}
-                    disabled={blocked}
+                    onPress={() => !isMaintBlocked && setMaintField('aceite', 'ok')}
+                    disabled={isMaintBlocked}
                   >
                     <Text style={[styles.btnText, maintenance.aceite === 'ok' && styles.btnTextActive]}>OK</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.iconButton, maintenance.aceite === 'fail' && styles.iconButtonFail, { width: 70 }]}
-                    onPress={() => !blocked && setMaintField('aceite', 'fail')}
-                    disabled={blocked}
+                    onPress={() => !isMaintBlocked && setMaintField('aceite', 'fail')}
+                    disabled={isMaintBlocked}
                   >
                     <Text style={[styles.btnText, maintenance.aceite === 'fail' && styles.btnTextActive]}>Bajo</Text>
                   </TouchableOpacity>
@@ -950,7 +1316,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <Text style={styles.saveButtonText}>
-                  {blocked ? 'BLOQUEADO — ESPERAR 7 DÍAS' : 'GUARDAR CHECKLIST MANTENIMIENTO'}
+                  {isMaintBlocked ? 'BLOQUEADO — ESPERAR 7 DÍAS' : 'GUARDAR CHECKLIST MANTENIMIENTO'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -992,25 +1358,81 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
                 {/* Grid de camiones */}
                 <View style={styles.gridCamiones}>
-                  {camionesDisponibles.map(camion => (
-                    <TouchableOpacity
-                      key={camion.id}
-                      style={styles.cardCamion}
-                      onPress={() => seleccionarCamion(camion)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={styles.iconoCamionBox}>
-                        <MaterialCommunityIcons name="fire-truck" size={28} color="#dc2626" />
-                      </View>
-                      <Text style={styles.nombreCamion} numberOfLines={2}>
-                        {camion.nombre_camion?.toUpperCase()}
-                      </Text>
-                      <View style={styles.estadoCamionRow}>
-                        <View style={styles.puntoVerde} />
-                        <Text style={styles.estadoCamionText}>ACTIVO</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  {camionesDisponibles.map(camion => {
+                    const ultimoCheck = camion.ultimoCheck;
+                    const controladoHoy = ultimoCheck && esDeHoy(ultimoCheck.fecha_control);
+                    
+                    let checkInfoText = 'Sin chequeos';
+                    let autorText = '';
+                    if (ultimoCheck) {
+                      const fecha = new Date(ultimoCheck.fecha_control);
+                      const dia = String(fecha.getDate()).padStart(2, '0');
+                      const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+                      const hora = String(fecha.getHours()).padStart(2, '0');
+                      const mins = String(fecha.getMinutes()).padStart(2, '0');
+                      
+                      checkInfoText = controladoHoy 
+                        ? `Hoy - ${hora}:${mins} hs` 
+                        : `${dia}/${mes} - ${hora}:${mins} hs`;
+                      
+                      const userBombero = ultimoCheck.usuarioId?.bombero;
+                      autorText = userBombero 
+                        ? `${userBombero.nombre} ${userBombero.apellido.substring(0, 1)}.`
+                        : ultimoCheck.usuarioId?.nombre_usuario || '';
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={camion.id}
+                        style={[
+                          styles.cardCamion,
+                          controladoHoy && { borderColor: '#22c55e', borderWidth: 1.5 }
+                        ]}
+                        onPress={() => seleccionarCamion(camion)}
+                        activeOpacity={0.75}
+                      >
+                        {ultimoCheck && (
+                          <TouchableOpacity 
+                            style={styles.eyeIconBadge}
+                            onPress={() => {
+                              setUltimoCheckSeleccionado({
+                                ...ultimoCheck,
+                                nombre_camion: camion.nombre_camion
+                              });
+                              setUltimoCheckModalVisible(true);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <MaterialCommunityIcons name="eye-outline" size={16} color="#94a3b8" />
+                          </TouchableOpacity>
+                        )}
+                        <View style={[styles.iconoCamionBox, controladoHoy && { backgroundColor: '#052e16' }]}>
+                          <MaterialCommunityIcons name="fire-truck" size={28} color={controladoHoy ? '#22c55e' : '#dc2626'} />
+                        </View>
+                        <Text style={styles.nombreCamion} numberOfLines={2}>
+                          {camion.nombre_camion?.toUpperCase()}
+                        </Text>
+                        
+                        <View style={styles.checkStatusInfo}>
+                          {controladoHoy ? (
+                            <View style={styles.badgeControladoHoy}>
+                              <Text style={styles.badgeControladoHoyText}>CONTROLADO HOY</Text>
+                            </View>
+                          ) : (
+                            <Text style={styles.ultimoCheckLabel}>ÚLTIMO CONTROL</Text>
+                          )}
+                          <Text style={[styles.ultimoCheckVal, controladoHoy && { color: '#22c55e', fontWeight: '800' }]}>
+                            {checkInfoText}
+                          </Text>
+                          {autorText ? (
+                            <Text style={styles.ultimoCheckAutor} numberOfLines={1}>
+                              Por: {autorText}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </>
             )}
@@ -1223,6 +1645,313 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           </>
         )}
       </ScrollView>
+
+      {/* Modal de Auditoría */}
+      <Modal
+        visible={ultimoCheckModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setUltimoCheckModalVisible(false)}
+      >
+        <View style={styles.auditCenteredView}>
+          <View style={styles.auditModalView}>
+            {/* Cabecera */}
+            <View style={styles.auditHeader}>
+              <View>
+                <Text style={styles.auditTitle}>
+                  {ultimoCheckSeleccionado?.nombre_camion
+                    ? `DETALLE DE CONTROL — ${ultimoCheckSeleccionado.nombre_camion.toUpperCase()}`
+                    : 'DETALLE DE CONTROL DE MÓVIL'}
+                </Text>
+                <Text style={styles.auditDesc}>
+                  Último chequeo: {ultimoCheckSeleccionado ? new Date(ultimoCheckSeleccionado.fecha_control).toLocaleDateString('es-AR') : ''}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setUltimoCheckModalVisible(false)}
+                style={styles.auditCloseIcon}
+              >
+                <MaterialCommunityIcons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Subheader con Auditor */}
+            {ultimoCheckSeleccionado && (
+              <View style={styles.auditAuditorBox}>
+                <MaterialCommunityIcons name="account-circle-outline" size={16} color="#94a3b8" />
+                <Text style={styles.auditAuditorText}>
+                  Auditor responsable:{' '}
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>
+                    {ultimoCheckSeleccionado.usuarioId?.bombero
+                      ? `${ultimoCheckSeleccionado.usuarioId.bombero.nombre} ${ultimoCheckSeleccionado.usuarioId.bombero.apellido}`
+                      : ultimoCheckSeleccionado.usuarioId?.nombre_usuario || 'Bombero de Guardia'}
+                  </Text>
+                </Text>
+              </View>
+            )}
+
+            {/* Lista Scrollable */}
+            <ScrollView style={styles.auditScroll} showsVerticalScrollIndicator={false}>
+              {ultimoCheckSeleccionado && groupDetailsBySector(ultimoCheckSeleccionado.detalles).map((group) => (
+                <View key={group.nombre_sector} style={styles.auditSectorBlock}>
+                  <View style={styles.auditSectorHeader}>
+                    <MaterialCommunityIcons name="archive-outline" size={14} color="#dc2626" />
+                    <Text style={styles.auditSectorTitle}>{group.nombre_sector.toUpperCase()}</Text>
+                  </View>
+
+                  {group.items.map((detalle) => {
+                    const herramientaNombre =
+                      detalle.inventarioId?.herramientaId?.nombre_herramienta ||
+                      detalle.inventarioId?.herramienta?.nombre_herramienta ||
+                      'Herramienta';
+                    const esChequeado = detalle.controlado === 'CHEQUEADO';
+
+                    return (
+                      <View key={detalle.id} style={styles.auditToolRow}>
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <Text style={styles.auditToolName}>{herramientaNombre.toUpperCase()}</Text>
+                          {detalle.observaciones ? (
+                            <Text style={styles.auditToolObs}>
+                              Obs: {detalle.observaciones}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <View style={styles.auditToolStatus}>
+                          <MaterialCommunityIcons
+                            name={esChequeado ? 'check-circle' : 'close-circle'}
+                            size={18}
+                            color={esChequeado ? '#22c55e' : '#dc2626'}
+                          />
+                          <Text style={[styles.auditToolStatusText, { color: esChequeado ? '#22c55e' : '#dc2626' }]}>
+                            {esChequeado ? 'OK' : 'FALTANTE'}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </ScrollView>
+
+            {/* Botón Cerrar */}
+            <TouchableOpacity
+              style={styles.auditBtnClose}
+              onPress={() => setUltimoCheckModalVisible(false)}
+            >
+              <Text style={styles.auditBtnCloseText}>CERRAR AUDITORÍA</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Auditoría de Inventario Base */}
+      <Modal
+        visible={auditCuartelModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setAuditCuartelModalVisible(false)}
+      >
+        <View style={styles.auditCenteredView}>
+          <View style={styles.auditModalView}>
+            {/* Cabecera */}
+            <View style={styles.auditHeader}>
+              <View>
+                <Text style={styles.auditTitle}>AUDITORÍA DE BASE</Text>
+                <Text style={styles.auditDesc}>
+                  CONTROL: {checklistCuartelSeleccionado ? new Date(checklistCuartelSeleccionado.fecha_control).toLocaleDateString('es-AR') : ''}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setAuditCuartelModalVisible(false)}
+                style={styles.auditCloseIcon}
+              >
+                <MaterialCommunityIcons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Subheader con Auditor */}
+            {checklistCuartelSeleccionado && (
+              <View style={styles.auditAuditorBox}>
+                <MaterialCommunityIcons name="account-circle-outline" size={16} color="#94a3b8" />
+                <Text style={styles.auditAuditorText}>
+                  Auditor responsable:{' '}
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>
+                    {checklistCuartelSeleccionado.usuario?.bombero
+                      ? `${checklistCuartelSeleccionado.usuario.bombero.nombre} ${checklistCuartelSeleccionado.usuario.bombero.apellido}`
+                      : checklistCuartelSeleccionado.usuario?.nombre_usuario || 'Bombero de Guardia'}
+                  </Text>
+                </Text>
+              </View>
+            )}
+
+            {/* Resumen de Hallazgos */}
+            {checklistCuartelSeleccionado && (() => {
+              const totalItems = checklistCuartelSeleccionado.detalles?.length || 0;
+              const okItems = checklistCuartelSeleccionado.detalles?.filter(d => d.controlado === 'CHEQUEADO').length || 0;
+              const failItems = totalItems - okItems;
+              return (
+                <View style={styles.auditSummaryContainer}>
+                  <View style={[styles.auditSummaryBlock, { borderColor: '#22c55e' }]}>
+                    <Text style={[styles.auditSummaryNum, { color: '#22c55e' }]}>{okItems}</Text>
+                    <Text style={styles.auditSummaryLabel}>OPERATIVOS</Text>
+                  </View>
+                  <View style={[styles.auditSummaryBlock, { borderColor: failItems > 0 ? '#dc2626' : '#26282f' }]}>
+                    <Text style={[styles.auditSummaryNum, { color: failItems > 0 ? '#dc2626' : '#64748b' }]}>{failItems}</Text>
+                    <Text style={styles.auditSummaryLabel}>FALTANTES</Text>
+                  </View>
+                </View>
+              );
+            })()}
+
+            {/* Lista Scrollable */}
+            <ScrollView style={styles.auditScroll} showsVerticalScrollIndicator={false}>
+              {checklistCuartelSeleccionado && (() => {
+                const sortedDetalles = [...(checklistCuartelSeleccionado.detalles || [])].sort((a, b) => {
+                  if (a.controlado === 'FALTANTE' && b.controlado === 'CHEQUEADO') return -1;
+                  if (a.controlado === 'CHEQUEADO' && b.controlado === 'FALTANTE') return 1;
+                  const nameA = a.herramienta?.nombre_herramienta || '';
+                  const nameB = b.herramienta?.nombre_herramienta || '';
+                  return nameA.localeCompare(nameB);
+                });
+
+                return sortedDetalles.map((detalle) => {
+                  const herramientaNombre = detalle.herramienta?.nombre_herramienta || 'Herramienta';
+                  const esChequeado = detalle.controlado === 'CHEQUEADO';
+                  const iconName = getToolIcon(herramientaNombre);
+
+                  return (
+                    <View key={detalle.id} style={[styles.auditToolRow, !esChequeado && { borderLeftWidth: 3, borderLeftColor: '#dc2626' }]}>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <MaterialCommunityIcons name={iconName} size={14} color="#fca5a5" />
+                          <Text style={styles.auditToolName}>{herramientaNombre.toUpperCase()}</Text>
+                        </View>
+                        {detalle.observaciones ? (
+                          <Text style={styles.auditToolObs}>
+                            Novedad: {detalle.observaciones}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.auditToolStatus}>
+                        <MaterialCommunityIcons
+                          name={esChequeado ? 'check-circle' : 'close-circle'}
+                          size={18}
+                          color={esChequeado ? '#22c55e' : '#dc2626'}
+                        />
+                        <Text style={[styles.auditToolStatusText, { color: esChequeado ? '#22c55e' : '#dc2626' }]}>
+                          {esChequeado ? 'OK' : 'FALTANTE'}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                });
+              })()}
+            </ScrollView>
+
+            {/* Botón Cerrar */}
+            <TouchableOpacity
+              style={styles.auditBtnClose}
+              onPress={() => setAuditCuartelModalVisible(false)}
+            >
+              <Text style={styles.auditBtnCloseText}>CERRAR AUDITORÍA</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Historial Completo de Base */}
+      <Modal
+        visible={historialModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setHistorialModalVisible(false)}
+      >
+        <View style={styles.auditCenteredView}>
+          <View style={styles.auditModalView}>
+            {/* Cabecera */}
+            <View style={styles.auditHeader}>
+              <View>
+                <Text style={styles.auditTitle}>HISTORIAL DE CONTROLES</Text>
+                <Text style={[styles.auditDesc, { color: '#94a3b8' }]}>
+                  AUDITORÍA HISTÓRICA DE INVENTARIO BASE
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setHistorialModalVisible(false)}
+                style={styles.auditCloseIcon}
+              >
+                <MaterialCommunityIcons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Lista de Controles */}
+            {historialCuartel.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <MaterialCommunityIcons name="history" size={48} color="#334155" />
+                <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+                  No se encontraron controles anteriores en el historial.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.auditScroll} showsVerticalScrollIndicator={false}>
+                {historialCuartel.map((item) => {
+                  const totalItems = item.detalles?.length || 0;
+                  const okItems = item.detalles?.filter(d => d.controlado === 'CHEQUEADO').length || 0;
+                  const failItems = totalItems - okItems;
+                  const formattedDate = new Date(item.fecha_control).toLocaleDateString('es-AR');
+                  const formattedTime = new Date(item.fecha_control).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.historyRow, failItems > 0 && { borderLeftColor: '#dc2626' }]}
+                      onPress={() => {
+                        setChecklistCuartelSeleccionado(item);
+                        setHistorialModalVisible(false);
+                        setAuditCuartelModalVisible(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <MaterialCommunityIcons name="calendar-clock" size={14} color="#94a3b8" />
+                          <Text style={styles.historyRowDate}>{formattedDate} - {formattedTime} hs</Text>
+                        </View>
+                        <Text style={styles.historyRowAuditor}>
+                          Por: {item.usuario?.bombero
+                            ? `${item.usuario.bombero.nombre} ${item.usuario.bombero.apellido}`
+                            : item.usuario?.nombre_usuario || 'Bombero de Guardia'}
+                        </Text>
+                      </View>
+                      
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        {failItems > 0 ? (
+                          <View style={[styles.controlledTodayBadge, { backgroundColor: 'rgba(220, 38, 38, 0.15)', borderColor: 'rgba(220, 38, 38, 0.3)' }]}>
+                            <Text style={[styles.controlledTodayText, { color: '#dc2626' }]}>{failItems} NOVEDAD{failItems > 1 ? 'ES' : ''}</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.controlledTodayBadge}>
+                            <Text style={styles.controlledTodayText}>S/N (OK)</Text>
+                          </View>
+                        )}
+                        <MaterialCommunityIcons name="chevron-right" size={18} color="#64748b" style={{ alignSelf: 'flex-end' }} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            {/* Botón Cerrar */}
+            <TouchableOpacity
+              style={styles.auditBtnClose}
+              onPress={() => setHistorialModalVisible(false)}
+            >
+              <Text style={styles.auditBtnCloseText}>CERRAR HISTORIAL</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1372,6 +2101,23 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
     lineHeight: 20,
+  },
+  bypassButton: {
+    marginTop: 14,
+    backgroundColor: '#fbbf24',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  bypassButtonText: {
+    color: '#0f172a',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 
   // Progress
@@ -1712,5 +2458,389 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+  eyeIconBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#26282f',
+    padding: 6,
+    borderRadius: 14,
+    zIndex: 10,
+  },
+  checkStatusInfo: {
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 4,
+  },
+  badgeControladoHoy: {
+    backgroundColor: '#052e16',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  badgeControladoHoyText: {
+    color: '#22c55e',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  ultimoCheckLabel: {
+    color: '#64748b',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  ultimoCheckVal: {
+    color: '#94a3b8',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  ultimoCheckAutor: {
+    color: '#64748b',
+    fontSize: 8,
+    fontStyle: 'italic',
+    marginTop: 2,
+    textAlign: 'center',
+    width: '100%',
+  },
+  // Modal layout styles
+  auditCenteredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    padding: 20,
+  },
+  auditModalView: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#16181d',
+    borderRadius: 8,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  auditHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+    paddingBottom: 12,
+  },
+  auditTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  auditDesc: {
+    color: '#dc2626',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: 4,
+  },
+  auditCloseIcon: {
+    padding: 6,
+    borderRadius: 14,
+    backgroundColor: '#26282f',
+  },
+  auditAuditorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#1b1d24',
+    padding: 10,
+    borderRadius: 4,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  auditAuditorText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  auditScroll: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  auditSectorBlock: {
+    marginBottom: 16,
+  },
+  auditSectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+    paddingBottom: 6,
+    marginBottom: 8,
+  },
+  auditSectorTitle: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  auditToolRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1b1d24',
+    padding: 12,
+    borderRadius: 4,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  auditToolName: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  auditToolObs: {
+    color: '#f87171',
+    fontSize: 9,
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  auditToolStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  auditToolStatusText: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  auditBtnClose: {
+    backgroundColor: '#334155',
+    borderRadius: 6,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  auditBtnCloseText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  lastCheckBaseCard: {
+    backgroundColor: '#1b1d24',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    padding: 14,
+    marginBottom: 16,
+  },
+  lastCheckBaseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  lastCheckBaseTitle: {
+    color: '#22c55e',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  controlledTodayBadge: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  controlledTodayText: {
+    color: '#22c55e',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  daysSinceBadge: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.3)',
+  },
+  daysSinceText: {
+    color: '#eab308',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  lastCheckBaseBody: {
+    gap: 12,
+  },
+  lastCheckBaseInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  lastCheckBaseLabel: {
+    color: '#64748b',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  lastCheckBaseVal: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  lastCheckBaseActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  lastCheckBaseBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#dc2626',
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  lastCheckBaseBtnText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  auditSummaryContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  auditSummaryBlock: {
+    flex: 1,
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  auditSummaryNum: {
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  auditSummaryLabel: {
+    color: '#64748b',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1b1d24',
+    padding: 12,
+    borderRadius: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    borderLeftWidth: 3,
+    borderLeftColor: '#22c55e',
+  },
+  historyRowDate: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  historyRowAuditor: {
+    color: '#94a3b8',
+    fontSize: 9,
+    fontWeight: '500',
+    fontStyle: 'italic',
+  },
+  modifyControlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderColor: '#22c55e',
+    borderWidth: 1,
+    paddingVertical: 8,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  modifyControlBtnText: {
+    color: '#22c55e',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  editModeWarningCard: {
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+    borderLeftWidth: 4,
+    borderLeftColor: '#fbbf24',
+    borderRadius: 6,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  editModeWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editModeWarningTitle: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  editModeWarningText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '500',
+    lineHeight: 14,
+  },
+  cancelEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.3)',
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  cancelEditBtnText: {
+    color: '#fca5a5',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

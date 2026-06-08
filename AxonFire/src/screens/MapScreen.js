@@ -17,10 +17,10 @@ import { Alert } from 'react-native';
 export default function MapScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
   
   const handleAdminPress = () => {
     if (user?.rol === 'ADMIN') {
-      const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
       if (isCurrentlyAdmin) {
         navigation.navigate('MainApp');
       } else {
@@ -106,7 +106,7 @@ export default function MapScreen({ navigation }) {
             {user?.rol === 'ADMIN' && (
               <TouchableOpacity style={styles.emergencyIcon} onPress={handleAdminPress} title="Admin Panel">
                 <MaterialCommunityIcons 
-                  name={navigation.getState()?.routeNames?.includes('Panel') ? "account-hard-hat" : "shield-account"} 
+                  name={isCurrentlyAdmin ? "account-hard-hat" : "shield-account"} 
                   size={16} 
                   color={Colors.primary} 
                 />
@@ -117,6 +117,8 @@ export default function MapScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+
+
 
         {/* Mission Status Card */}
         <View style={styles.missionCard}>
@@ -162,6 +164,17 @@ export default function MapScreen({ navigation }) {
           <MaterialCommunityIcons name="minus" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
       </View>
+
+      {/* ── Admin FAB for New Emergency (left side) ── */}
+      {user?.rol === 'ADMIN' && (
+        <TouchableOpacity
+          style={styles.floatingMapFab}
+          onPress={() => navigation.navigate('NewAlert')}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="alarm-light" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -362,5 +375,47 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  floatingMapFab: {
+    position: 'absolute',
+    bottom: 120,
+    left: Spacing.lg,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#dc2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#7f1d1d',
+    ...Platform.select({
+      ios: { shadowColor: '#dc2626', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8 },
+      android: { elevation: 8 },
+      web: { boxShadow: '0px 4px 12px rgba(220, 38, 38, 0.5)' },
+    }),
+  },
+  roleBreadcrumb: {
+    height: 24,
+    backgroundColor: '#1b1d24',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderLeftWidth: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+    marginTop: 6,
+    borderRadius: 2,
+  },
+  roleBreadcrumbDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  roleBreadcrumbText: {
+    fontSize: 9,
+    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 1.2,
   },
 });

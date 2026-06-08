@@ -18,16 +18,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
-import { API_BASE_URL } from '../config/api';
 
-const BASE_URL = API_BASE_URL;
+import { API_BASE_URL } from '../config/api';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 // Los tipos de refuerzo que el bombero puede solicitar
 const TIPOS_REFUERZO = [
-  { icono: 'water',         nombre: 'CISTERNA',    color: Colors.alertBlue,     tipo: 'cisterna'    },
-  { icono: 'gas-station',   nombre: 'COMBUSTIBLE', color: Colors.warningOrange, tipo: 'combustible' },
-  { icono: 'ambulance',     nombre: 'AMBULANCIA',  color: Colors.primary,       tipo: 'ambulancia'  },
-  { icono: 'hammer-wrench', nombre: 'RESCATE',     color: Colors.secondary,     tipo: 'rescate'     },
+  { icono: 'water',         nombre: 'CISTERNA',    color: Colors.alertBlue,     tipo: 'cisterna',    subcat: '4' },
+  { icono: 'gas-station',   nombre: 'COMBUSTIBLE', color: Colors.warningOrange, tipo: 'combustible', subcat: '4' },
+  { icono: 'ambulance',     nombre: 'AMBULANCIA',  color: Colors.primary,       tipo: 'ambulancia',  subcat: '4' },
+  { icono: 'hammer-wrench', nombre: 'RESCATE',     color: Colors.secondary,     tipo: 'rescate',     subcat: '2' },
 ];
 
 function tiempoTranscurrido(fechaISO) {
@@ -38,16 +39,10 @@ function tiempoTranscurrido(fechaISO) {
   return `Hace ${Math.floor(min / 60)} hs`;
 }
 
-export default function PedidosSuministroScreen({ navigation, route }) {
+export default function PedidosSuministroScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-
-  const token = route?.params?.token || '';
-  const usuarioId = route?.params?.usuarioId || '';
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  const { token, user } = useAuth();
+  const usuarioId = user?.id || '';
 
   // ── Estado ────────────────────────────────────────────────────────────────
   const [solicitudes, setSolicitudes] = useState([]);
@@ -61,41 +56,52 @@ export default function PedidosSuministroScreen({ navigation, route }) {
   const [motivoPersonal, setMotivoPersonal] = useState('');
   const [enviandoPersonal, setEnviandoPersonal] = useState(false);
 
-  // ── Cargar historial de solicitudes ──────────────────────────────────────
-  async function cargarSolicitudes() {
+  // Alerta activa a la cual ligar el pedido
+  const [alertaActiva, setAlertaActiva] = useState(null);
+
+  // ── Cargar historial y alertas activas ──────────────────────────────────────
+  async function cargarDatos() {
     setCargando(true);
     try {
-      // Usamos el endpoint de respuestas como proxy temporal de solicitudes.
-      // En un futuro el backend debería tener un módulo propio de "solicitudes de recursos".
-      const res = await fetch(`${BASE_URL}/respuestas_alertas/`, { headers });
-      let data = [];
-      if (res.ok) {
-        data = await res.json();
+      // 1. Buscar alerta activa (la más reciente que no sea FINALIZADO)
+      const resAlertas = await axios.post(`${API_BASE_URL}/alerta/rango`, {
+        fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        fecha_hasta: new Date().toISOString()
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      
+      const activas = (resAlertas.data?.alertas || []).filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
+      if (activas.length > 0) {
+        setAlertaActiva(activas[0]); // Tomamos la más reciente
+        
+        // 2. Cargar registros de comunicación de esa alerta
+        const resLogs = await axios.get(`${API_BASE_URL}/registros_comunicacion/alerta/${activas[0].id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setSolicitudes(Array.isArray(resLogs.data) ? resLogs.data : []);
       } else {
-        console.log(`Solicitudes API returned status ${res.status}, using empty fallback.`);
+        setAlertaActiva(null);
+        setSolicitudes([]);
       }
-
-      // Filtramos las que creó este usuario
-      const mias = (Array.isArray(data) ? data : []).filter(
-        (r) => r.usuario_id === usuarioId || r.usuarioId === usuarioId || !usuarioId
-      );
-      setSolicitudes(mias);
     } catch (err) {
-      console.error('Error cargando solicitudes:', err);
+      console.error('Error cargando datos de suministro:', err);
     } finally {
       setCargando(false);
     }
   }
 
   useEffect(() => {
-    cargarSolicitudes();
-  }, []);
+    if (usuarioId) cargarDatos();
+  }, [usuarioId]);
 
-  // ── Enviar solicitud de refuerzo ────────────────────────────────────────
   function pedirRefuerzo(refuerzo) {
+    if (!alertaActiva) {
+      Alert.alert("Atención", "No hay ninguna emergencia activa en este momento para ligar el pedido.");
+      return;
+    }
+
     Alert.alert(
       `Solicitar ${refuerzo.nombre}`,
-      `¿Confirmás que necesitás ${refuerzo.nombre} en tu posición?`,
+      `¿Confirmás que necesitás ${refuerzo.nombre} para la emergencia activa en ${alertaActiva.ubicacion}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -104,22 +110,19 @@ export default function PedidosSuministroScreen({ navigation, route }) {
             setEnviandoTipo(refuerzo.tipo);
             try {
               const body = {
-                ubicacion: `Solicitud de ${refuerzo.nombre}`,
-                observaciones: `Pedido de refuerzo: ${refuerzo.nombre}. Enviado desde la app.`,
-                usuario_alta_alerta: usuarioId,
-                destinatariosIds: [],
+                alerta_id: alertaActiva.id,
+                usuario_id: usuarioId,
+                mensaje: `[${refuerzo.nombre}] Solicitado para la emergencia.`,
+                tipo_comunicacion: 'SUMINISTROS',
+                fecha_hora: new Date().toISOString()
               };
 
-              const res = await fetch(`${BASE_URL}/alerta/crear-con-notificacion`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(body),
+              await axios.post(`${API_BASE_URL}/registros_comunicacion/crear`, body, {
+                headers: { Authorization: `Bearer ${token}` }
               });
 
-              if (!res.ok) throw new Error(`Error ${res.status}`);
-
-              Alert.alert('✅ Enviado', `Pedido de ${refuerzo.nombre} enviado al comando.`);
-              cargarSolicitudes();
+              Alert.alert('✅ Enviado', `Pedido de ${refuerzo.nombre} enviado silenciosamente.`);
+              cargarDatos();
             } catch (err) {
               console.error('Error enviando solicitud:', err);
               Alert.alert('Error', 'No se pudo enviar. Intentá de nuevo.');
@@ -132,8 +135,12 @@ export default function PedidosSuministroScreen({ navigation, route }) {
     );
   }
 
-  // ── Enviar solicitud de personal ──────────────────────────────────────────
   async function pedirPersonal() {
+    if (!alertaActiva) {
+      Alert.alert("Atención", "No hay ninguna emergencia activa para pedir personal.");
+      return;
+    }
+
     if (!motivoPersonal.trim()) {
       Alert.alert('Falta el motivo', 'Escribí por qué necesitás refuerzo de personal.');
       return;
@@ -142,25 +149,22 @@ export default function PedidosSuministroScreen({ navigation, route }) {
     setEnviandoPersonal(true);
     try {
       const body = {
-        ubicacion: 'Solicitud de personal adicional',
-        observaciones: `Se solicitan ${cantidadPersonal} bombero(s). Motivo: ${motivoPersonal}`,
-        usuario_alta_alerta: usuarioId,
-        destinatariosIds: [],
+        alerta_id: alertaActiva.id,
+        usuario_id: usuarioId,
+        mensaje: `[REFUERZO PERSONAL] ${cantidadPersonal} bomberos: ${motivoPersonal}`,
+        tipo_comunicacion: 'APOYO',
+        fecha_hora: new Date().toISOString()
       };
 
-      const res = await fetch(`${BASE_URL}/alerta/crear-con-notificacion`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
+      await axios.post(`${API_BASE_URL}/registros_comunicacion/crear`, body, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      if (!res.ok) throw new Error(`Error ${res.status}`);
 
       setModalVisible(false);
       setCantidadPersonal(1);
       setMotivoPersonal('');
-      Alert.alert('✅ Enviado', 'Pedido de personal enviado al comando.');
-      cargarSolicitudes();
+      Alert.alert('✅ Enviado', 'Pedido de personal enviado silenciosamente.');
+      cargarDatos();
     } catch (err) {
       console.error('Error enviando pedido de personal:', err);
       Alert.alert('Error', 'No se pudo enviar. Intentá de nuevo.');
@@ -181,7 +185,7 @@ export default function PedidosSuministroScreen({ navigation, route }) {
           <MaterialCommunityIcons name="arrow-left" size={22} color="#263238" />
         </TouchableOpacity>
         <Text style={styles.tituloHeader}>Pedidos de Suministro</Text>
-        <TouchableOpacity style={styles.botonRefresh} onPress={cargarSolicitudes}>
+        <TouchableOpacity style={styles.botonRefresh} onPress={cargarDatos}>
           <MaterialCommunityIcons name="refresh" size={20} color="#263238" />
         </TouchableOpacity>
       </View>
@@ -251,19 +255,21 @@ export default function PedidosSuministroScreen({ navigation, route }) {
             <TacticalCard key={sol.id || idx}>
               <View style={styles.filaSolicitud}>
                 <View style={[styles.iconoSolicitud, { backgroundColor: `${Colors.alertBlue}18` }]}>
-                  <MaterialCommunityIcons name="send-check" size={20} color={Colors.alertBlue} />
+                  <MaterialCommunityIcons 
+                    name={sol.tipo_comunicacion === 'APOYO' ? 'account-group' : 'truck-check'} 
+                    size={20} 
+                    color={Colors.alertBlue} 
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.tituloSolicitud} numberOfLines={1}>Solicitud enviada</Text>
+                  <Text style={styles.tituloSolicitud} numberOfLines={2}>
+                    {sol.mensaje.replace(/[\[\]]/g, '') || sol.tipo_comunicacion}
+                  </Text>
                   <Text style={styles.subtituloSolicitud}>
-                    {sol.estado_respuesta || 'PENDIENTE'} · {tiempoTranscurrido(sol.fecha_hora)}
+                    {sol.usuarioId?.bombero ? `${sol.usuarioId.bombero.nombre} ${sol.usuarioId.bombero.apellido}` : 'Sistema'} · {tiempoTranscurrido(sol.fecha_hora)}
                   </Text>
                 </View>
-                {sol.estado_respuesta === 'ACEPTADO' ? (
-                  <MaterialIcons name="check-circle" size={22} color={Colors.success} />
-                ) : (
-                  <MaterialCommunityIcons name="sync" size={18} color={Colors.onSurfaceVariant} />
-                )}
+                <MaterialCommunityIcons name="check-all" size={18} color={Colors.success} />
               </View>
             </TacticalCard>
           ))

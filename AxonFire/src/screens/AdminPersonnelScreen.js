@@ -101,7 +101,7 @@ export default function AdminPersonnelScreen({ navigation }) {
       '¿Estás seguro que deseas cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: () => logout().then(() => navigation.replace('Login')), style: 'destructive' }
+        { text: 'Confirmar', onPress: () => logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })), style: 'destructive' }
       ]
     );
   };
@@ -118,7 +118,9 @@ export default function AdminPersonnelScreen({ navigation }) {
   };
 
   const filteredPersonnel = personnel.filter(person => {
-    const fullName = `${person.nombre} ${person.apellido}`.toLowerCase();
+    const nombre = person.nombre || '';
+    const apellido = person.apellido || '';
+    const fullName = `${nombre} ${apellido}`.toLowerCase();
     const username = person.usuarioId?.nombre_usuario?.toLowerCase() || '';
     const rango = person.rangoBombero?.nombre_rol?.toLowerCase() || '';
     const query = searchQuery.toLowerCase();
