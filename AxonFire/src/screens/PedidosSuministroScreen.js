@@ -18,8 +18,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius } from '../theme';
 import TacticalCard from '../components/TacticalCard';
 import StatusBadge from '../components/StatusBadge';
+import { API_BASE_URL } from '../config/api';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = API_BASE_URL;
 
 // Los tipos de refuerzo que el bombero puede solicitar
 const TIPOS_REFUERZO = [
@@ -67,15 +68,12 @@ export default function PedidosSuministroScreen({ navigation, route }) {
       // Usamos el endpoint de respuestas como proxy temporal de solicitudes.
       // En un futuro el backend debería tener un módulo propio de "solicitudes de recursos".
       const res = await fetch(`${BASE_URL}/respuestas_alertas/`, { headers });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-
-      /* Estos datos usaba de ejemplo para ver como quedaban las screen , antes de integrarlo
-      const data = [
-        { id: '1', usuario_id: usuarioId || '123', estado_respuesta: 'PENDIENTE', fecha_hora: new Date(Date.now() - 500000).toISOString() },
-        { id: '2', usuario_id: usuarioId || '123', estado_respuesta: 'ACEPTADO', fecha_hora: new Date(Date.now() - 3600000).toISOString() }
-      ];
-      */
+      let data = [];
+      if (res.ok) {
+        data = await res.json();
+      } else {
+        console.log(`Solicitudes API returned status ${res.status}, using empty fallback.`);
+      }
 
       // Filtramos las que creó este usuario
       const mias = (Array.isArray(data) ? data : []).filter(

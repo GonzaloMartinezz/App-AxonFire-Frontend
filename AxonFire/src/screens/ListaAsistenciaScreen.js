@@ -64,7 +64,7 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
     try {
       const res = await axios.get(`${BASE_URL}/alerta/${alertaId}`, {
         headers,
-        timeout: 1500
+        timeout: 5000
       });
       if (res.status === 200) {
         setAlerta(res.data);
@@ -85,16 +85,13 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
     else setCargando(true);
 
     try {
-      // Traemos TODAS las respuestas y filtramos por esta alerta.
-      const res = await axios.get(`${BASE_URL}/respuestas_alertas/`, {
+      // Traemos las respuestas de esta alerta específica.
+      const res = await axios.get(`${BASE_URL}/respuestas_alertas/${alertaId}`, {
         headers,
-        timeout: 1500
+        timeout: 5000
       });
       if (res.status === 200) {
-        const data = res.data;
-        const deEstaAlerta = (Array.isArray(data) ? data : []).filter(
-          (r) => r.alerta_id === alertaId || r.alertaId === alertaId
-        );
+        const deEstaAlerta = Array.isArray(res.data) ? res.data : [];
 
         setRespuestas(deEstaAlerta);
 
@@ -134,7 +131,7 @@ export default function ListaAsistenciaScreen({ navigation, route }) {
         },
         {
           headers,
-          timeout: 2000
+          timeout: 5000
         }
       );
 

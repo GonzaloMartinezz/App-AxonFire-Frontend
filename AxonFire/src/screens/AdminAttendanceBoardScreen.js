@@ -195,7 +195,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
             headers: authHeaders(),
             params: { fecha_desde: desde, fecha_hasta: hasta },
-            timeout: 1500
+            timeout: 5000
           });
           const data = resAlertas.data;
           const alertas = data.alertas || [];
@@ -230,7 +230,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       try {
         const bomberosRes = await axios.get(`${API_BASE_URL}/usuarios/bomberos`, {
           headers: authHeaders(),
-          timeout: 1500
+          timeout: 5000
         });
         if (bomberosRes.status === 200) {
           bomberosData = bomberosRes.data;
@@ -252,7 +252,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         try {
           const respuestasRes = await axios.get(`${API_BASE_URL}/respuestas_alertas/${activeAlertaId}`, {
             headers: authHeaders(),
-            timeout: 1500
+            timeout: 5000
           });
           if (respuestasRes.status === 200) {
             respuestas = respuestasRes.data;
@@ -291,7 +291,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           try {
             const detailRes = await axios.get(`${API_BASE_URL}/alerta/${activeAlertaId}`, {
               headers: authHeaders(),
-              timeout: 1500
+              timeout: 5000
             });
             if (detailRes.status === 200) {
               detailData = detailRes.data;
@@ -412,7 +412,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
               try {
                 await axios.patch(`${API_BASE_URL}/alerta/${currentAlertaId}/finalizar`, {}, {
                   headers: authHeaders(),
-                  timeout: 1500
+                  timeout: 5000
                 });
               } catch (e) {
                 console.log('Error calling finalize endpoint, using local override:', e);
