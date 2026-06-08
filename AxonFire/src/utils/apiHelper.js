@@ -75,11 +75,11 @@ export async function fetchAlertasPorRango(baseUrl, fecha_desde, fecha_hasta, he
       return [];
     }
   } else {
-    // En nativo (Android/iOS), axios.get con data funciona correctamente
+    // En nativo (Android/iOS), usamos params ya que el backend soporta Query Params
     try {
       const res = await axios.get(`${baseUrl}/alerta/rango`, {
         headers,
-        data: { fecha_desde, fecha_hasta },
+        params: { fecha_desde, fecha_hasta },
         timeout,
       });
       return res.data?.alertas || [];
