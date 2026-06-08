@@ -22,10 +22,18 @@ if (Platform.OS !== 'web') {
   });
 }
 
-const sirenSound = require('./assets/siren.mp3');
+const sirenSound = require('./assets/siren.wav');
+
+let appSirenSound = null;
 
 async function playSiren() {
   try {
+    if (appSirenSound) {
+      await appSirenSound.stopAsync().catch(() => {});
+      await appSirenSound.unloadAsync().catch(() => {});
+      appSirenSound = null;
+    }
+
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       staysActiveInBackground: true,
@@ -40,15 +48,32 @@ async function playSiren() {
       isLooping: false,
     });
 
+    appSirenSound = sound;
+
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.isLoaded && status.didJustFinish) {
-        sound.unloadAsync();
+        sound.unloadAsync().catch(() => {});
+        if (appSirenSound === sound) {
+          appSirenSound = null;
+        }
       }
     });
   } catch (error) {
     console.warn('Error reproduciendo sirena:', error);
   }
 }
+
+global.stopAppSiren = async function() {
+  if (appSirenSound) {
+    try {
+      await appSirenSound.stopAsync();
+      await appSirenSound.unloadAsync();
+    } catch (e) {
+      console.warn('Error stopping app siren:', e);
+    }
+    appSirenSound = null;
+  }
+};
 
 function AppContent() {
   const { isLoading, user, token } = useAuth();
@@ -61,14 +86,14 @@ function AppContent() {
   }, [user, token]);
 
   useEffect(() => {
-    if (
-      lastNotificationResponse &&
-      lastNotificationResponse.notification?.request?.content?.data?.alertaId &&
-      navigationRef.isReady()
-    ) {
-      navigationRef.navigate('Emergency', {
-        alerta_id: lastNotificationResponse.notification.request.content.data.alertaId,
-      });
+    if (lastNotificationResponse && navigationRef.isReady()) {
+      const data = lastNotificationResponse.notification?.request?.content?.data;
+      const targetAlertaId = data?.alertaId ?? data?.alerta_id;
+      if (targetAlertaId) {
+        navigationRef.navigate('Emergency', {
+          alerta_id: targetAlertaId,
+        });
+      }
     }
   }, [lastNotificationResponse]);
 
@@ -105,9 +130,10 @@ export default function App() {
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const { alertaId } = response.notification.request.content.data;
-      if (alertaId && navigationRef.isReady()) {
-        navigationRef.navigate('Emergency', { alerta_id: alertaId });
+      const data = response.notification.request.content.data;
+      const targetAlertaId = data?.alertaId ?? data?.alerta_id;
+      if (targetAlertaId && navigationRef.isReady()) {
+        navigationRef.navigate('Emergency', { alerta_id: targetAlertaId });
       }
     });
 

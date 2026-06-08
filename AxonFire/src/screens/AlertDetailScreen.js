@@ -13,14 +13,13 @@ import {
   Dimensions,
   ActivityIndicator,
   Modal,
-  Alert
+  Alert,
+  TextInput
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
 
@@ -59,10 +58,159 @@ const PERSONNEL = [
   },
 ];
 
+// ── Helper: formatea Date a HH:MM ────────────────────────────────────────────
+function formatHora(date) {
+  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Helper: valida que el string sea HH:MM válido ─────────────────────────────
+function esHoraValida(str) {
+  if (!str) return false;
+  const regex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  return regex.test(str);
+}
+
+// ── Helper: obtiene estilos de insignia de estado dinámicos ───────────────────
+function obtenerBadgeEstado(nombreEstado = '') {
+  const e = nombreEstado.toUpperCase();
+  if (e === 'FINALIZADO' || e.includes('RESUEL') || e.includes('CERRAD')) {
+    return { bg: 'rgba(16, 185, 129, 0.15)', text: '#10b981', label: 'RESUELTA' };
+  }
+  if (e === 'EN CURSO' || e.includes('PROGRESO') || e.includes('CURSO')) {
+    return { bg: 'rgba(56, 189, 248, 0.15)', text: '#38bdf8', label: 'EN PROGRESO' };
+  }
+  if (e.includes('DESPACH')) {
+    return { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', label: 'DESPACHADA' };
+  }
+  return { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', label: 'ACTIVA' };
+}
+
+
+// ── Componente: Input de hora amigable ────────────────────────────────────────
+function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-outline' }) {
+  const [texto, setTexto] = useState(value || '');
+  const [enfocado, setEnfocado] = useState(false);
+
+  useEffect(() => { setTexto(value || ''); }, [value]);
+
+  function handleChange(raw) {
+    const soloDigitos = raw.replace(/\D/g, '').slice(0, 4);
+    let formateado = soloDigitos;
+    if (soloDigitos.length >= 3) {
+      formateado = soloDigitos.slice(0, 2) + ':' + soloDigitos.slice(2);
+    }
+    setTexto(formateado);
+    if (formateado.length === 5) onChange(formateado);
+  }
+
+  function handleBlur() {
+    setEnfocado(false);
+    if (esHoraValida(texto)) {
+      onChange(texto);
+    } else if (texto.length > 0) {
+      Alert.alert('Hora inválida', 'Ingresá la hora en formato HH:MM (ej: 14:30)');
+      setTexto('');
+      onChange('');
+    }
+  }
+  const estaVacio   = texto.length === 0;
+  const esValido    = esHoraValida(texto);
+
+  return (
+    <View style={inputStyles.wrapper}>
+      <Text style={inputStyles.label}>{label}</Text>
+      <View style={[
+        inputStyles.container,
+        readOnly  && inputStyles.containerReadOnly,
+        enfocado  && inputStyles.containerFocused,
+        esValido  && !readOnly && inputStyles.containerValid,
+      ]}>
+        <MaterialCommunityIcons
+          name={icono}
+          size={18}
+          color={
+            readOnly    ? '#475569'
+            : esValido  ? '#22c55e'
+            : enfocado  ? '#3b82f6'
+            : '#64748b'
+          }
+          style={{ marginRight: 10 }}
+        />
+
+        {readOnly ? (
+          <View style={inputStyles.readOnlyBox}>
+            <Text style={inputStyles.readOnlyTexto}>
+              {texto || '—'}
+            </Text>
+            <View style={inputStyles.badgeReadOnly}>
+              <MaterialCommunityIcons name="lock-outline" size={9} color="#475569" />
+              <Text style={inputStyles.badgeReadOnlyTexto}>AUTO</Text>
+            </View>
+          </View>
+        ) : (
+          <TextInput
+            style={inputStyles.input}
+            value={texto}
+            onChangeText={handleChange}
+            onFocus={() => setEnfocado(true)}
+            onBlur={handleBlur}
+            placeholder="HH:MM"
+            placeholderTextColor="#334155"
+            keyboardType="numeric"
+            maxLength={5}
+            returnKeyType="done"
+          />
+        )}
+
+        {!readOnly && esValido && (
+          <MaterialCommunityIcons name="check-circle" size={16} color="#22c55e" />
+        )}
+        {!readOnly && !esValido && !estaVacio && (
+          <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#f59e0b" />
+        )}
+      </View>
+
+      {!readOnly && enfocado && (
+        <Text style={inputStyles.ayuda}>Ingresá los 4 dígitos · Ej: 1430 → 14:30</Text>
+      )}
+      {readOnly && (
+        <Text style={inputStyles.ayudaReadOnly}>
+          Registrada automáticamente al disparar la alerta
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const inputStyles = StyleSheet.create({
+  wrapper:            { marginBottom: 16 },
+  label:              { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
+  container:          { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,24,39,0.8)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  containerReadOnly: { backgroundColor: 'rgba(15,20,28,0.9)', borderColor: 'rgba(71,85,105,0.3)', borderStyle: 'dashed' },
+  containerFocused:  { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.05)' },
+  containerValid:    { borderColor: 'rgba(34,197,94,0.4)' },
+  input:              { flex: 1, color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
+  readOnlyBox:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  readOnlyTexto:    { color: '#475569', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
+  badgeReadOnly:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(71,85,105,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  badgeReadOnlyTexto: { color: '#475569', fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
+  ayuda:            { color: '#475569', fontSize: 10, fontWeight: '500', marginTop: 4 },
+  ayudaReadOnly:    { color: '#334155', fontSize: 9, fontWeight: '500', marginTop: 3, fontStyle: 'italic' },
+});
+
 export default function AlertDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const alertaId = route?.params?.alerta_id ?? null;
   const { token, user } = useAuth();
+  const rol = user?.rol || 'BOMBERO';
+
+  const abrirInforme = () => {
+    navigation.navigate('InformePostEmergencia', {
+      alertaId,
+      token,
+      rol
+    });
+  };
 
   const [alerta, setAlerta] = useState(null);
   const [responders, setResponders] = useState([]);
@@ -70,222 +218,15 @@ export default function AlertDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [timerText, setTimerText] = useState('00:00:00');
   
+  // Tiempos Críticos
+  const [horaLlamado, setHoraLlamado]   = useState('');
+  const [horaSalida, setHoraSalida]     = useState('');
+  const [horaRegreso, setHoraRegreso]   = useState('');
+  const [guardandoTiempos, setGuardandoTiempos] = useState(false);
+  
   // Modal Solicitar Recursos
   const [modalVisible, setModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
-
-  const rol = user?.rol;
-
-  const abrirInforme = () => {
-    navigation.navigate('InformePostEmergencia', {
-      alertaId: alertaId,
-      token: token,
-      rol: user?.rol
-    });
-  };
-
-  const generarBorradorLegal = async () => {
-    if (!alerta) return;
-    try {
-      const fechaInicio = new Date(alerta.fecha_hora);
-      // Simular duración estimada si no hay campo duracion
-      const fechaFin = new Date(fechaInicio.getTime() + 2 * 60 * 60 * 1000);
-      
-      const formatFechaHora = (date) => {
-        return date.toLocaleString('es-AR', {
-          day: '2-digit', month: '2-digit', year: 'numeric',
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
-        });
-      };
-
-      const tableRows = responders.map(r => `
-        <tr>
-          <td>${r.name}</td>
-          <td>${r.role}</td>
-          <td>${r.hora} HS</td>
-        </tr>
-      `).join('');
-
-      const htmlContent = `
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body {
-                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                color: #1e293b;
-                padding: 40px;
-                line-height: 1.6;
-              }
-              .header {
-                text-align: center;
-                border-bottom: 3px double #0f172a;
-                padding-bottom: 20px;
-                margin-bottom: 30px;
-              }
-              .header h1 {
-                font-size: 24px;
-                text-transform: uppercase;
-                margin: 0;
-                color: #7f1d1d;
-                letter-spacing: 1px;
-              }
-              .header h2 {
-                font-size: 14px;
-                margin: 5px 0 0 0;
-                color: #475569;
-                font-weight: normal;
-                letter-spacing: 2px;
-              }
-              .doc-title {
-                text-align: center;
-                text-transform: uppercase;
-                font-size: 18px;
-                font-weight: bold;
-                margin: 20px 0;
-                color: #0f172a;
-                text-decoration: underline;
-              }
-              .section {
-                margin-bottom: 25px;
-              }
-              .section-title {
-                font-size: 14px;
-                text-transform: uppercase;
-                font-weight: bold;
-                border-bottom: 1px solid #cbd5e1;
-                padding-bottom: 5px;
-                margin-bottom: 12px;
-                color: #7f1d1d;
-              }
-              .grid {
-                display: flex;
-                flex-wrap: wrap;
-                margin-bottom: 15px;
-              }
-              .grid-item {
-                width: 50%;
-                margin-bottom: 8px;
-                font-size: 13px;
-              }
-              .grid-item span {
-                font-weight: bold;
-                color: #475569;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 10px;
-                font-size: 13px;
-              }
-              th, td {
-                border: 1px solid #cbd5e1;
-                padding: 10px;
-                text-align: left;
-              }
-              th {
-                background-color: #f1f5f9;
-                color: #0f172a;
-                font-weight: bold;
-              }
-              tr:nth-child(even) {
-                background-color: #f8fafc;
-              }
-              .footer-signature {
-                margin-top: 60px;
-                display: flex;
-                justify-content: space-between;
-              }
-              .signature-box {
-                width: 45%;
-                text-align: center;
-                border-top: 1px solid #94a3b8;
-                padding-top: 10px;
-                font-size: 12px;
-                color: #475569;
-              }
-              .stamp-box {
-                margin-top: 40px;
-                text-align: center;
-                font-size: 11px;
-                color: #64748b;
-                border: 1px dashed #cbd5e1;
-                padding: 15px;
-                border-radius: 6px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Cuerpo de Bomberos Voluntarios</h1>
-              <h2>DOCUMENTO DE CONSTANCIA OFICIAL</h2>
-            </div>
-            
-            <div class="doc-title">Borrador de Informe Legal de Siniestro</div>
-            
-            <div class="section">
-              <div class="section-title">Datos de la Emergencia</div>
-              <div class="grid">
-                <div class="grid-item"><span>ID Alerta:</span> ${alerta.id}</div>
-                <div class="grid-item"><span>Tipo de Siniestro:</span> ${alerta.subCategoriaAlerta?.nombre_sub_categoria || alerta.observaciones || 'Siniestro'}</div>
-                <div class="grid-item"><span>Fecha/Hora Inicio:</span> ${formatFechaHora(fechaInicio)}</div>
-                <div class="grid-item"><span>Fecha/Hora Fin (Est.):</span> ${formatFechaHora(fechaFin)}</div>
-                <div class="grid-item"><span>Ubicación:</span> ${alerta.ubicacion || 'No especificada'}</div>
-                <div class="grid-item"><span>Estado:</span> FINALIZADO</div>
-              </div>
-            </div>
-
-            <div class="section">
-              <div class="section-title">Descripción y Observaciones</div>
-              <p style="font-size: 13px; margin: 5px 0;">${alerta.observaciones || 'No hay observaciones adicionales registradas para este siniestro.'}</p>
-            </div>
-
-            <div class="section">
-              <div class="section-title">Personal de Asistencia</div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nombre y Apellido</th>
-                    <th>Rango</th>
-                    <th>Hora de Respuesta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${tableRows || '<tr><td colspan="3" style="text-align:center;">No se registraron asistencias oficiales.</td></tr>'}
-                </tbody>
-              </table>
-            </div>
-
-            <div class="stamp-box">
-              <strong>Nota Importante para la Aseguradora / Desarrollo Social:</strong><br>
-              El presente documento constituye un borrador de informe de intervención de emergencia expedido por el sistema digital AxonFire. El informe definitivo con firma digital o sello holográfico del Jefe de Cuerpo debe solicitarse en la sede central del Cuartel de Bomberos Voluntarios correspondiente.
-            </div>
-
-            <div class="footer-signature">
-              <div class="signature-box">
-                Firma y Aclaración<br>
-                Oficial a Cargo del Siniestro
-              </div>
-              <div class="signature-box">
-                Firma y Sello<br>
-                Jefe de Cuerpo / Administración
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Informe_Legal_${alerta.id}.pdf`,
-        UTI: 'com.adobe.pdf'
-      });
-    } catch (err) {
-      console.log('Error generating PDF:', err);
-      Alert.alert('Error', 'No se pudo generar el borrador legal en PDF.');
-    }
-  };
 
   const fetchDetail = useCallback(async () => {
     if (!alertaId) {
@@ -314,16 +255,20 @@ export default function AlertDetailScreen({ route, navigation }) {
         console.log('Error fetching alert detail from server:', err);
       }
 
+      // Retrieve local override/finalized state
+      const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${alertaId}`);
+
       if (!detailData) {
-        // Retrieve local override/finalized state
-        const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${alertaId}`);
         detailData = {
           id: alertaId,
           observaciones: 'ALERTA DE INCENDIO ACTIVA',
           ubicacion: 'ZONA CENTRAL',
           fecha_hora: new Date().toISOString(),
-          estadoAlerta: { nombre_estado: isLocallyFinalized ? 'FINALIZADO' : 'ACTIVA' }
+          estadoAlerta: { nombre_estado: isLocallyFinalized === 'true' ? 'FINALIZADO' : 'ACTIVA' }
         };
+      } else if (isLocallyFinalized === 'true') {
+        if (!detailData.estadoAlerta) detailData.estadoAlerta = {};
+        detailData.estadoAlerta.nombre_estado = 'FINALIZADO';
       }
       setAlerta(detailData);
 
@@ -426,6 +371,23 @@ export default function AlertDetailScreen({ route, navigation }) {
       logisticsData.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
       setLogistics(logisticsData);
 
+      // Dynamic parsing of Critical Times from logistics data
+      const tiempoCriticoLog = logisticsData.find(item => item.mensaje && item.mensaje.startsWith('TIEMPOS CRÍTICOS —'));
+      if (tiempoCriticoLog) {
+        const msg = tiempoCriticoLog.mensaje;
+        const llamadoMatch = msg.match(/Llamado:\s*([^\s|]+)/);
+        const salidaMatch = msg.match(/Salida:\s*([^\s|]+)/);
+        const regresoMatch = msg.match(/Regreso:\s*([^\s|]+)/);
+        
+        if (llamadoMatch) setHoraLlamado(llamadoMatch[1]);
+        if (salidaMatch) setHoraSalida(salidaMatch[1]);
+        if (regresoMatch && regresoMatch[1] !== 'pendiente') setHoraRegreso(regresoMatch[1]);
+      } else {
+        if (detailData && detailData.fecha_hora) {
+          setHoraLlamado(formatHora(new Date(detailData.fecha_hora)));
+        }
+      }
+
     } catch (err) {
       console.log('Error fetching alert details', err);
     } finally {
@@ -494,6 +456,114 @@ export default function AlertDetailScreen({ route, navigation }) {
       fetchDetail();
     }, [fetchDetail])
   );
+
+  // ── Guardar tiempos críticos ──
+  const guardarTiempos = async () => {
+    if (!esHoraValida(horaSalida)) {
+      Alert.alert('Hora de Salida requerida', 'Ingresá la hora de salida del móvil (HH:MM).');
+      return;
+    }
+    if (horaRegreso && !esHoraValida(horaRegreso)) {
+      Alert.alert('Hora de Regreso inválida', 'Verificá el formato HH:MM.');
+      return;
+    }
+
+    setGuardandoTiempos(true);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      const mensaje =
+        `TIEMPOS CRÍTICOS — ` +
+        `Llamado: ${horaLlamado} | ` +
+        `Salida: ${horaSalida} | ` +
+        `Regreso: ${horaRegreso || 'pendiente'}`;
+
+      const newLog = {
+        id: `local_log_${Date.now()}`,
+        alerta_id: alertaId,
+        usuario_id: user?.id,
+        mensaje,
+        tipo_comunicacion: 'INFORMACION',
+        fecha_hora: new Date().toISOString(),
+      };
+
+      try {
+        await fetch(`${API_BASE_URL}/registros_comunicacion/crear`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(newLog),
+        });
+      } catch (err) {
+        console.log('Error sending communication to backend, using local fallback:', err);
+      }
+
+      // Save locally to AsyncStorage
+      try {
+        const storedLogistics = await AsyncStorage.getItem(`local_logistics_${alertaId}`);
+        const list = storedLogistics ? JSON.parse(storedLogistics) : [];
+        list.push(newLog);
+        await AsyncStorage.setItem(`local_logistics_${alertaId}`, JSON.stringify(list));
+      } catch (e) {
+        console.log('Error saving local log:', e);
+      }
+
+      Alert.alert('✅ Tiempos guardados', 'Los tiempos críticos fueron registrados correctamente.');
+      fetchDetail();
+    } catch (err) {
+      console.error('Error guardando tiempos:', err);
+      Alert.alert('Error', 'No se pudieron guardar los tiempos. Intentá de nuevo.');
+    } finally {
+      setGuardandoTiempos(false);
+    }
+  };
+
+  // ── Finalizar Emergencia ──
+  const finalizarEmergencia = async () => {
+    if (!alertaId) return;
+
+    Alert.alert(
+      "Finalizar Emergencia",
+      "¿Estás seguro de que deseas finalizar esta emergencia? Ya no se podrán recibir respuestas.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Finalizar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              };
+
+              try {
+                await fetch(`${API_BASE_URL}/alerta/${alertaId}/finalizar`, {
+                  method: 'PATCH',
+                  headers,
+                });
+              } catch (e) {
+                console.log('Error calling finalize endpoint, using local override:', e);
+              }
+
+              // Always write local override
+              await AsyncStorage.setItem(`finalized_alert_${alertaId}`, 'true');
+
+              Alert.alert("Éxito", "La emergencia ha sido finalizada.");
+              fetchDetail();
+            } catch (e) {
+              Alert.alert("Error", e.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // ── Timer Effect ─────────────────────────────────────────────
   useEffect(() => {
@@ -574,9 +644,14 @@ export default function AlertDetailScreen({ route, navigation }) {
           <View style={styles.mainCardContent}>
             <View style={styles.titleRow}>
               <Text style={styles.mainTitle}>{alerta?.observaciones || 'Incidente'}</Text>
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelText}>{alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' ? 'FINALIZADO' : 'ACTIVA'}</Text>
-              </View>
+              {(() => {
+                const badgeEst = obtenerBadgeEstado(alerta?.estadoAlerta?.nombre_estado || alerta?.estadoAlerta?.nombre || alerta?.estado || '');
+                return (
+                  <View style={[styles.levelBadge, { backgroundColor: badgeEst.bg }]}>
+                    <Text style={[styles.levelText, { color: badgeEst.text }]}>{badgeEst.label}</Text>
+                  </View>
+                );
+              })()}
             </View>
             <View style={styles.locationRow}>
               <MaterialIcons name="location-on" size={16} color="#94a3b8" />
@@ -596,6 +671,18 @@ export default function AlertDetailScreen({ route, navigation }) {
             </View>
           </View>
         </View>
+
+        {/* Botón Finalizar Emergencia (solo para Administrador si no está finalizada) */}
+        {rol === 'ADMIN' && alerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
+          <TouchableOpacity 
+            style={styles.finalizeBtn} 
+            onPress={finalizarEmergencia}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
+            <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Logistics Section */}
         <View style={styles.sectionContainer}>
@@ -659,16 +746,61 @@ export default function AlertDetailScreen({ route, navigation }) {
               </View>
             )}
           </TouchableOpacity>
+        </View>
 
-          {/* ── AX-15: Botón Borrador Legal PDF ── */}
-          {alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' && (
+        {/* Tiempos Críticos Section */}
+        <View style={styles.tiemposCard}>
+          <View style={styles.tiemposHeader}>
+            <MaterialCommunityIcons name="timer-outline" size={18} color="#e11d48" />
+            <Text style={styles.tiemposTitulo}>TIEMPOS CRÍTICOS</Text>
+          </View>
+          <Text style={styles.tiemposDesc}>
+            Registrá los tiempos del operativo para trazabilidad completa.
+          </Text>
+
+          {/* HORA DE LLAMADO — Read-Only */}
+          <InputHora
+            label="Hora de Llamado"
+            value={horaLlamado}
+            onChange={() => {}} 
+            readOnly={true}
+            icono="phone-incoming"
+          />
+
+          {/* HORA DE SALIDA — Editable */}
+          <InputHora
+            label="Hora de Salida del Móvil *"
+            value={horaSalida}
+            onChange={setHoraSalida}
+            readOnly={alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO'}
+            icono="truck-fast-outline"
+          />
+
+          {/* HORA DE REGRESO — Editable */}
+          <InputHora
+            label="Hora de Regreso"
+            value={horaRegreso}
+            onChange={setHoraRegreso}
+            readOnly={alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO'}
+            icono="home-clock-outline"
+          />
+
+          {/* Botón guardar tiempos */}
+          {alerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
             <TouchableOpacity
-              style={styles.legalPDFButton}
-              onPress={generarBorradorLegal}
+              style={[styles.botonGuardarTiempos, guardandoTiempos && { opacity: 0.6 }]}
+              onPress={guardarTiempos}
+              disabled={guardandoTiempos}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="file-pdf-box" size={18} color="#fff" />
-              <Text style={styles.legalPDFButtonText}>GENERAR BORRADOR LEGAL</Text>
+              {guardandoTiempos ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="content-save-check-outline" size={16} color="#fff" />
+                  <Text style={styles.botonGuardarTiemposTexto}>GUARDAR TIEMPOS</Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -771,32 +903,6 @@ export default function AlertDetailScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* Bottom Nav */}
-      <View style={styles.fakeBottomNav}>
-        <View style={styles.navItem}>
-          <MaterialCommunityIcons name="view-grid" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>STATUS</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation?.navigate('PersonnelStatus')}
-        >
-          <MaterialCommunityIcons name="account-group" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>UNITS</Text>
-        </TouchableOpacity>
-        <View style={styles.sosContainer}>
-          <MaterialCommunityIcons name="asterisk" size={28} color="#e11d48" />
-          <Text style={styles.sosLabel}>SOS</Text>
-        </View>
-        <View style={styles.navItem}>
-          <MaterialCommunityIcons name="archive" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>LOGISTICS</Text>
-        </View>
-        <View style={styles.navItem}>
-          <MaterialCommunityIcons name="compass" size={24} color="#64748b" />
-          <Text style={styles.navLabel}>MAP</Text>
-        </View>
-      </View>
     </View>
   );
 }
@@ -810,7 +916,7 @@ container:         { flex: 1, backgroundColor: '#16181d' },
   iconBtn:          { padding: 4 },
   avatarBtn:        { width: 32, height: 32, borderRadius: 6, backgroundColor: '#2d333b', alignItems: 'center', justifyContent: 'center' },
   scrollView:       { flex: 1 },
-  contentScroll:   { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 100 },
+  contentScroll:   { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
 
   mainCard:         { backgroundColor: '#1b1d24', borderRadius: 8, flexDirection: 'row', overflow: 'hidden', marginBottom: 24 },
   cardLeftBorder:  { width: 4, backgroundColor: '#e11d48' },
@@ -851,25 +957,6 @@ container:         { flex: 1, backgroundColor: '#16181d' },
     flex: 1, color: '#c4b5fd',
     fontSize: 12, fontWeight: '900', letterSpacing: 0.8,
   },
-  legalPDFButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#7f1d1d',
-    borderWidth: 1,
-    borderColor: '#991b1b',
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginTop: 10,
-  },
-  legalPDFButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
   informeBadgeRol: {
     backgroundColor: '#3b1f6e',
     paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4,
@@ -909,11 +996,73 @@ container:         { flex: 1, backgroundColor: '#16181d' },
   resName:         { color: '#f8fafc', fontSize: 10, fontWeight: '800', textAlign: 'center', letterSpacing: 0.5 },
   logisticsStatus: { backgroundColor: '#064e3b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   statusMiniText:  { color: '#10b981', fontSize: 8, fontWeight: '900' },
-
-  // ── Navegación inferior (De la rama dev) ───────────────────────────────────────────────
-  fakeBottomNav:   { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', backgroundColor: '#1b1d24', paddingVertical: 12, paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: '#26282f', position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
-  navItem:         { alignItems: 'center', gap: 4, flex: 1 },
-  navLabel:        { color: '#64748b', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  sosContainer:    { backgroundColor: '#2d333b', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, alignItems: 'center', gap: 2, flex: 1.2 },
-  sosLabel:        { color: '#e11d48', fontSize: 10, fontWeight: '800' },
+  finalizeBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: '#e11d48', 
+    paddingVertical: 14, 
+    borderRadius: 8, 
+    marginBottom: 24, 
+    gap: 8,
+    shadowColor: '#e11d48',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  finalizeBtnText: { 
+    color: '#fff', 
+    fontSize: 13, 
+    fontWeight: '800', 
+    letterSpacing: 1 
+  },
+  tiemposCard: {
+    backgroundColor: '#1b1d24',
+    borderRadius: 8, 
+    padding: 20, 
+    marginBottom: 24,
+    borderWidth: 1, 
+    borderColor: 'rgba(225,29,72,0.15)',
+  },
+  tiemposHeader: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8, 
+    marginBottom: 6,
+  },
+  tiemposTitulo: {
+    color: '#e11d48', 
+    fontSize: 12, 
+    fontWeight: '900', 
+    letterSpacing: 1.2,
+  },
+  tiemposDesc: {
+    color: '#64748b', 
+    fontSize: 11, 
+    fontWeight: '500',
+    marginBottom: 20, 
+    lineHeight: 16,
+  },
+  botonGuardarTiempos: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    gap: 8, 
+    backgroundColor: '#e11d48',
+    borderRadius: 6, 
+    paddingVertical: 14, 
+    marginTop: 4,
+    shadowColor: '#e11d48',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  botonGuardarTiemposTexto: {
+    color: '#fff', 
+    fontSize: 12, 
+    fontWeight: '900', 
+    letterSpacing: 1,
+  },
 });

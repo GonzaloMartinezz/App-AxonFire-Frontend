@@ -9,6 +9,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -27,17 +29,157 @@ function getMockTools() {
   ];
 }
 
+function getIconoBolso(nombre = '') {
+  const n = nombre.toLowerCase();
+  if (n.includes('trauma') || n.includes('medic') || n.includes('primero')) return 'medical-bag';
+  if (n.includes('cuerda') || n.includes('soga') || n.includes('rescate'))   return 'rope';
+  if (n.includes('incendio') || n.includes('fuego'))                          return 'fire-extinguisher';
+  if (n.includes('herramienta') || n.includes('kit'))                         return 'toolbox-outline';
+  return 'bag-personal-outline';
+}
+
 export default function AdminEquipmentScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('moviles'); // 'moviles' | 'base'
+  const [activeTab, setActiveTab] = useState('moviles'); // 'moviles' | 'base' | 'bolsos'
   const [herramientas, setHerramientas] = useState([]);
   const [loadingBase, setLoadingBase] = useState(false);
 
+  // Estados de Móviles
+  const [camiones, setCamiones] = useState([]);
+  const [loadingMoviles, setLoadingMoviles] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [nuevoNombreCamion, setNuevoNombreCamion] = useState('');
+
+  // Estados de Bolsos
+  const [bolsos, setBolsos] = useState([]);
+  const [loadingBolsos, setLoadingBolsos] = useState(false);
+  const [modalBolsoVisible, setModalBolsoVisible] = useState(false);
+  const [nuevoNombreBolso, setNuevoNombreBolso] = useState('');
+
   useEffect(() => {
-    if (activeTab === 'base') fetchHerramientas();
+    if (activeTab === 'base') {
+      fetchHerramientas();
+    } else if (activeTab === 'bolsos') {
+      fetchBolsos();
+    } else {
+      fetchCamiones();
+    }
   }, [activeTab]);
+
+  const fetchCamiones = async () => {
+    setLoadingMoviles(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/camiones`, {
+        headers: { 
+          'Content-Type': 'application/json', 
+          ...(token ? { Authorization: `Bearer ${token}` } : {}) 
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCamiones(Array.isArray(data) ? data : []);
+      } else {
+        console.warn('Error fetching camiones:', res.status);
+      }
+    } catch (e) {
+      console.warn('Error fetching camiones:', e);
+    } finally {
+      setLoadingMoviles(false);
+    }
+  };
+
+  const crearCamion = async () => {
+    if (!nuevoNombreCamion.trim()) {
+      Alert.alert('Error', 'El nombre del móvil no puede estar vacío.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/camiones`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          nombre_camion: nuevoNombreCamion.trim()
+        })
+      });
+      if (res.ok) {
+        Alert.alert('✅ Éxito', 'El móvil se ha agregado correctamente.');
+        setNuevoNombreCamion('');
+        setModalVisible(false);
+        fetchCamiones();
+      } else {
+        const errData = await res.json();
+        Alert.alert('Error', errData.error || 'No se pudo agregar el móvil.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    }
+  };
+
+  const toggleEstadoCamion = async (camion) => {
+    const nuevoEstado = camion.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    try {
+      const res = await fetch(`${API_BASE_URL}/camiones/${camion.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          estado: nuevoEstado
+        })
+      });
+      if (res.ok) {
+        fetchCamiones();
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar el estado del móvil.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    }
+  };
+
+  const eliminarCamion = (camion) => {
+    const performDelete = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/camiones/${camion.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        });
+        if (res.status === 204 || res.ok) {
+          Alert.alert('✅ Éxito', 'El móvil se ha eliminado correctamente.');
+          fetchCamiones();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          Alert.alert(
+            '⚠️ No se pudo eliminar',
+            errData.error || 'Este móvil contiene registros de checklist históricos. Desactívalo en su lugar o solicita al equipo de backend habilitar la eliminación en cascada.'
+          );
+        }
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'No se pudo conectar al servidor.');
+      }
+    };
+
+    Alert.alert(
+      'Eliminar Móvil',
+      `¿Estás seguro que deseas eliminar el ${camion.nombre_camion?.toUpperCase()} de forma permanente? Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', onPress: performDelete, style: 'destructive' }
+      ]
+    );
+  };
 
   const fetchHerramientas = async () => {
     setLoadingBase(true);
@@ -70,6 +212,120 @@ export default function AdminEquipmentScreen({ navigation }) {
     } finally {
       setLoadingBase(false);
     }
+  };
+
+  const fetchBolsos = async () => {
+    setLoadingBolsos(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/bolsos/`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBolsos(Array.isArray(data) ? data : []);
+      } else {
+        console.warn('Error fetching bolsos:', res.status);
+      }
+    } catch (e) {
+      console.warn('Error fetching bolsos:', e);
+    } finally {
+      setLoadingBolsos(false);
+    }
+  };
+
+  const crearBolso = async () => {
+    if (!nuevoNombreBolso.trim()) {
+      Alert.alert('Error', 'El nombre del bolso no puede estar vacío.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/bolsos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          nombre_bolso: nuevoNombreBolso.trim(),
+          estado: 'ACTIVO'
+        })
+      });
+      if (res.ok) {
+        Alert.alert('✅ Éxito', 'El bolso se ha agregado correctamente.');
+        setNuevoNombreBolso('');
+        setModalBolsoVisible(false);
+        fetchBolsos();
+      } else {
+        const errData = await res.json();
+        Alert.alert('Error', errData.error || 'No se pudo agregar el bolso.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    }
+  };
+
+  const toggleEstadoBolso = async (bolso) => {
+    const nuevoEstado = bolso.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    try {
+      const res = await fetch(`${API_BASE_URL}/bolsos/${bolso.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          estado: nuevoEstado
+        })
+      });
+      if (res.ok) {
+        fetchBolsos();
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar el estado del bolso.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'No se pudo conectar al servidor.');
+    }
+  };
+
+  const eliminarBolso = (bolso) => {
+    const performDelete = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/bolsos/${bolso.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        });
+        if (res.status === 204 || res.ok) {
+          Alert.alert('✅ Éxito', 'El bolso se ha eliminado correctamente.');
+          fetchBolsos();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          Alert.alert(
+            '⚠️ No se pudo eliminar',
+            errData.error || 'Este bolso contiene registros de checklist históricos. Desactívalo en su lugar o solicita al equipo de backend habilitar la eliminación en cascada.'
+          );
+        }
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'No se pudo conectar al servidor.');
+      }
+    };
+
+    Alert.alert(
+      'Eliminar Bolso',
+      `¿Estás seguro que deseas eliminar el bolso ${bolso.nombre_bolso?.toUpperCase()} de forma permanente? Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', onPress: performDelete, style: 'destructive' }
+      ]
+    );
   };
 
   const getStockColor = (qty) => qty > 5 ? '#22c55e' : qty > 0 ? '#eab308' : '#dc2626';
@@ -120,86 +376,89 @@ export default function AdminEquipmentScreen({ navigation }) {
           Supervisión en tiempo real de la flota táctica y activos críticos del Sector 7G.
         </Text>
 
-        <TouchableOpacity style={styles.actionBtn}>
-          <MaterialCommunityIcons name="plus-circle" size={20} color="#fff" />
-          <Text style={styles.actionBtnText}>AGREGAR EQUIPO</Text>
-        </TouchableOpacity>
+        {activeTab === 'moviles' ? (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setModalVisible(true)}>
+            <MaterialCommunityIcons name="truck-plus" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>AGREGAR NUEVO MÓVIL</Text>
+          </TouchableOpacity>
+        ) : activeTab === 'bolsos' ? (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setModalBolsoVisible(true)}>
+            <MaterialCommunityIcons name="bag-personal-plus" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>AGREGAR NUEVO BOLSO</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => Alert.alert('Información', 'Para agregar herramientas contactá al administrador de base de datos.')}>
+            <MaterialCommunityIcons name="plus-circle" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>AGREGAR EQUIPO</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Tab Selector */}
         <View style={styles.tabRow}>
           <TouchableOpacity style={[styles.tab, activeTab === 'moviles' && styles.tabActive]} onPress={() => setActiveTab('moviles')}>
-            <MaterialCommunityIcons name="fire-truck" size={16} color={activeTab === 'moviles' ? '#fff' : '#64748b'} />
+            <MaterialCommunityIcons name="fire-truck" size={14} color={activeTab === 'moviles' ? '#fff' : '#64748b'} />
             <Text style={[styles.tabText, activeTab === 'moviles' && styles.tabTextActive]}>MÓVILES</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.tab, activeTab === 'base' && styles.tabActive]} onPress={() => setActiveTab('base')}>
-            <MaterialCommunityIcons name="warehouse" size={16} color={activeTab === 'base' ? '#fff' : '#64748b'} />
-            <Text style={[styles.tabText, activeTab === 'base' && styles.tabTextActive]}>INVENTARIO BASE</Text>
+            <MaterialCommunityIcons name="warehouse" size={14} color={activeTab === 'base' ? '#fff' : '#64748b'} />
+            <Text style={[styles.tabText, activeTab === 'base' && styles.tabTextActive]}>BASE</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tab, activeTab === 'bolsos' && styles.tabActive]} onPress={() => setActiveTab('bolsos')}>
+            <MaterialCommunityIcons name="bag-personal" size={14} color={activeTab === 'bolsos' ? '#fff' : '#64748b'} />
+            <Text style={[styles.tabText, activeTab === 'bolsos' && styles.tabTextActive]}>BOLSOS/KITS</Text>
           </TouchableOpacity>
         </View>
 
         {activeTab === 'moviles' ? (
           <>
-            {/* Móvil 12 Card */}
-            <View style={styles.vehicleCard}>
-              <View style={styles.vehicleLeftBorder} />
-              <Image 
-                source={{ uri: 'https://images.unsplash.com/photo-1599839619722-39751411ea63?q=80&w=600&auto=format&fit=crop' }} 
-                style={styles.vehicleImg} 
-              />
-              <View style={styles.vehicleInfo}>
-                <View style={styles.vehicleTitleRow}>
-                  <Text style={styles.vehicleName}>Móvil 12</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: '#dc2626' }]}>
-                    <Text style={styles.statusTextWhite}>OPERATIVO</Text>
-                  </View>
-                </View>
-                <Text style={styles.vehicleType}>UNIDAD DE ATAQUE RÁPIDO</Text>
-                <View style={styles.statsRow}>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>COMBUSTIBLE</Text>
-                    <View style={styles.barBg}>
-                      <View style={[styles.barFill, { width: '85%', backgroundColor: '#dc2626' }]} />
-                    </View>
-                    <Text style={styles.statValue}>85%</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>AGUA</Text>
-                    <View style={styles.barBg}>
-                      <View style={[styles.barFill, { width: '100%', backgroundColor: '#3b82f6' }]} />
-                    </View>
-                    <Text style={styles.statValue}>100%</Text>
-                  </View>
-                </View>
-                <View style={styles.vehicleActions}>
-                  <TouchableOpacity style={styles.vehicleBtn}>
-                    <Text style={styles.vehicleBtnText}>BITÁCORA</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.vehicleBtn}>
-                    <Text style={styles.vehicleBtnText}>PERSONAL</Text>
-                  </TouchableOpacity>
-                </View>
+            {loadingMoviles ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color="#dc2626" />
+                <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 12, fontWeight: '600' }}>Cargando móviles...</Text>
               </View>
-            </View>
-
-            {/* Móvil 05 Card */}
-            <View style={styles.vehicleCard}>
-              <View style={styles.vehicleInfo}>
-                <View style={styles.vehicleTitleRow}>
-                  <Text style={styles.vehicleName}>Móvil 05</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: '#334155' }]}>
-                    <Text style={styles.statusTextWhite}>MANTENIMIENTO</Text>
-                  </View>
-                </View>
-                <Text style={styles.vehicleType}>ESCALA TELESCÓPICA</Text>
-                <View style={styles.warningRow}>
-                  <MaterialCommunityIcons name="alert-triangle" size={14} color="#fca5a5" />
-                  <Text style={styles.warningText}>Revisión de sistema hidráulico en curso</Text>
-                </View>
-                <TouchableOpacity style={styles.fullWidthBtn}>
-                  <Text style={styles.fullWidthBtnText}>VER REPORTE</Text>
-                </TouchableOpacity>
+            ) : camiones.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <MaterialCommunityIcons name="truck-remove-outline" size={48} color="#334155" />
+                <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, fontWeight: '600' }}>No hay móviles registrados</Text>
               </View>
-            </View>
+            ) : (
+              camiones.map((camion) => {
+                const esActivo = camion.estado === 'ACTIVO';
+                return (
+                  <View key={camion.id} style={styles.vehicleCard}>
+                    <View style={[styles.vehicleLeftBorder, { backgroundColor: esActivo ? '#22c55e' : '#64748b' }]} />
+                    <View style={styles.vehicleInfo}>
+                      <View style={styles.vehicleTitleRow}>
+                        <Text style={styles.vehicleName}>{camion.nombre_camion?.toUpperCase()}</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: esActivo ? '#052e16' : '#1e293b' }]}>
+                          <Text style={[styles.statusTextWhite, { color: esActivo ? '#22c55e' : '#94a3b8' }]}>
+                            {esActivo ? 'OPERATIVO' : 'DESACTIVADO'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.vehicleType}>FLOTA TÁCTICA SECTOR 7G</Text>
+                      
+                      <View style={[styles.vehicleActions, { marginTop: 16 }]}>
+                        <TouchableOpacity 
+                          style={[styles.vehicleBtn, { backgroundColor: esActivo ? '#26282f' : '#052e16' }]}
+                          onPress={() => toggleEstadoCamion(camion)}
+                        >
+                          <Text style={[styles.vehicleBtnText, { color: esActivo ? '#cbd5e1' : '#22c55e' }]}>
+                            {esActivo ? 'DESACTIVAR' : 'ACTIVAR'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.vehicleBtn, { backgroundColor: '#2d1515' }]} 
+                          onPress={() => eliminarCamion(camion)}
+                        >
+                          <Text style={[styles.vehicleBtnText, { color: '#ef4444' }]}>ELIMINAR</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
 
             {/* Herramientas Críticas */}
             <Text style={styles.sectionTitle}>HERRAMIENTAS CRÍTICAS</Text>
@@ -256,6 +515,66 @@ export default function AdminEquipmentScreen({ navigation }) {
               <Text style={styles.warningTextSmall}>REQUIERE CALIBRACIÓN</Text>
             </View>
           </>
+        ) : activeTab === 'bolsos' ? (
+          <>
+            {/* BOLSOS Y KITS TAB */}
+            <View style={styles.baseHeader}>
+              <MaterialCommunityIcons name="bag-personal" size={20} color="#93c5fd" />
+              <Text style={styles.baseHeaderText}>CONTROL DE BOLSOS Y KITS TÁCTICOS</Text>
+            </View>
+
+            {loadingBolsos ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color="#dc2626" />
+                <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 12, fontWeight: '600' }}>Cargando bolsos...</Text>
+              </View>
+            ) : bolsos.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <MaterialCommunityIcons name="bag-remove-outline" size={48} color="#334155" />
+                <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, fontWeight: '600' }}>No hay bolsos registrados</Text>
+              </View>
+            ) : (
+              bolsos.map((bolso) => {
+                const esActivo = bolso.estado === 'ACTIVO';
+                return (
+                  <View key={bolso.id} style={styles.vehicleCard}>
+                    <View style={[styles.vehicleLeftBorder, { backgroundColor: esActivo ? '#22c55e' : '#64748b' }]} />
+                    <View style={styles.vehicleInfo}>
+                      <View style={styles.vehicleTitleRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <MaterialCommunityIcons name={getIconoBolso(bolso.nombre_bolso)} size={24} color={esActivo ? '#dc2626' : '#64748b'} />
+                          <Text style={styles.vehicleName}>{bolso.nombre_bolso?.toUpperCase()}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: esActivo ? '#052e16' : '#1e293b' }]}>
+                          <Text style={[styles.statusTextWhite, { color: esActivo ? '#22c55e' : '#94a3b8' }]}>
+                            {esActivo ? 'OPERATIVO' : 'DESACTIVADO'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.vehicleType}>KITS POST-EMERGENCIA (AFTER EMERGENCY)</Text>
+                      
+                      <View style={[styles.vehicleActions, { marginTop: 16 }]}>
+                        <TouchableOpacity 
+                          style={[styles.vehicleBtn, { backgroundColor: esActivo ? '#26282f' : '#052e16' }]}
+                          onPress={() => toggleEstadoBolso(bolso)}
+                        >
+                          <Text style={[styles.vehicleBtnText, { color: esActivo ? '#cbd5e1' : '#22c55e' }]}>
+                            {esActivo ? 'DESACTIVAR' : 'ACTIVAR'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.vehicleBtn, { backgroundColor: '#2d1515' }]} 
+                          onPress={() => eliminarBolso(bolso)}
+                        >
+                          <Text style={[styles.vehicleBtnText, { color: '#ef4444' }]}>ELIMINAR</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </>
         ) : (
           <>
             {/* BASE INVENTORY TAB */}
@@ -307,6 +626,96 @@ export default function AdminEquipmentScreen({ navigation }) {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Modal de Creación de Móvil */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalCenteredView}>
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <MaterialCommunityIcons name="fire-truck" size={24} color="#e11d48" />
+              <Text style={styles.modalTitle}>NUEVO MÓVIL</Text>
+            </View>
+            <Text style={styles.modalDesc}>
+              Ingresá la identificación del nuevo móvil de la flota táctica.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. MÓVIL 03"
+              placeholderTextColor="#64748b"
+              value={nuevoNombreCamion}
+              onChangeText={setNuevoNombreCamion}
+              autoCapitalize="characters"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalBtnCancel]} 
+                onPress={() => {
+                  setModalVisible(false);
+                  setNuevoNombreCamion('');
+                }}
+              >
+                <Text style={styles.modalBtnTextCancel}>CANCELAR</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalBtnConfirm]} 
+                onPress={crearCamion}
+              >
+                <Text style={styles.modalBtnTextConfirm}>CREAR MÓVIL</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Creación de Bolso */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalBolsoVisible}
+        onRequestClose={() => setModalBolsoVisible(false)}
+      >
+        <View style={styles.modalCenteredView}>
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <MaterialCommunityIcons name="bag-personal" size={24} color="#e11d48" />
+              <Text style={styles.modalTitle}>NUEVO BOLSO / KIT</Text>
+            </View>
+            <Text style={styles.modalDesc}>
+              Ingresá el nombre o identificación del bolso táctico para el control post-emergencia.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. BOLSO DE TRAUMA B"
+              placeholderTextColor="#64748b"
+              value={nuevoNombreBolso}
+              onChangeText={setNuevoNombreBolso}
+              autoCapitalize="characters"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalBtnCancel]} 
+                onPress={() => {
+                  setModalBolsoVisible(false);
+                  setNuevoNombreBolso('');
+                }}
+              >
+                <Text style={styles.modalBtnTextCancel}>CANCELAR</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalBtnConfirm]} 
+                onPress={crearBolso}
+              >
+                <Text style={styles.modalBtnTextConfirm}>CREAR BOLSO</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -687,6 +1096,86 @@ const styles = StyleSheet.create({
   baseHeaderText: {
     color: '#93c5fd',
     fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  modalCenteredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    padding: 20,
+  },
+  modalView: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#1b1d24',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    color: '#f8fafc',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  modalDesc: {
+    color: '#94a3b8',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#16181d',
+    borderColor: '#334155',
+    borderWidth: 1,
+    borderRadius: 6,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: '#26282f',
+  },
+  modalBtnConfirm: {
+    backgroundColor: '#e11d48',
+  },
+  modalBtnTextCancel: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  modalBtnTextConfirm: {
+    color: '#fff',
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
   },
