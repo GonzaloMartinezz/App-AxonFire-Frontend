@@ -94,18 +94,18 @@ export default function ReportsScreen({ navigation }) {
       const filtered = [];
       for (const alert of alertsData) {
         const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${alert.id}`);
-        const isFinalized = 
-          alert.estadoAlerta?.nombre_estado === 'FINALIZADO' || 
-          alert.fecha_hora_finalizacion !== null ||
+        const isFinalized =
+          alert.estadoAlerta?.nombre_estado === 'FINALIZADO' ||
+          !!alert.fecha_hora_finalizacion ||
           isLocallyFinalized === 'true';
 
         if (isFinalized) {
           filtered.push({
             ...alert,
             // Normalizar el estado a finalizado para la UI
-            estadoAlerta: { 
-              ...alert.estadoAlerta, 
-              nombre_estado: 'FINALIZADO' 
+            estadoAlerta: {
+              ...alert.estadoAlerta,
+              nombre_estado: 'FINALIZADO'
             }
           });
         }
@@ -138,23 +138,17 @@ export default function ReportsScreen({ navigation }) {
         'Authorization': `Bearer ${token}`
       };
 
-      // 1. Obtener todas las respuestas para poder cruzar los bomberos aceptados
-      let responsesData = [];
+      // 1. Obtener las respuestas de esta alerta específica para poder cruzar los bomberos aceptados
+      let alertResponses = [];
       try {
-        const resResp = await axios.get(`${API_BASE_URL}/respuestas_alertas/`, {
+        const resResp = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alerta.id}`, {
           headers,
           timeout: 5000
         });
-        responsesData = Array.isArray(resResp.data) ? resResp.data : [];
+        alertResponses = Array.isArray(resResp.data) ? resResp.data : [];
       } catch (err) {
-        console.log('Error loading responses:', err?.message || err);
+        console.log('Error loading responses for alert:', err?.message || err);
       }
-
-      // Filtrar las respuestas correspondientes a esta alerta específica
-      let alertResponses = responsesData.filter(r => {
-        const rAlertaId = r.alerta_id || r.alertaId?.id || r.alertaId;
-        return rAlertaId === alerta.id;
-      });
 
       // Combinar con respuestas locales de AsyncStorage si las hubiera
       try {
@@ -419,9 +413,9 @@ export default function ReportsScreen({ navigation }) {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
-        contentContainerStyle={styles.contentScroll} 
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentScroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -470,8 +464,8 @@ export default function ReportsScreen({ navigation }) {
           </View>
         ) : filteredAlertsList.length > 0 ? (
           filteredAlertsList.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
+            <TouchableOpacity
+              key={item.id}
               style={styles.alertCard}
               activeOpacity={0.8}
               onPress={() => navigation.navigate('AlertDetail', { alerta_id: item.id })}
@@ -501,7 +495,7 @@ export default function ReportsScreen({ navigation }) {
                 </Text>
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.pdfButton,
                   generatingPdfId === item.id && styles.pdfButtonDisabled

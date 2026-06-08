@@ -125,13 +125,26 @@ export default function EstadisticasScreen({ navigation }) {
         console.log('Error loading range alerts:', err?.message || err);
       }
 
-      // 2. Fetch all responses (includes usuario data via backend include)
+      // 2. Fetch responses for the alerts in this period (using the alert-specific endpoint)
       try {
-        const resResp = await axios.get(`${API_BASE_URL}/respuestas_alertas/`, {
-          headers,
-          timeout: 5000
-        });
-        responsesData = Array.isArray(resResp.data) ? resResp.data : [];
+        if (alertsData.length > 0) {
+          const promises = alertsData.map(async (alert) => {
+            try {
+              const resResp = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alert.id}`, {
+                headers,
+                timeout: 5000
+              });
+              return Array.isArray(resResp.data) ? resResp.data : [];
+            } catch (err) {
+              console.log(`Error loading responses for alert ${alert.id}:`, err?.message || err);
+              return [];
+            }
+          });
+          const results = await Promise.all(promises);
+          responsesData = results.flat();
+        } else {
+          responsesData = [];
+        }
       } catch (err) {
         console.log('Error loading alert responses:', err?.message || err);
       }
