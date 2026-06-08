@@ -17,29 +17,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { API_BASE_URL } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getIconoBolso(nombre = '') {
   const n = nombre.toLowerCase();
   if (n.includes('trauma') || n.includes('medic') || n.includes('primero')) return 'medical-bag';
-  if (n.includes('cuerda') || n.includes('soga') || n.includes('rescate'))   return 'rope';
-  if (n.includes('incendio') || n.includes('fuego'))                          return 'fire-extinguisher';
-  if (n.includes('herramienta') || n.includes('kit'))                         return 'toolbox-outline';
+  if (n.includes('cuerda') || n.includes('soga') || n.includes('rescate')) return 'rope';
+  if (n.includes('incendio') || n.includes('fuego')) return 'fire-extinguisher';
+  if (n.includes('herramienta') || n.includes('kit')) return 'toolbox-outline';
   return 'bag-personal-outline';
 }
 
 function getIconoHerramienta(nombre = '') {
   const n = nombre.toLowerCase();
-  if (n.includes('extintor'))                         return 'fire-extinguisher';
-  if (n.includes('venda') || n.includes('gasa'))      return 'bandage';
-  if (n.includes('tijera'))                           return 'content-cut';
-  if (n.includes('guante'))                           return 'hand-back-left-outline';
-  if (n.includes('linterna') || n.includes('luz'))    return 'flashlight';
-  if (n.includes('cuerda') || n.includes('soga'))     return 'rope';
+  if (n.includes('extintor')) return 'fire-extinguisher';
+  if (n.includes('venda') || n.includes('gasa')) return 'bandage';
+  if (n.includes('tijera')) return 'content-cut';
+  if (n.includes('guante')) return 'hand-back-left-outline';
+  if (n.includes('linterna') || n.includes('luz')) return 'flashlight';
+  if (n.includes('cuerda') || n.includes('soga')) return 'rope';
   if (n.includes('mascarilla') || n.includes('oxig')) return 'air-filter';
-  if (n.includes('camilla'))                          return 'bed-outline';
-  if (n.includes('hacha'))                            return 'axe';
+  if (n.includes('camilla')) return 'bed-outline';
+  if (n.includes('hacha')) return 'axe';
   return 'package-variant-closed';
 }
 
@@ -48,9 +49,12 @@ function getIconoHerramienta(nombre = '') {
 export default function ChecklistBolsosScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
 
-  const token      = route?.params?.token      || '';
+  const camionNombre = route?.params?.camionNombre || 'Móvil';
+  const { user, token: userToken } = useAuth();
+  const token = userToken ?? user?.token ?? '';
+
   // Si viene con un bolsoId fijo (desde el disparador de emergencia), lo usamos
-  const bolsoIdParam = route?.params?.bolsoId  || null;
+  const bolsoIdParam = route?.params?.bolsoId || null;
 
   const headers = {
     'Content-Type': 'application/json',
@@ -60,29 +64,29 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   // ── Estado ──────────────────────────────────────────────────────────────────
 
   // Lista de bolsos disponibles (para el selector)
-  const [bolsos, setBolsos]           = useState([]);
+  const [bolsos, setBolsos] = useState([]);
   const [bolsoActivo, setBolsoActivo] = useState(null); // bolso seleccionado
 
   // Herramientas del bolso activo
   const [herramientas, setHerramientas] = useState([]);
 
   // { [inventarioId]: 'CHEQUEADO' | 'FALTANTE' | null }
-  const [estadoItems, setEstadoItems]   = useState({});
+  const [estadoItems, setEstadoItems] = useState({});
 
   // { [inventarioId]: string } — observaciones para FALTANTE
   const [observaciones, setObservaciones] = useState({});
 
-  const [cargandoBolsos, setCargandoBolsos]         = useState(true);
+  const [cargandoBolsos, setCargandoBolsos] = useState(true);
   const [cargandoInventario, setCargandoInventario] = useState(false);
-  const [refrescando, setRefrescando]               = useState(false);
-  const [guardando, setGuardando]                   = useState(false);
-  const [error, setError]                           = useState(null);
+  const [refrescando, setRefrescando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
 
   // ── Estado de Modo Administrador ─────────────────────────────────────────────
-  const [modoAdmin, setModoAdmin]               = useState(false);
-  const [modalVisible, setModalVisible]         = useState(false);
+  const [modoAdmin, setModoAdmin] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
   const [nuevoNombreBolso, setNuevoNombreBolso] = useState('');
-  const [creando, setCreando]                   = useState(false);
+  const [creando, setCreando] = useState(false);
 
   // ── Carga de bolsos ──────────────────────────────────────────────────────────
 
@@ -288,13 +292,15 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
         faltantes > 0
           ? `Se registraron ${faltantes} ítem(s) faltante(s). Coordinar reposición.`
           : 'Todo el bolso está completo y en condiciones.',
-        [{ text: 'OK', onPress: () => {
-          // Reseteamos para poder hacer otro bolso
-          setBolsoActivo(null);
-          setHerramientas([]);
-          setEstadoItems({});
-          setObservaciones({});
-        }}]
+        [{
+          text: 'OK', onPress: () => {
+            // Reseteamos para poder hacer otro bolso
+            setBolsoActivo(null);
+            setHerramientas([]);
+            setEstadoItems({});
+            setObservaciones({});
+          }
+        }]
       );
     } catch (err) {
       console.error('Error guardando checklist de bolso:', err);
@@ -306,7 +312,7 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
 
   // ── Progreso ──────────────────────────────────────────────────────────────────
 
-  const total    = Object.keys(estadoItems).length;
+  const total = Object.keys(estadoItems).length;
   const marcados = Object.values(estadoItems).filter(v => v !== null).length;
   const faltantes = Object.values(estadoItems).filter(v => v === 'FALTANTE').length;
   const progreso = total > 0 ? marcados / total : 0;
@@ -544,8 +550,10 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                 <View style={styles.progressBar}>
                   <View style={[
                     styles.progressFill,
-                    { width: `${progreso * 100}%`,
-                      backgroundColor: faltantes > 0 ? '#f59e0b' : '#22c55e' }
+                    {
+                      width: `${progreso * 100}%`,
+                      backgroundColor: faltantes > 0 ? '#f59e0b' : '#22c55e'
+                    }
                   ]} />
                 </View>
               </View>
@@ -572,9 +580,9 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                 || item.herramienta
                 || 'Herramienta';
               const cantidad = item.cantidad_herramienta ?? item.cantidad ?? 1;
-              const estado   = estadoItems[item.id] || null;
+              const estado = estadoItems[item.id] || null;
               const esChequeado = estado === 'CHEQUEADO';
-              const esFaltante  = estado === 'FALTANTE';
+              const esFaltante = estado === 'FALTANTE';
 
               return (
                 <View
@@ -582,7 +590,7 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                   style={[
                     styles.cardItem,
                     esChequeado && styles.cardOk,
-                    esFaltante  && styles.cardFail,
+                    esFaltante && styles.cardFail,
                   ]}
                 >
                   <View style={styles.cardItemLeft}>
@@ -658,9 +666,9 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                   {guardando
                     ? <ActivityIndicator size="small" color="#fff" />
                     : <>
-                        <MaterialCommunityIcons name="content-save-check" size={18} color="#fff" />
-                        <Text style={styles.textoGuardar}>GUARDAR REVISIÓN</Text>
-                      </>
+                      <MaterialCommunityIcons name="content-save-check" size={18} color="#fff" />
+                      <Text style={styles.textoGuardar}>GUARDAR REVISIÓN</Text>
+                    </>
                   }
                 </LinearGradient>
               </TouchableOpacity>
@@ -716,9 +724,9 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                 {creando
                   ? <ActivityIndicator size="small" color="#000" />
                   : <>
-                      <MaterialCommunityIcons name="plus" size={16} color="#000" />
-                      <Text style={styles.modalBtnCrearText}>CREAR BOLSO</Text>
-                    </>
+                    <MaterialCommunityIcons name="plus" size={16} color="#000" />
+                    <Text style={styles.modalBtnCrearText}>CREAR BOLSO</Text>
+                  </>
                 }
               </TouchableOpacity>
             </View>
@@ -812,7 +820,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderLeftWidth: 3, borderLeftColor: '#334155',
   },
-  cardOk:   { borderLeftColor: '#22c55e' },
+  cardOk: { borderLeftColor: '#22c55e' },
   cardFail: { borderLeftColor: '#dc2626', backgroundColor: '#1f1315' },
   cardItemLeft: { flex: 1, paddingRight: 10 },
   itemIconRow: { flexDirection: 'row', alignItems: 'center' },
@@ -861,6 +869,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3, borderLeftColor: '#dc2626', marginBottom: 12,
   },
   errorText: { color: '#f87171', fontSize: 12, fontWeight: '600', flex: 1 },
+<<<<<<< HEAD
+=======
 
   // ── Modo Admin ────────────────────────────────────────────────────────────────
   iconBtnActive: { backgroundColor: '#451a03' },
@@ -957,4 +967,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#f59e0b',
   },
   modalBtnCrearText: { color: '#000', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+>>>>>>> carona
 });
