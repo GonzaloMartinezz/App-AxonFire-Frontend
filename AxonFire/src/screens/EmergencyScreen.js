@@ -325,6 +325,31 @@ export default function EmergencyScreen({ route, navigation }) {
   const vibrationRef = useRef(null);
   const isAlertActiveRef = useRef(false);
   const soundLoadingRef = useRef(false);
+  const pulseScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let animation;
+    if (!alertaData) {
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseScale, {
+            toValue: 1.15,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseScale, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+    }
+    return () => {
+      if (animation) animation.stop();
+    };
+  }, [alertaData]);
   const revisionBolsos = useRevisionBolsos();
   const promptedRef = useRef({});
 
@@ -431,8 +456,13 @@ export default function EmergencyScreen({ route, navigation }) {
       }
 
       if (!activeAlertaId) {
-        // Fallback demo alert si la base de datos está vacía o el cliente está fuera de línea
-        activeAlertaId = 'demo-alert-123';
+        setResolvedAlertaId(null);
+        setAlertaData(null);
+        setRespuesta(null);
+        setResponders([]);
+        setRespuestaSummary({ confirmaron: 0, rechazaron: 0, pendientes: 0 });
+        setLoadingAlerta(false);
+        return;
       }
       
       setResolvedAlertaId(activeAlertaId);
@@ -979,100 +1009,128 @@ export default function EmergencyScreen({ route, navigation }) {
             <Text style={styles.date}>{currentDate}</Text>
           </View>
 
-          <View style={styles.alertBox}>
-            <MaterialCommunityIcons name="alert" size={24} color="#fff" />
-            <View>
-              <Text style={styles.alertTitle}>¡ALERTA DE EMERGENCIA!</Text>
-              <Text style={styles.alertSubtitle}>AXON CODE</Text>
-            </View>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>TIPO DE INCIDENTE</Text>
-            <Text style={styles.text}>{alertaData?.observaciones || 'Incendio Estructural - Edificio'}</Text>
-            <Text style={styles.text}>{alertaData?.ubicacion || 'Ubicación no disponible'}</Text>
-            <View style={styles.row}>
-              <View>
-                <Text style={styles.label}>HORA</Text>
-                <Text style={styles.text}>
-                  {alertaData?.fecha_hora
-                    ? formatHora(parseDateLocal(alertaData.fecha_hora))
-                    : currentTime} HS
-                </Text>
+          {!alertaData ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.pulseContainer}>
+                <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulseScale }] }]} />
+                <View style={styles.pulseIconContainer}>
+                  <MaterialCommunityIcons name="shield-lock-outline" size={64} color="#10b981" />
+                </View>
               </View>
-              <View>
-                <Text style={styles.label}>PRIORIDAD</Text>
-                <Text style={styles.critical}>CRÍTICA</Text>
-              </View>
-            </View>
-            <View style={styles.location}>
-              <MaterialCommunityIcons name="map-marker" size={20} color="#3b82f6" />
-              <Text style={styles.locationText}>
-                {alertaData?.ubicacion || 'Av. Corrientes 1234, CABA. Múltiples focos en piso 4 y 5.'}
+              
+              <Text style={styles.emptyTitle}>SITUACIÓN BAJO CONTROL</Text>
+              <Text style={styles.emptySubtitle}>
+                No se registran emergencias activas en este momento.
               </Text>
-            </View>
-          </View>
-
-          {error && (
-            <View style={styles.errorBox}>
-              <MaterialCommunityIcons name="alert-circle" size={16} color="#ef4444" />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          {responders.length > 0 && (
-            <View style={styles.respondersPreview}>
-              <View style={styles.respondersHeader}>
-                <MaterialCommunityIcons name="account-group" size={18} color="#3b82f6" />
-                <Text style={styles.respondersTitle}>PERSONAL RESPONDIENDO ({responders.length})</Text>
+              
+              <View style={styles.statusBoxActive}>
+                <View style={styles.greenDot} />
+                <Text style={styles.statusBoxText}>SISTEMA EN MONITOREO ACTIVO</Text>
               </View>
-              <View style={styles.respondersGrid}>
-                {responders.map((r, idx) => (
-                  <View key={idx} style={styles.responderChip}>
-                    <Text style={styles.responderChipText}>{r.nombre[0]}. {r.apellido}</Text>
+              
+              <TouchableOpacity style={styles.emptyRefreshButton} onPress={fetchEmergencyData}>
+                <MaterialCommunityIcons name="refresh" size={18} color="#94a3b8" />
+                <Text style={styles.emptyRefreshButtonText}>VERIFICAR ALERTA</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.alertBox}>
+                <MaterialCommunityIcons name="alert" size={24} color="#fff" />
+                <View>
+                  <Text style={styles.alertTitle}>¡ALERTA DE EMERGENCIA!</Text>
+                  <Text style={styles.alertSubtitle}>AXON CODE</Text>
+                </View>
+              </View>
+
+              <View style={styles.card}>
+                <Text style={styles.label}>TIPO DE INCIDENTE</Text>
+                <Text style={styles.text}>{alertaData?.observaciones || 'Incendio Estructural - Edificio'}</Text>
+                <Text style={styles.text}>{alertaData?.ubicacion || 'Ubicación no disponible'}</Text>
+                <View style={styles.row}>
+                  <View>
+                    <Text style={styles.label}>HORA</Text>
+                    <Text style={styles.text}>
+                      {alertaData?.fecha_hora
+                        ? formatHora(parseDateLocal(alertaData.fecha_hora))
+                        : currentTime} HS
+                    </Text>
                   </View>
-                ))}
+                  <View>
+                    <Text style={styles.label}>PRIORIDAD</Text>
+                    <Text style={styles.critical}>CRÍTICA</Text>
+                  </View>
+                </View>
+                <View style={styles.location}>
+                  <MaterialCommunityIcons name="map-marker" size={20} color="#3b82f6" />
+                  <Text style={styles.locationText}>
+                    {alertaData?.ubicacion || 'Av. Corrientes 1234, CABA. Múltiples focos en piso 4 y 5.'}
+                  </Text>
+                </View>
               </View>
-            </View>
+
+              {error && (
+                <View style={styles.errorBox}>
+                  <MaterialCommunityIcons name="alert-circle" size={16} color="#ef4444" />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+
+              {responders.length > 0 && (
+                <View style={styles.respondersPreview}>
+                  <View style={styles.respondersHeader}>
+                    <MaterialCommunityIcons name="account-group" size={18} color="#3b82f6" />
+                    <Text style={styles.respondersTitle}>PERSONAL RESPONDIENDO ({responders.length})</Text>
+                  </View>
+                  <View style={styles.respondersGrid}>
+                    {responders.map((r, idx) => (
+                      <View key={idx} style={styles.responderChip}>
+                        <Text style={styles.responderChipText}>{r.nombre[0]}. {r.apellido}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, loading && styles.buttonDisabled]}
+                  onPress={() => enviarRespuesta('ACEPTADO')}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
+                  )}
+                  <Text style={styles.buttonText}>CONFIRMAR ASISTENCIA</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.rejectButton, loading && styles.buttonDisabled]}
+                  onPress={() => enviarRespuesta('RECHAZADO')}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
+                  )}
+                  <Text style={styles.buttonText}>RECHAZAR</Text>
+                </TouchableOpacity>
+
+                {/* Acceso siempre disponible al Tablero de Asistencia */}
+                <TouchableOpacity 
+                  style={styles.boardAccessButton}
+                  onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#fff" />
+                  <Text style={styles.boardAccessButtonText}>VER TABLERO DE ASISTENCIA</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
-
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.confirmButton, loading && styles.buttonDisabled]}
-              onPress={() => enviarRespuesta('ACEPTADO')}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <MaterialCommunityIcons name="check-circle-outline" size={20} color="#fff" />
-              )}
-              <Text style={styles.buttonText}>CONFIRMAR ASISTENCIA</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.rejectButton, loading && styles.buttonDisabled]}
-              onPress={() => enviarRespuesta('RECHAZADO')}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <MaterialCommunityIcons name="close-circle-outline" size={20} color="#fff" />
-              )}
-              <Text style={styles.buttonText}>RECHAZAR</Text>
-            </TouchableOpacity>
-
-            {/* Acceso siempre disponible al Tablero de Asistencia */}
-            <TouchableOpacity 
-              style={styles.boardAccessButton}
-              onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#fff" />
-              <Text style={styles.boardAccessButtonText}>VER TABLERO DE ASISTENCIA</Text>
-            </TouchableOpacity>
-          </View>
 
         {/* FOOTER */}
         <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
@@ -1285,5 +1343,96 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    marginTop: 40,
+  },
+  pulseContainer: {
+    position: 'relative',
+    width: 120,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  pulseIconContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#90a4ae',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  statusBoxActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 30,
+    marginBottom: 32,
+  },
+  greenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10b981',
+    marginRight: 10,
+  },
+  statusBoxText: {
+    color: '#10b981',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  emptyRefreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1f2937',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  emptyRefreshButtonText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

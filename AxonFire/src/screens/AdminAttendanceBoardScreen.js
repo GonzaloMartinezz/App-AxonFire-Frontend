@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -13,6 +13,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -259,6 +260,32 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const [timerText, setTimerText] = useState('00:00:00');
   const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
+  const pulseScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let animation;
+    if (!activeAlerta) {
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseScale, {
+            toValue: 1.15,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseScale, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+    }
+    return () => {
+      if (animation) animation.stop();
+    };
+  }, [activeAlerta]);
+
   // Estados para RSVP interactivo
   const [miRespuesta, setMiRespuesta] = useState(null);
   const [respondiendo, setRespondiendo] = useState(false);
@@ -309,7 +336,12 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       }
 
       if (!activeAlertaId) {
-        activeAlertaId = 'demo-alert-123';
+        setCurrentAlertaId(null);
+        setActiveAlerta(null);
+        setPersonnel([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
       }
 
       setCurrentAlertaId(activeAlertaId);
@@ -671,214 +703,234 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentColor} />}
       >
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <View style={styles.titleLeftGroup}>
-            <View style={[styles.redAccent, { backgroundColor: accentColor }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerLabel}>
-                {activeAlerta ? 'DETALLE DE ASISTENCIA' : 'ATTENDANCE BOARD'} • {lastRefresh}
-              </Text>
-              <Text style={styles.mainTitle} numberOfLines={2}>
-                {activeAlerta ? (activeAlerta.observaciones || 'INCIDENTE DE EMERGENCIA') : 'TABLERO DE\nASISTENCIA'}
-              </Text>
-              {activeAlerta && activeAlerta.ubicacion ? (
-                <Text style={styles.alertInfoSub}>{activeAlerta.ubicacion}</Text>
+        {!activeAlerta ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.pulseContainer}>
+              <Animated.View style={[styles.pulseRing, { transform: [{ scale: pulseScale }] }]} />
+              <View style={styles.pulseIconContainer}>
+                <MaterialCommunityIcons name="clipboard-check-outline" size={64} color="#10b981" />
+              </View>
+            </View>
+            
+            <Text style={styles.emptyTitle}>SITUACIÓN BAJO CONTROL</Text>
+            <Text style={styles.emptySubtitle}>
+              No hay registro de asistencia a revisar ya que no hay ninguna emergencia activa.
+            </Text>
+            
+            <View style={styles.statusBoxActive}>
+              <View style={styles.greenDot} />
+              <Text style={styles.statusBoxText}>SISTEMA EN ESPERA DE DESPACHOS</Text>
+            </View>
+            
+            <TouchableOpacity style={styles.emptyRefreshButton} onPress={fetchData}>
+              <MaterialCommunityIcons name="refresh" size={18} color="#94a3b8" />
+              <Text style={styles.emptyRefreshButtonText}>ACTUALIZAR TABLERO</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* Header */}
+            <View style={styles.headerRow}>
+              <View style={styles.titleLeftGroup}>
+                <View style={[styles.redAccent, { backgroundColor: accentColor }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.headerLabel}>
+                    {activeAlerta ? 'DETALLE DE ASISTENCIA' : 'ATTENDANCE BOARD'} • {lastRefresh}
+                  </Text>
+                  <Text style={styles.mainTitle} numberOfLines={2}>
+                    {activeAlerta ? (activeAlerta.observaciones || 'INCIDENTE DE EMERGENCIA') : 'TABLERO DE\nASISTENCIA'}
+                  </Text>
+                  {activeAlerta && activeAlerta.ubicacion ? (
+                    <Text style={styles.alertInfoSub}>{activeAlerta.ubicacion}</Text>
+                  ) : null}
+                </View>
+              </View>
+              {activeAlerta && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO' ? (
+                <View style={styles.rateBox}>
+                  <Text style={styles.rateLabel}>TRANSCURRIDO</Text>
+                  <Text style={[styles.rateValue, { color: '#ef4444' }]}>{timerText}</Text>
+                </View>
               ) : null}
             </View>
-          </View>
-          {activeAlerta && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO' ? (
-            <View style={styles.rateBox}>
-              <Text style={styles.rateLabel}>TRANSCURRIDO</Text>
-              <Text style={[styles.rateValue, { color: '#ef4444' }]}>{timerText}</Text>
-            </View>
-          ) : null}
-        </View>
 
-        {!activeAlerta && (
-          <View style={[styles.alertInfoBox, { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, borderLeftColor: accentColor }]}>
-            <MaterialCommunityIcons name="shield-check" size={48} color="#388e3c" style={{ marginBottom: 12 }} />
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>No hay ninguna emergencia en curso</Text>
-            <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>El personal se encuentra inactivo o en guardia.</Text>
-          </View>
-        )}
-
-        {user?.rol === 'ADMIN' && currentAlertaId && activeAlerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
-          <TouchableOpacity style={styles.finalizeBtn} onPress={finalizarEmergencia}>
-            <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
-            <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Error Banner */}
-        {errorMsg && (
-          <View style={styles.errorBanner}>
-            <MaterialCommunityIcons name="alert-circle" size={16} color="#ef4444" />
-            <Text style={styles.errorBannerText}>{errorMsg}</Text>
-            <TouchableOpacity onPress={onRefresh}>
-              <Text style={styles.retryText}>REINTENTAR</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Summary Cards Row */}
-        <View style={styles.cardsRow}>
-          <View style={[styles.summaryCard, { borderLeftColor: '#10b981' }]}>
-            <MaterialCommunityIcons name="check-circle" size={22} color="#10b981" />
-            <Text style={styles.cardNumber}>{String(confirmedCount).padStart(2, '0')}</Text>
-            <Text style={styles.cardLabel}>CONFIRMADOS</Text>
-          </View>
-          <View style={[styles.summaryCard, { borderLeftColor: '#f59e0b' }]}>
-            <MaterialCommunityIcons name="clock-outline" size={22} color="#f59e0b" />
-            <Text style={styles.cardNumber}>{String(pendingCount).padStart(2, '0')}</Text>
-            <Text style={styles.cardLabel}>PENDIENTES</Text>
-          </View>
-          <View style={[styles.summaryCard, { borderLeftColor: '#ef4444' }]}>
-            <MaterialCommunityIcons name="close-circle" size={22} color="#ef4444" />
-            <Text style={styles.cardNumber}>{String(absentCount).padStart(2, '0')}</Text>
-            <Text style={styles.cardLabel}>AUSENTES</Text>
-          </View>
-        </View>
-
-        {/* Total Counter Card */}
-        <View style={styles.totalCard}>
-          <View style={styles.totalLeft}>
-            <Text style={styles.totalLabel}>TOTAL PERSONAL REGISTRADO</Text>
-            <Text style={styles.totalValue}>
-              {String(totalCount).padStart(2, '0')}{' '}
-              <Text style={styles.totalUnit}>EFECTIVOS</Text>
-            </Text>
-          </View>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${confirmRate}%` }]} />
-          </View>
-        </View>
-
-        {/* API Count Badge */}
-        {paramAlertaId && (
-          <View style={styles.apiCountBadge}>
-            <MaterialCommunityIcons name="account-check" size={16} color="#10b981" />
-            <Text style={styles.apiCountText}>
-              ASISTENCIAS CONFIRMADAS (API): {confirmedCountAPI}
-            </Text>
-          </View>
-        )}
-
-        {/* Search */}
-        <View style={styles.searchRow}>
-          <MaterialCommunityIcons name="magnify" size={20} color="#94a3b8" style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="BUSCAR POR NOMBRE O UNIDAD"
-            placeholderTextColor="#64748b"
-            value={searchText}
-            onChangeText={setSearchText}
-          />
-          {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchText('')}>
-              <MaterialCommunityIcons name="close" size={18} color="#94a3b8" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Classification Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabsScroll}
-          contentContainerStyle={styles.tabsContainer}
-        >
-          {CLASSIFICATION_TABS.map((tab) => {
-            const isActive = activeTab === tab.key;
-            const count =
-              tab.key === 'all' ? totalCount : personnel.filter((p) => p.classification === tab.key).length;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={[styles.classTab, isActive && { backgroundColor: accentColor }]}
-                onPress={() => setActiveTab(tab.key)}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons name={tab.icon} size={16} color={isActive ? '#fff' : '#64748b'} />
-                <Text style={[styles.classTabText, isActive && styles.classTabTextActive]}>{tab.label}</Text>
-                <View style={[styles.classTabBadge, isActive && styles.classTabBadgeActive]}>
-                  <Text style={[styles.classTabBadgeText, isActive && { color: accentColor }]}>{count}</Text>
-                </View>
+            {user?.rol === 'ADMIN' && currentAlertaId && activeAlerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
+              <TouchableOpacity style={styles.finalizeBtn} onPress={finalizarEmergencia}>
+                <MaterialCommunityIcons name="flag-checkered" size={20} color="#fff" />
+                <Text style={styles.finalizeBtnText}>FINALIZAR EMERGENCIA</Text>
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+            )}
 
-        {/* Section Header */}
-        <View style={styles.sectionHeader}>
-          <View style={[styles.sectionLine, { backgroundColor: accentColor }]} />
-          <Text style={styles.sectionTitle}>LISTA DE PERSONAL</Text>
-          <View style={styles.sectionCountBadge}>
-            <Text style={styles.sectionCountText}>
-              {filtered.length} RESULTADO{filtered.length !== 1 ? 'S' : ''}
-            </Text>
-          </View>
-        </View>
+            {/* Error Banner */}
+            {errorMsg && (
+              <View style={styles.errorBanner}>
+                <MaterialCommunityIcons name="alert-circle" size={16} color="#ef4444" />
+                <Text style={styles.errorBannerText}>{errorMsg}</Text>
+                <TouchableOpacity onPress={onRefresh}>
+                  <Text style={styles.retryText}>REINTENTAR</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
-        {/* Personnel List */}
-        {filtered.map((person) => {
-          const cfg = STATUS_CONFIG[person.status] || STATUS_CONFIG.ABSENT;
-          return (
-            <View key={person.id} style={[styles.personCard, { borderLeftColor: cfg.color }]}>
-              <View style={styles.personInfoRow}>
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: person.avatar }}
-                    style={[styles.personAvatar, person.status === 'RECHAZADO' && { opacity: 0.4 }]}
-                  />
-                  <View style={[styles.statusDot, { backgroundColor: cfg.color }]} />
-                </View>
-                <View style={styles.personDetails}>
-                  <View style={styles.rankRow}>
-                    <View style={styles.rankBadge}>
-                      <Text style={styles.rankText}>{person.rank || 'BOMBERO'}</Text>
+            {/* Summary Cards Row */}
+            <View style={styles.cardsRow}>
+              <View style={[styles.summaryCard, { borderLeftColor: '#10b981' }]}>
+                <MaterialCommunityIcons name="check-circle" size={22} color="#10b981" />
+                <Text style={styles.cardNumber}>{String(confirmedCount).padStart(2, '0')}</Text>
+                <Text style={styles.cardLabel}>CONFIRMADOS</Text>
+              </View>
+              <View style={[styles.summaryCard, { borderLeftColor: '#f59e0b' }]}>
+                <MaterialCommunityIcons name="clock-outline" size={22} color="#f59e0b" />
+                <Text style={styles.cardNumber}>{String(pendingCount).padStart(2, '0')}</Text>
+                <Text style={styles.cardLabel}>PENDIENTES</Text>
+              </View>
+              <View style={[styles.summaryCard, { borderLeftColor: '#ef4444' }]}>
+                <MaterialCommunityIcons name="close-circle" size={22} color="#ef4444" />
+                <Text style={styles.cardNumber}>{String(absentCount).padStart(2, '0')}</Text>
+                <Text style={styles.cardLabel}>AUSENTES</Text>
+              </View>
+            </View>
+
+            {/* Total Counter Card */}
+            <View style={styles.totalCard}>
+              <View style={styles.totalLeft}>
+                <Text style={styles.totalLabel}>TOTAL PERSONAL REGISTRADO</Text>
+                <Text style={styles.totalValue}>
+                  {String(totalCount).padStart(2, '0')}{' '}
+                  <Text style={styles.totalUnit}>EFECTIVOS</Text>
+                </Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${confirmRate}%` }]} />
+              </View>
+            </View>
+
+            {/* API Count Badge */}
+            {paramAlertaId && (
+              <View style={styles.apiCountBadge}>
+                <MaterialCommunityIcons name="account-check" size={16} color="#10b981" />
+                <Text style={styles.apiCountText}>
+                  ASISTENCIAS CONFIRMADAS (API): {confirmedCountAPI}
+                </Text>
+              </View>
+            )}
+
+            {/* Search */}
+            <View style={styles.searchRow}>
+              <MaterialCommunityIcons name="magnify" size={20} color="#94a3b8" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="BUSCAR POR NOMBRE O UNIDAD"
+                placeholderTextColor="#64748b"
+                value={searchText}
+                onChangeText={setSearchText}
+              />
+              {searchText.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchText('')}>
+                  <MaterialCommunityIcons name="close" size={18} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Classification Tabs */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.tabsScroll}
+              contentContainerStyle={styles.tabsContainer}
+            >
+              {CLASSIFICATION_TABS.map((tab) => {
+                const isActive = activeTab === tab.key;
+                const count =
+                  tab.key === 'all' ? totalCount : personnel.filter((p) => p.classification === tab.key).length;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[styles.classTab, isActive && { backgroundColor: accentColor }]}
+                    onPress={() => setActiveTab(tab.key)}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons name={tab.icon} size={16} color={isActive ? '#fff' : '#64748b'} />
+                    <Text style={[styles.classTabText, isActive && styles.classTabTextActive]}>{tab.label}</Text>
+                    <View style={[styles.classTabBadge, isActive && styles.classTabBadgeActive]}>
+                      <Text style={[styles.classTabBadgeText, isActive && { color: accentColor }]}>{count}</Text>
                     </View>
-                    <Text style={styles.unitText}>{person.unit}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Section Header */}
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionLine, { backgroundColor: accentColor }]} />
+              <Text style={styles.sectionTitle}>LISTA DE PERSONAL</Text>
+              <View style={styles.sectionCountBadge}>
+                <Text style={styles.sectionCountText}>
+                  {filtered.length} RESULTADO{filtered.length !== 1 ? 'S' : ''}
+                </Text>
+              </View>
+            </View>
+
+            {/* Personnel List */}
+            {filtered.map((person) => {
+              const cfg = STATUS_CONFIG[person.status] || STATUS_CONFIG.ABSENT;
+              return (
+                <View key={person.id} style={[styles.personCard, { borderLeftColor: cfg.color }]}>
+                  <View style={styles.personInfoRow}>
+                    <View style={styles.avatarContainer}>
+                      <Image
+                        source={{ uri: person.avatar }}
+                        style={[styles.personAvatar, person.status === 'RECHAZADO' && { opacity: 0.4 }]}
+                      />
+                      <View style={[styles.statusDot, { backgroundColor: cfg.color }]} />
+                    </View>
+                    <View style={styles.personDetails}>
+                      <View style={styles.rankRow}>
+                        <View style={styles.rankBadge}>
+                          <Text style={styles.rankText}>{person.rank || 'BOMBERO'}</Text>
+                        </View>
+                        <Text style={styles.unitText}>{person.unit}</Text>
+                      </View>
+                      <Text style={[styles.personName, person.status === 'RECHAZADO' && { opacity: 0.5 }]}>
+                        {person.name}
+                      </Text>
+                      {renderStatusBadge(person.status)}
+                    </View>
+                    <View style={styles.etaBox}>
+                      <Text style={styles.etaLabel}>HORA</Text>
+                      <Text style={[styles.etaValue, { color: cfg.color }]}>{person.eta}</Text>
+                    </View>
                   </View>
-                  <Text style={[styles.personName, person.status === 'RECHAZADO' && { opacity: 0.5 }]}>
-                    {person.name}
-                  </Text>
-                  {renderStatusBadge(person.status)}
                 </View>
-                <View style={styles.etaBox}>
-                  <Text style={styles.etaLabel}>HORA</Text>
-                  <Text style={[styles.etaValue, { color: cfg.color }]}>{person.eta}</Text>
+              );
+            })}
+
+            {filtered.length === 0 && !loading && (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="account-search" size={48} color="#334155" />
+                <Text style={styles.emptyText}>SIN RESULTADOS</Text>
+              </View>
+            )}
+
+            {/* Bottom Summary */}
+            <View style={styles.bottomSummary}>
+              <Text style={styles.bottomSummaryTitle}>RESUMEN DE ASISTENCIA</Text>
+              <View style={styles.bottomSummaryRow}>
+                <View style={styles.bottomSummaryItem}>
+                  <Text style={styles.bottomSummaryLabel}>TASA DE RESPUESTA</Text>
+                  <Text style={styles.bottomSummaryValue}>{confirmRate}%</Text>
+                </View>
+                <View style={styles.bottomSummaryItem}>
+                  <Text style={styles.bottomSummaryLabel}>CONFIRMADOS API</Text>
+                  <Text style={styles.bottomSummaryValue}>
+                    {String(paramAlertaId ? confirmedCountAPI : confirmedCount).padStart(2, '0')}
+                  </Text>
                 </View>
               </View>
             </View>
-          );
-        })}
 
-        {filtered.length === 0 && !loading && (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="account-search" size={48} color="#334155" />
-            <Text style={styles.emptyText}>SIN RESULTADOS</Text>
-          </View>
+            <View style={{ height: 100 }} />
+          </>
         )}
-
-        {/* Bottom Summary */}
-        <View style={styles.bottomSummary}>
-          <Text style={styles.bottomSummaryTitle}>RESUMEN DE ASISTENCIA</Text>
-          <View style={styles.bottomSummaryRow}>
-            <View style={styles.bottomSummaryItem}>
-              <Text style={styles.bottomSummaryLabel}>TASA DE RESPUESTA</Text>
-              <Text style={styles.bottomSummaryValue}>{confirmRate}%</Text>
-            </View>
-            <View style={styles.bottomSummaryItem}>
-              <Text style={styles.bottomSummaryLabel}>CONFIRMADOS API</Text>
-              <Text style={styles.bottomSummaryValue}>
-                {String(paramAlertaId ? confirmedCountAPI : confirmedCount).padStart(2, '0')}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
@@ -1045,5 +1097,96 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     letterSpacing: 1.2,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    marginTop: 40,
+  },
+  pulseContainer: {
+    position: 'relative',
+    width: 120,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  pulseIconContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  statusBoxActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 30,
+    marginBottom: 32,
+  },
+  greenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10b981',
+    marginRight: 10,
+  },
+  statusBoxText: {
+    color: '#10b981',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  emptyRefreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1f2937',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  emptyRefreshButtonText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });
