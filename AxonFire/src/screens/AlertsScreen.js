@@ -94,13 +94,19 @@ const StatusBadge = ({ severity, type = 'severity' }) => {
   );
 };
 
-export default function AlertsScreen({ navigation }) {
-  const [activeFilter, setActiveFilter] = useState('Activas');
+export default function AlertsScreen({ navigation, route }) {
+  const [activeFilter, setActiveFilter] = useState(route?.params?.filtro || 'Activas');
   const [showMenu, setShowMenu] = useState(false);
   const insets = useSafeAreaInsets();
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
   const { token, user } = useAuth();
+
+  useEffect(() => {
+    if (route?.params?.filtro) {
+      setActiveFilter(route.params.filtro);
+    }
+  }, [route?.params?.filtro]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -259,17 +265,7 @@ export default function AlertsScreen({ navigation }) {
                 <MaterialCommunityIcons name="truck-outline" size={18} color="#e11d48" />
                 <Text style={styles.dropdownItemText}>Pedidos Suministro</Text>
               </TouchableOpacity>
-              <View style={styles.dropdownDivider} />
-              <TouchableOpacity 
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setShowMenu(false);
-                  navigation?.navigate('AlertasVisuales');
-                }}
-              >
-                <MaterialCommunityIcons name="bell-ring-outline" size={18} color="#e11d48" />
-                <Text style={styles.dropdownItemText}>Alertas Visuales</Text>
-              </TouchableOpacity>
+
               <View style={styles.dropdownDivider} />
               <TouchableOpacity 
                 style={styles.dropdownItem}

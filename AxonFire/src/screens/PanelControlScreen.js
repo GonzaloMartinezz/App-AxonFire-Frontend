@@ -328,7 +328,7 @@ export default function PanelControlScreen({ navigation }) {
             <View style={styles.grilla}>
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Activas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Activas' })}
                 style={[styles.cardStat, { borderLeftColor: '#ef4444' }]}
               >
                 <View style={styles.cardStatHeader}>
@@ -340,7 +340,7 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Despachadas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Despachadas' })}
                 style={[styles.cardStat, { borderLeftColor: '#3b82f6' }]}
               >
                 <View style={styles.cardStatHeader}>
@@ -352,7 +352,7 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Resueltas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Resueltas' })}
                 style={[styles.cardStat, { borderLeftColor: '#10b981' }]}
               >
                 <View style={styles.cardStatHeader}>
@@ -364,7 +364,7 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Todas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Todas' })}
                 style={[styles.cardStat, { borderLeftColor: '#94a3b8' }]}
               >
                 <View style={styles.cardStatHeader}>

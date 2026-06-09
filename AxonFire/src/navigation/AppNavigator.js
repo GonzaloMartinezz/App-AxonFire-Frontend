@@ -32,11 +32,9 @@ import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen'
 // ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
-import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
 import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
-import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -267,9 +265,7 @@ export default function AppNavigator() {
 
           {/* Pantallas nuevas */}
           <Stack.Screen name="PanelControl" component={PanelControlScreen} />
-          <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
           <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
-          <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
           <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
           <Stack.Screen name="AdminEquipment" component={AdminEquipmentScreen} />
           <Stack.Screen name="InformePostEmergencia" component={InformePostEmergenciaScreen} />
