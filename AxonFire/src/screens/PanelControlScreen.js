@@ -507,6 +507,21 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemTitle}>Reportes Legales</Text>
                 <Text style={styles.gridItemSub}>Historial de actas</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('Estadisticas')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(225, 29, 72, 0.12)' }]}>
+                    <MaterialCommunityIcons name="chart-bar" size={18} color="#e11d48" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Métricas y Reportes</Text>
+                <Text style={styles.gridItemSub}>Estadísticas RUBA</Text>
+              </TouchableOpacity>
             </View>
 
             {/* ── Actividad reciente ────────────────────────────────────── */}
