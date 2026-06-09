@@ -471,11 +471,11 @@ export default function EstadisticasScreen({ navigation }) {
                 <View style={styles.chartWrapper}>
                   <BarChart
                     data={{
-                      labels: Object.keys(statsTipos),
+                      labels: Object.keys(statsTipos).map(tipo => tipo.length > 15 ? tipo.substring(0, 13) + '..' : tipo),
                       datasets: [{ data: Object.values(statsTipos) }]
                     }}
                     width={width - 80}
-                    height={220}
+                    height={240}
                     chartConfig={{
                       backgroundColor: '#1b1d24',
                       backgroundGradientFrom: '#1b1d24',
@@ -486,8 +486,13 @@ export default function EstadisticasScreen({ navigation }) {
                       style: { borderRadius: 8 },
                       fillShadowGradient: '#e11d48',
                       fillShadowGradientOpacity: 0.6,
+                      propsForLabels: {
+                        fontSize: 8,
+                        fontWeight: '700',
+                      },
                     }}
                     fromZero
+                    verticalLabelRotation={20}
                     segments={
                       Math.max(...Object.values(statsTipos), 0) < 5
                         ? Math.max(...Object.values(statsTipos), 1)

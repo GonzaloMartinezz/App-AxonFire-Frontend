@@ -69,6 +69,17 @@ const STATUS_CONFIG = {
   ABSENT:    { color: '#ef4444', bg: '#7f1d1d', label: 'SIN RESPONDER', icon: 'help-circle', key: 'absent' }
 };
 
+// ── Helper: parsea fecha de la base de datos a local ──────────────────────────
+function parseDateLocal(dateInput) {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput !== 'string') return new Date(dateInput);
+  
+  // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
+  const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
+  return new Date(cleaned);
+}
+
 // ── Local Mock Helpers ───────────────────────────────────────────────────────
 function getMockBomberos() {
   return [
@@ -223,6 +234,18 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
 
   // Alerta ID recibido por parámetros (flexible snake_case y camelCase)
   const paramAlertaId = route?.params?.alerta_id ?? route?.params?.alertaId ?? null;
+
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      if (user?.rol === 'ADMIN') {
+        navigation.navigate('AdminApp');
+      } else {
+        navigation.navigate('MainApp');
+      }
+    }
+  };
 
   const [activeTab, setActiveTab] = useState('all');
   const [searchText, setSearchText] = useState('');
@@ -504,7 +527,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   useEffect(() => {
     let interval;
     if (activeAlerta && activeAlerta.fecha_hora && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
-      const startTime = new Date(activeAlerta.fecha_hora).getTime();
+      const startTime = parseDateLocal(activeAlerta.fecha_hora).getTime();
       
       const updateTimer = () => {
         const now = new Date().getTime();
@@ -624,8 +647,8 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          {navigation.canGoBack() && (
-            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 8 }}>
+          {(navigation.canGoBack() || route?.name === 'AttendanceBoard') && (
+            <TouchableOpacity onPress={handleBack} style={{ marginRight: 8 }}>
               <MaterialCommunityIcons name="arrow-left" size={22} color="#94a3b8" />
             </TouchableOpacity>
           )}

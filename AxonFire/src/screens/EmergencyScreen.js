@@ -158,6 +158,17 @@ function esHoraValida(str) {
   return regex.test(str);
 }
 
+// ── Helper: parsea fecha de la base de datos a local ──────────────────────────
+function parseDateLocal(dateInput) {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput !== 'string') return new Date(dateInput);
+  
+  // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
+  const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
+  return new Date(cleaned);
+}
+
 // ── Componente: Input de hora amigable ────────────────────────────────────────
 // Muestra un campo formateado HH:MM con teclado numérico.
 // Acepta tipeo libre y formatea automáticamente al salir del campo.
@@ -476,7 +487,7 @@ export default function EmergencyScreen({ route, navigation }) {
 
       // AX-14: Extracción automática de la hora de llamado para la UI (Aporte dev)
       if (alertDataObj?.fecha_hora) {
-        setHoraLlamado(formatHora(new Date(alertDataObj.fecha_hora)));
+        setHoraLlamado(formatHora(parseDateLocal(alertDataObj.fecha_hora)));
       }
 
       // 4. Cargar respuestas del personal asignado
@@ -525,8 +536,8 @@ export default function EmergencyScreen({ route, navigation }) {
           revisionBolsos.mostrar({ token, navigation, alertaId: activeAlertaId });
         }
       } else if (miRespuestaVal && miRespuestaVal !== 'PENDIENTE') {
-        setRespuesta(miRespuestaVal);
         stopEmergencyAlert();
+        setRespuesta(miRespuestaVal);
         animateIn();
       } else {
         // Si no hemos respondido o es PENDIENTE, reseteamos para que aparezcan los botones
@@ -575,25 +586,6 @@ export default function EmergencyScreen({ route, navigation }) {
     }, [fetchEmergencyData])
   );
 
-  // Redirección de Administrador (colocada después de todos los hooks de estado para evitar romper reglas de hooks)
-  useEffect(() => {
-    if (user?.rol === 'ADMIN') {
-      stopEmergencyAlert();
-      const activeAlertaId = route?.params?.alerta_id ?? resolvedAlertaId ?? alertaId;
-      navigation.replace('AttendanceBoard', { alerta_id: activeAlertaId });
-    }
-  }, [user, navigation, resolvedAlertaId, alertaId, route?.params?.alerta_id]);
-
-  if (user?.rol === 'ADMIN') {
-    return (
-      <View style={[styles.container, { flex: 1, backgroundColor: '#0a0f12', justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#dc2626" />
-        <Text style={{ color: '#90a4ae', marginTop: 12, fontWeight: '700' }}>
-          Redireccionando al Tablero de Asistencia...
-        </Text>
-      </View>
-    );
-  }
 
   // ── Animaciones ──────────────────────────────────────────────────────────
   function animateIn() {
@@ -616,8 +608,6 @@ export default function EmergencyScreen({ route, navigation }) {
       if (targetAlertaId) {
         await AsyncStorage.setItem(`local_response_${targetAlertaId}`, estadoRespuesta);
       }
-      // AX-14: capturamos la hora de llamado si no vino del backend
-      if (!horaLlamado) setHoraLlamado(formatHora(new Date()));
       setRespuesta(estadoRespuesta);
       animateIn();
       return;
@@ -678,8 +668,6 @@ export default function EmergencyScreen({ route, navigation }) {
       await AsyncStorage.setItem(`responses_${targetAlertaId}`, JSON.stringify(mockList));
       await AsyncStorage.setItem(`local_response_${targetAlertaId}`, estadoRespuesta);
       await stopEmergencyAlert();
-      // AX-14: si no se cargó del backend, capturamos ahora
-      if (!horaLlamado) setHoraLlamado(formatHora(new Date()));
       setRespuesta(estadoRespuesta);
       animateIn();
       fetchEmergencyData();
@@ -758,6 +746,15 @@ export default function EmergencyScreen({ route, navigation }) {
   const currentDate = new Date()
     .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase();
+
+  if (loadingAlerta && respuesta === null) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#ef4444" />
+        <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 14 }}>Cargando estado de la emergencia...</Text>
+      </View>
+    );
+  }
 
   // ── Render: pantalla de confirmación + formulario de tiempos ─────────────
   if (respuesta !== null) {
@@ -999,7 +996,7 @@ export default function EmergencyScreen({ route, navigation }) {
                 <Text style={styles.label}>HORA</Text>
                 <Text style={styles.text}>
                   {alertaData?.fecha_hora
-                    ? formatHora(new Date(alertaData.fecha_hora))
+                    ? formatHora(parseDateLocal(alertaData.fecha_hora))
                     : currentTime} HS
                 </Text>
               </View>

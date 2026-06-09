@@ -70,6 +70,68 @@ function esHoraValida(str) {
   return regex.test(str);
 }
 
+// ── Helper: parsea fecha de la base de datos a local ──────────────────────────
+function parseDateLocal(dateInput) {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput !== 'string') return new Date(dateInput);
+  
+  // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
+  const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
+  return new Date(cleaned);
+}
+
+// ── Helper: deduplica y prioriza registros de comunicación ───────────────────
+function deduplicarLogistics(logs) {
+  if (!Array.isArray(logs)) return [];
+  const result = [];
+  
+  const normalizeMsg = (msg) => {
+    if (!msg) return '';
+    return msg
+      .toLowerCase()
+      .replace(/[\[\]\s\/]/g, '')
+      .replace(/solicitadoparalaemergencia\.?/, '')
+      .replace(/solicitadoparaemergencia\.?/, '');
+  };
+
+  // Sort chronological ascending so we process from oldest to newest
+  const sortedLogs = [...logs].sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora));
+
+  for (const log of sortedLogs) {
+    const norm = normalizeMsg(log.mensaje);
+    const time = new Date(log.fecha_hora).getTime();
+    
+    let duplicateIdx = -1;
+    for (let i = 0; i < result.length; i++) {
+      const existing = result[i];
+      const existingNorm = normalizeMsg(existing.mensaje);
+      const existingTime = new Date(existing.fecha_hora).getTime();
+      
+      // If messages match and time difference is <= 2 minutes (120000 ms)
+      if (norm && norm === existingNorm && Math.abs(time - existingTime) <= 120000) {
+        duplicateIdx = i;
+        break;
+      }
+    }
+
+    if (duplicateIdx !== -1) {
+      const existing = result[duplicateIdx];
+      const logHasUser = !!log.usuarioId?.bombero;
+      const existingHasUser = !!existing.usuarioId?.bombero;
+      
+      if (logHasUser && !existingHasUser) {
+        result[duplicateIdx] = log;
+      }
+    } else {
+      result.push(log);
+    }
+  }
+
+  // Sort descending (newest first)
+  return result.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+}
+
 // ── Helper: obtiene estilos de insignia de estado dinámicos ───────────────────
 function obtenerBadgeEstado(nombreEstado = '') {
   const e = nombreEstado.toUpperCase();
@@ -400,7 +462,7 @@ export default function AlertDetailScreen({ route, navigation }) {
       }
 
       logisticsData.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
-      setLogistics(logisticsData);
+      setLogistics(deduplicarLogistics(logisticsData));
 
       // Dynamic parsing of Critical Times from logistics data
       const tiempoCriticoLog = logisticsData.find(item => item.mensaje && item.mensaje.startsWith('TIEMPOS CRÍTICOS —'));
@@ -415,7 +477,7 @@ export default function AlertDetailScreen({ route, navigation }) {
         if (regresoMatch && regresoMatch[1] !== 'pendiente') setHoraRegreso(regresoMatch[1]);
       } else {
         if (detailData && detailData.fecha_hora) {
-          setHoraLlamado(formatHora(new Date(detailData.fecha_hora)));
+          setHoraLlamado(formatHora(parseDateLocal(detailData.fecha_hora)));
         }
       }
 
@@ -600,7 +662,7 @@ export default function AlertDetailScreen({ route, navigation }) {
   useEffect(() => {
     let interval;
     if (alerta && alerta.fecha_hora && alerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
-      const startTime = new Date(alerta.fecha_hora).getTime();
+      const startTime = parseDateLocal(alerta.fecha_hora).getTime();
       
       const updateTimer = () => {
         const now = new Date().getTime();
@@ -692,7 +754,7 @@ export default function AlertDetailScreen({ route, navigation }) {
               <View style={styles.timeStatItem}>
                 <Text style={styles.timeLabel}>LLAMADO</Text>
                 <Text style={styles.timeValueRed}>
-                  {alerta?.fecha_hora ? new Date(alerta.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'} HS
+                  {alerta?.fecha_hora ? parseDateLocal(alerta.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'} HS
                 </Text>
               </View>
               <View style={styles.timeStatItemRight}>

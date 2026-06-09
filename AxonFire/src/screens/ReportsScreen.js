@@ -44,6 +44,17 @@ const MESES = [
 
 const ANIOS = [2024, 2025, 2026, 2027];
 
+// ── Helper: parsea fecha de la base de datos a local ──────────────────────────
+function parseDateLocal(dateInput) {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput !== 'string') return new Date(dateInput);
+  
+  // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
+  const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
+  return new Date(cleaned);
+}
+
 export default function ReportsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -215,10 +226,10 @@ export default function ReportsScreen({ navigation }) {
           };
         });
 
-      const fechaInicio = new Date(alerta.fecha_hora);
+      const fechaInicio = parseDateLocal(alerta.fecha_hora);
       let fechaFin;
       if (alerta.fecha_hora_finalizacion) {
-        fechaFin = new Date(alerta.fecha_hora_finalizacion);
+        fechaFin = parseDateLocal(alerta.fecha_hora_finalizacion);
       } else if (alerta.duracion_total_alerta) {
         // Si duracion_total_alerta > 1000, asumimos que está en milisegundos y lo usamos directamente;
         // de lo contrario, lo tratamos como horas y lo convertimos a milisegundos.
@@ -533,7 +544,7 @@ export default function ReportsScreen({ navigation }) {
               <View style={styles.metaRow}>
                 <MaterialCommunityIcons name="clock-outline" size={15} color="#94a3b8" />
                 <Text style={styles.metaText}>
-                  {new Date(item.fecha_hora).toLocaleDateString('es-AR')} • {new Date(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
+                  {parseDateLocal(item.fecha_hora).toLocaleDateString('es-AR')} • {parseDateLocal(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
                 </Text>
               </View>
 
