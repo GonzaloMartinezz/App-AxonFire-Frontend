@@ -531,7 +531,11 @@ export default function EmergencyScreen({ route, navigation }) {
       } else {
         // Si no hemos respondido o es PENDIENTE, reseteamos para que aparezcan los botones
         setRespuesta(null);
-        startEmergencyAlert();
+        if (activeAlertaId !== 'demo-alert-123') {
+          startEmergencyAlert();
+        } else {
+          stopEmergencyAlert();
+        }
       }
 
       // Resumen de respuestas

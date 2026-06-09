@@ -145,12 +145,45 @@ export default function ReportsScreen({ navigation }) {
           headers,
           timeout: 5000
         });
-        alertResponses = Array.isArray(resResp.data) ? resResp.data : [];
+        if (resResp.status === 200 && Array.isArray(resResp.data)) {
+          alertResponses = resResp.data;
+        }
       } catch (err) {
-        console.log('Error loading responses for alert:', err?.message || err);
+        console.log('Error loading responses for alert, trying backup endpoint:', err?.message || err);
+        try {
+          const resRespBackup = await axios.get(`${API_BASE_URL}/respuestas_alertas`, {
+            headers,
+            timeout: 5000
+          });
+          if (resRespBackup.status === 200 && Array.isArray(resRespBackup.data)) {
+            alertResponses = resRespBackup.data.filter(
+              r => r.alerta_id === alerta.id || r.alertaId === alerta.id || r.alertaId?.id === alerta.id
+            );
+          }
+        } catch (backupErr) {
+          console.log('Backup responses fetch failed:', backupErr?.message || backupErr);
+        }
       }
 
-      // Combinar con respuestas locales de AsyncStorage si las hubiera
+      // 2. Combinar con respuestas locales de AsyncStorage si las hubiera
+      try {
+        const localSaved = await AsyncStorage.getItem(`responses_${alerta.id}`);
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          const combined = [...alertResponses];
+          parsed.forEach(fl => {
+            const uId = fl.usuario_id || fl.usuarioId?.id;
+            if (uId && !combined.some(c => (c.usuario_id || c.usuarioId?.id) === uId)) {
+              combined.push(fl);
+            }
+          });
+          alertResponses = combined;
+        }
+      } catch (e) {
+        console.log('Error reading local responses:', e);
+      }
+
+      // 3. Fallback adicional por si acaso (para mantener compatibilidad heredada)
       try {
         const storedResponses = await AsyncStorage.getItem('local_alert_responses');
         if (storedResponses) {
@@ -166,10 +199,8 @@ export default function ReportsScreen({ navigation }) {
           alertResponses = combined;
         }
       } catch (e) {
-        console.log('Error reading local responses:', e);
+        console.log('Error reading fallback local responses:', e);
       }
-
-
 
       const aceptados = alertResponses
         .filter(r => r.estado_respuesta === 'ACEPTADO')
@@ -185,9 +216,20 @@ export default function ReportsScreen({ navigation }) {
         });
 
       const fechaInicio = new Date(alerta.fecha_hora);
-      // Estimar 2 horas o usar duración si existe duracion_total_alerta
-      const duracionMs = (alerta.duracion_total_alerta || 2) * 60 * 60 * 1000;
-      const fechaFin = new Date(fechaInicio.getTime() + duracionMs);
+      let fechaFin;
+      if (alerta.fecha_hora_finalizacion) {
+        fechaFin = new Date(alerta.fecha_hora_finalizacion);
+      } else if (alerta.duracion_total_alerta) {
+        // Si duracion_total_alerta > 1000, asumimos que está en milisegundos y lo usamos directamente;
+        // de lo contrario, lo tratamos como horas y lo convertimos a milisegundos.
+        const duracionMs = alerta.duracion_total_alerta > 1000
+          ? alerta.duracion_total_alerta
+          : alerta.duracion_total_alerta * 60 * 60 * 1000;
+        fechaFin = new Date(fechaInicio.getTime() + duracionMs);
+      } else {
+        // Estimar 2 horas por defecto
+        fechaFin = new Date(fechaInicio.getTime() + 2 * 60 * 60 * 1000);
+      }
 
       const formatFechaHora = (date) => {
         return date.toLocaleString('es-AR', {

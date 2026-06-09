@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
- 
+
 // Pantallas existentes
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -28,7 +28,7 @@ import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen';
 
- 
+
 // ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
@@ -36,10 +36,11 @@ import AlertasVisualesScreen from '../screens/AlertasVisualesScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
 import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
- 
+import ListaAsistenciaScreen from '../screens/ListaAsistenciaScreen';
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
- 
+
 // ── Bombero Tab Bar ─────────────────────────────────────────────
 // 5 tabs: Mapa · Alertas · SOS (FAB) · Emergencia · Perfil
 // Logística y Asistencia siguen accesibles como Stack screens.
@@ -48,10 +49,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
 
   // Icon pairs: [inactive (outline), active (filled)]
   const ICON_MAP = {
-    Mapa:       ['map-outline',             'map'],
-    Alertas:    ['bell-outline',            'bell'],
-    Emergencia: ['shield-alert-outline',    'shield-alert'],
-    Perfil:     ['account-outline',         'account'],
+    Mapa: ['map-outline', 'map'],
+    Alertas: ['bell-outline', 'bell'],
+    Emergencia: ['shield-alert-outline', 'shield-alert'],
+    Perfil: ['account-outline', 'account'],
   };
 
   return (
@@ -63,8 +64,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
             options.tabBarLabel !== undefined
               ? options.tabBarLabel
               : options.title !== undefined
-              ? options.title
-              : route.name;
+                ? options.title
+                : route.name;
           const isFocused = state.index === index;
 
           const onPress = () => {
@@ -129,25 +130,25 @@ function MainTabNavigator() {
       tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Mapa"       component={MapScreen}                  options={{ title: 'Mapa' }} />
-      <Tab.Screen name="Alertas"    component={AlertsScreen}               options={{ title: 'Alertas' }} />
-      <Tab.Screen name="SOS"        component={NewAlertScreen}             options={{ title: 'Alerta' }} />
-      <Tab.Screen name="Emergencia" component={EmergencyScreen}            options={{ title: 'Emergencia' }} />
-      <Tab.Screen name="Perfil"     component={ProfileScreen}              options={{ title: 'Perfil' }} />
+      <Tab.Screen name="Mapa" component={MapScreen} options={{ title: 'Mapa' }} />
+      <Tab.Screen name="Alertas" component={AlertsScreen} options={{ title: 'Alertas' }} />
+      <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'Alerta' }} />
+      <Tab.Screen name="Emergencia" component={EmergencyScreen} options={{ title: 'Emergencia' }} />
+      <Tab.Screen name="Perfil" component={ProfileScreen} options={{ title: 'Perfil' }} />
     </Tab.Navigator>
   );
 }
- 
+
 // ── Admin Tab Bar ───────────────────────────────────────────────
 function AdminTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
 
   // Icon pairs: [inactive (outline), active (filled)]
   const ICON_MAP = {
-    Panel:     ['monitor-dashboard-outline', 'monitor-dashboard'],
-    Mapa:      ['map-outline',               'map'],
-    Alertas:   ['bell-outline',              'bell'],
-    Asistencia:['clipboard-list-outline',    'clipboard-list'],
+    Panel: ['monitor-dashboard-outline', 'monitor-dashboard'],
+    Mapa: ['map-outline', 'map'],
+    Alertas: ['bell-outline', 'bell'],
+    Asistencia: ['clipboard-list-outline', 'clipboard-list'],
   };
 
   return (
@@ -159,8 +160,8 @@ function AdminTabBar({ state, descriptors, navigation }) {
             options.tabBarLabel !== undefined
               ? options.tabBarLabel
               : options.title !== undefined
-              ? options.title
-              : route.name;
+                ? options.title
+                : route.name;
           const isFocused = state.index === index;
 
           const onPress = () => {
@@ -225,15 +226,15 @@ function AdminTabNavigator() {
       tabBar={props => <AdminTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Panel"      component={PanelControlScreen}        options={{ title: 'Panel' }} />
-      <Tab.Screen name="Mapa"       component={MapScreen}                 options={{ title: 'Mapa' }} />
-      <Tab.Screen name="SOS"        component={NewAlertScreen}            options={{ title: 'Alerta' }} />
-      <Tab.Screen name="Alertas"    component={AlertsScreen}              options={{ title: 'Alertas' }} />
+      <Tab.Screen name="Panel" component={PanelControlScreen} options={{ title: 'Panel' }} />
+      <Tab.Screen name="Mapa" component={MapScreen} options={{ title: 'Mapa' }} />
+      <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'Alerta' }} />
+      <Tab.Screen name="Alertas" component={AlertsScreen} options={{ title: 'Alertas' }} />
       <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} options={{ title: 'Asistencia' }} />
     </Tab.Navigator>
   );
 }
- 
+
 export default function AppNavigator() {
   const { token, user } = useAuth();
 
@@ -252,7 +253,7 @@ export default function AppNavigator() {
             <Stack.Screen name="AdminApp" component={AdminTabNavigator} />
           )}
           <Stack.Screen name="MainApp" component={MainTabNavigator} />
-          
+
           {/* Pantallas comunes/modales */}
           <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="NewAlert" component={NewAlertScreen} />
@@ -263,10 +264,10 @@ export default function AppNavigator() {
           <Stack.Screen name="Emergency" component={EmergencyScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
           <Stack.Screen name="Personal" component={AdminPersonnelScreen} />
-          
+
           {/* Pantallas nuevas */}
           <Stack.Screen name="PanelControl" component={PanelControlScreen} />
-          <Stack.Screen name="ListaAsistencia" component={AdminAttendanceBoardScreen} />
+          <Stack.Screen name="ListaAsistencia" component={ListaAsistenciaScreen} />
           <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
           <Stack.Screen name="AlertasVisuales" component={AlertasVisualesScreen} />
           <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
@@ -280,7 +281,7 @@ export default function AppNavigator() {
     </Stack.Navigator>
   );
 }
- 
+
 const styles = StyleSheet.create({
   // ── Bombero Tab Bar ──────────────────────────────────────────
   tabBarContainer: {
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: '#f8fafc',
   },
-  
+
   // FAB central bombero
   fabContainer: {
     flex: 1,

@@ -277,12 +277,43 @@ export default function AlertDetailScreen({ route, navigation }) {
         const respuestasRes = await fetch(`${API_BASE_URL}/respuestas_alertas/${alertaId}`, { headers });
         if (respuestasRes.ok) {
           responsesData = await respuestasRes.json();
+        } else {
+          throw new Error('Not OK');
         }
       } catch (err) {
-        console.log('Error fetching alert responses from server:', err);
+        console.log('Error fetching alert responses from server, trying backup endpoint:', err);
+        try {
+          const resBackup = await fetch(`${API_BASE_URL}/respuestas_alertas`, { headers });
+          if (resBackup.ok) {
+            const allResp = await resBackup.json();
+            responsesData = (Array.isArray(allResp) ? allResp : []).filter(
+              r => r.alerta_id === alertaId || r.alertaId === alertaId || r.alertaId?.id === alertaId
+            );
+          }
+        } catch (backupErr) {
+          console.log('Backup responses fetch failed in AlertDetail:', backupErr);
+        }
       }
 
       // Merge/load from AsyncStorage local responses
+      try {
+        const localSaved = await AsyncStorage.getItem(`responses_${alertaId}`);
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          const combined = [...responsesData];
+          parsed.forEach(fl => {
+            const uId = fl.usuario_id || fl.usuarioId?.id;
+            if (uId && !combined.some(c => (c.usuario_id || c.usuarioId?.id) === uId)) {
+              combined.push(fl);
+            }
+          });
+          responsesData = combined;
+        }
+      } catch (e) {
+        console.log('Error reading responses_${alertaId} from storage:', e);
+      }
+
+      // Legacy fallback (local_alert_responses)
       try {
         const storedResponses = await AsyncStorage.getItem('local_alert_responses');
         if (storedResponses) {
@@ -298,7 +329,7 @@ export default function AlertDetailScreen({ route, navigation }) {
           responsesData = combined;
         }
       } catch (e) {
-        console.log('Error reading local responses:', e);
+        console.log('Error reading local_alert_responses from storage:', e);
       }
 
       // If still empty responses, add some mock ones for a good UX if the alert is active

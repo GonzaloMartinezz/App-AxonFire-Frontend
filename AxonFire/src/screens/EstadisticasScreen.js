@@ -9,13 +9,13 @@ import {
   Alert,
   StatusBar,
   Platform,
-  Dimensions,
   Modal,
-  FlatList
+  FlatList,
+  Dimensions
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { BarChart } from 'react-native-chart-kit';
+import { BarChart, PieChart } from 'react-native-chart-kit';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import axios from 'axios';
@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
 const { width } = Dimensions.get('window');
+
 
 const MESES = [
   { value: 0, label: 'Enero' },
@@ -44,37 +45,106 @@ const ANIOS = [2024, 2025, 2026, 2027];
 
 // Helper: calcula la duración en horas de una alerta
 function calcularDuracionAlerta(alerta) {
-  // 1. Si existe duracion_total_alerta y es > 0, usarla directamente
-  if (alerta.duracion_total_alerta && alerta.duracion_total_alerta > 0) {
-    return alerta.duracion_total_alerta;
-  }
-  // 2. Si tiene fecha_hora_finalizacion, calcular la diferencia
+  // 1. Si tiene fecha_hora_finalizacion, calcular la diferencia directamente (más preciso)
   if (alerta.fecha_hora && alerta.fecha_hora_finalizacion) {
     const inicio = new Date(alerta.fecha_hora).getTime();
     const fin = new Date(alerta.fecha_hora_finalizacion).getTime();
     if (fin > inicio) {
-      return (fin - inicio) / (1000 * 60 * 60); // convertir ms a horas
+      const diffHours = (fin - inicio) / (1000 * 60 * 60); // convertir ms a horas
+      return diffHours < 100 ? diffHours : 0; // Filtrar anomalías/outliers
     }
+  }
+  // 2. Si no tiene fecha_finalizacion pero existe duracion_total_alerta
+  if (alerta.duracion_total_alerta && alerta.duracion_total_alerta > 0) {
+    // Si duracion_total_alerta > 1000, asumimos que está en milisegundos y lo convertimos a horas
+    const rawHours = alerta.duracion_total_alerta > 1000
+      ? alerta.duracion_total_alerta / (1000 * 60 * 60)
+      : alerta.duracion_total_alerta;
+    return rawHours < 100 ? rawHours : 0; // Filtrar anomalías/outliers
   }
   // 3. Sin datos de duración disponibles
   return 0;
 }
 
-// Helper: extrae el tipo/categoría de una alerta de forma resiliente
+// Helper: extrae el tipo/categoría de una alerta de forma resiliente y clasificada
 function extraerTipoAlerta(alerta) {
-  // Intentar obtener de la relación subCategoriaAlerta
+  // 1. Intentar obtener de la relación subCategoriaAlerta
   const subCat = alerta.subCategoriaAlerta?.nombre_sub_categoria
     || alerta.subCategoriaAlerta?.nombre;
-  if (subCat) return subCat.toUpperCase().trim();
-
-  // Fallback: extraer de observaciones
-  const obs = (alerta.observaciones || '').toUpperCase().trim();
-  if (obs) {
-    // Limpiar prefijos comunes
-    return obs.replace('INCIDENTE DE ', '').replace('INCENDIO DE ', '').trim();
+  
+  let rawText = '';
+  if (subCat) {
+    rawText = subCat.toUpperCase().trim();
+  } else {
+    // Fallback: extraer de observaciones
+    rawText = (alerta.observaciones || '').toUpperCase().trim();
   }
 
-  return 'SIN CATEGORÍA';
+  if (!rawText) return 'INCIDENTE GENERAL';
+
+  // Limpiar cualquier prefijo de severidad como "[NIVEL 4 - CRÍTICO] -"
+  let cleanText = rawText.replace(/^\[NIVEL\s+\d+\s+-\s+[^\]]+\]\s*-\s*/i, '').trim();
+
+  // Limpiar prefijos de tipo comunes
+  cleanText = cleanText
+    .replace(/^INCIDENTE DE /i, '')
+    .replace(/^INCENDIO DE /i, '')
+    .trim();
+
+  // Clasificar según palabras clave para agrupar y mostrar información de valor
+  if (cleanText.includes('INCENDIO ESTRUCTURAL') || cleanText === 'ESTRUCTURAL') {
+    return 'INCENDIO ESTRUCTURAL';
+  }
+  if (cleanText.includes('INCENDIO FORESTAL') || cleanText === 'FORESTAL') {
+    return 'INCENDIO FORESTAL';
+  }
+  if (cleanText.includes('INCENDIO') || cleanText.includes('FUEGO')) {
+    return 'INCENDIO';
+  }
+  if (cleanText.includes('RESCATE VEHICULAR') || cleanText.includes('CHOQUE') || cleanText.includes('COLISION') || cleanText.includes('COLISIÓN')) {
+    return 'RESCATE VEHICULAR';
+  }
+  if (cleanText.includes('RESCATE')) {
+    return 'RESCATE';
+  }
+  if (cleanText.includes('MEDICA') || cleanText.includes('MÉDICA') || cleanText.includes('AMBULANCIA') || cleanText.includes('PARO')) {
+    return 'EMERGENCIA MÉDICA';
+  }
+  if (cleanText.includes('GAS') || cleanText.includes('FUGA')) {
+    return 'FUGA DE GAS';
+  }
+  if (cleanText.includes('INDUSTRIAL') || cleanText.includes('ACCIDENTE INDUSTRIAL')) {
+    return 'ACCIDENTE INDUSTRIAL';
+  }
+  if (cleanText.includes('HAZMAT') || cleanText.includes('QUIMICO') || cleanText.includes('QUÍMICO')) {
+    return 'HAZMAT';
+  }
+
+  // Agrupar datos ruidosos o de test comunes en desarrollo
+  const lowerText = cleanText.toLowerCase();
+  if (
+    lowerText === 'sef' ||
+    lowerText === 'papas' ||
+    lowerText === '3e3e3e' ||
+    lowerText === 'sin descripción' ||
+    lowerText === 'sin descripcion' ||
+    lowerText.length < 3
+  ) {
+    return 'INCIDENTE GENERAL';
+  }
+
+  // Si no coincide con ninguna palabra clave, retornar el texto limpio acotado (máximo 25 caracteres)
+  return cleanText.length > 25 ? cleanText.substring(0, 22) + '...' : cleanText;
+}
+
+// Helper: mapea el tipo de emergencia a un icono de MaterialCommunityIcons
+function getTipoIcon(tipo) {
+  const t = tipo.toLowerCase();
+  if (t.includes('incendio') || t.includes('fuego')) return 'fire';
+  if (t.includes('rescate') || t.includes('accidente') || t.includes('vehicular')) return 'car-wrench';
+  if (t.includes('gas') || t.includes('quimico') || t.includes('hazmat')) return 'biohazard';
+  if (t.includes('medic') || t.includes('ambulancia')) return 'ambulance';
+  return 'alert-circle';
 }
 
 export default function EstadisticasScreen({ navigation }) {
@@ -86,6 +156,7 @@ export default function EstadisticasScreen({ navigation }) {
   const [selectedAnio, setSelectedAnio] = useState(new Date().getFullYear());
   const [mesModalVisible, setMesModalVisible] = useState(false);
   const [anioModalVisible, setAnioModalVisible] = useState(false);
+  const [chartView, setChartView] = useState('bar'); // 'bar' | 'pie' | 'list'
 
   // States for fetched datasets
   const [alerts, setAlerts] = useState([]);
@@ -185,11 +256,12 @@ export default function EstadisticasScreen({ navigation }) {
 
         if (!firefighterMap[userId]) {
           // Extract name info from the included usuario relation
-          const usuario = r.usuarioId || {};
-          const nombre = usuario.nombre_usuario || usuario.nombre || userId;
+          const b = r.usuarioId?.bombero || r.bombero || {};
+          const nombreUsuario = r.usuarioId?.nombre_usuario || r.usuarioId?.nombre || '';
+          const fullLabel = b.nombre ? `${b.nombre} ${b.apellido || ''}`.trim() : nombreUsuario || userId;
           firefighterMap[userId] = {
             id: userId,
-            nombre: nombre.toUpperCase(),
+            nombre: fullLabel.toUpperCase(),
             asistencias: 0,
             horas: 0
           };
@@ -250,35 +322,40 @@ export default function EstadisticasScreen({ navigation }) {
     }
   };
 
-  // Setup chart data
-  const chartLabels = Object.keys(statsTipos);
-  const chartValues = Object.values(statsTipos);
 
-  const chartData = {
-    labels: chartLabels.length > 0 ? chartLabels : ['SIN DATOS'],
-    datasets: [
-      {
-        data: chartValues.length > 0 ? chartValues : [0]
-      }
-    ]
-  };
+  // Dynamic KPIs calculations
+  const kpis = React.useMemo(() => {
+    const totalEmergencias = alerts.length;
 
-  const chartConfig = {
-    backgroundColor: '#1b1d24',
-    backgroundGradientFrom: '#1b1d24',
-    backgroundGradientTo: '#1b1d24',
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(225, 29, 72, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(148, 163, 184, ${opacity})`,
-    style: {
-      borderRadius: 8
-    },
-    propsForDots: {
-      r: '6',
-      strokeWidth: '2',
-      stroke: '#e11d48'
-    }
-  };
+    // Filter accepted responses for this period's alerts
+    const alertIdsInPeriod = new Set(alerts.map(a => a.id));
+    const acceptedInPeriod = responders.filter(r => {
+      if (r.estado_respuesta !== 'ACEPTADO') return false;
+      const rAlertaId = r.alerta_id || r.alertaId?.id || r.alertaId;
+      return alertIdsInPeriod.has(rAlertaId);
+    });
+
+    const avgResponders = totalEmergencias > 0
+      ? (acceptedInPeriod.length / totalEmergencias).toFixed(1)
+      : '0.0';
+
+    // Calculate alert durations in hours
+    const alertsWithDuration = alerts.map(a => calcularDuracionAlerta(a)).filter(d => d > 0);
+    const avgDuration = alertsWithDuration.length > 0
+      ? (alertsWithDuration.reduce((acc, d) => acc + d, 0) / alertsWithDuration.length).toFixed(1)
+      : '0.0';
+
+    const bomberoDestacado = participationList.length > 0
+      ? participationList[0].nombre
+      : 'SIN REGISTRO';
+
+    return {
+      totalEmergencias,
+      avgResponders,
+      avgDuration,
+      bomberoDestacado
+    };
+  }, [alerts, responders, participationList]);
 
   if (loading) {
     return (
@@ -325,19 +402,159 @@ export default function EstadisticasScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
+        {/* KPIs Summary Grid */}
+        <View style={styles.kpisGrid}>
+          <View style={[styles.kpiCard, { borderLeftColor: '#e11d48' }]}>
+            <View style={styles.kpiHeader}>
+              <MaterialCommunityIcons name="fire" size={20} color="#e11d48" />
+              <Text style={styles.kpiValue}>{kpis.totalEmergencias}</Text>
+            </View>
+            <Text style={styles.kpiLabel}>TOTAL EMERGENCIAS</Text>
+          </View>
+
+          <View style={[styles.kpiCard, { borderLeftColor: '#3b82f6' }]}>
+            <View style={styles.kpiHeader}>
+              <MaterialCommunityIcons name="account-multiple" size={20} color="#3b82f6" />
+              <Text style={styles.kpiValue}>{kpis.avgResponders}</Text>
+            </View>
+            <Text style={styles.kpiLabel}>PROM. RESPONDEDORES</Text>
+          </View>
+
+          <View style={[styles.kpiCard, { borderLeftColor: '#10b981' }]}>
+            <View style={styles.kpiHeader}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color="#10b981" />
+              <Text style={styles.kpiValue}>{kpis.avgDuration}h</Text>
+            </View>
+            <Text style={styles.kpiLabel}>DURACIÓN PROMEDIO</Text>
+          </View>
+
+          <View style={[styles.kpiCard, { borderLeftColor: '#fbbf24' }]}>
+            <View style={styles.kpiHeader}>
+              <MaterialCommunityIcons name="trophy" size={20} color="#fbbf24" />
+              <Text style={[styles.kpiValue, { fontSize: 13, flex: 1, textAlign: 'right' }]} numberOfLines={1}>
+                {kpis.bomberoDestacado.split(' ')[0]}
+              </Text>
+            </View>
+            <Text style={styles.kpiLabel}>BOMBERO LÍDER</Text>
+          </View>
+        </View>
+
         {/* Chart Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>EMERGENCIAS POR TIPO</Text>
-          {chartValues.length > 0 ? (
-            <BarChart
-              data={chartData}
-              width={width - 48}
-              height={220}
-              chartConfig={chartConfig}
-              verticalLabelRotation={10}
-              style={styles.chart}
-              fromZero
-            />
+          <View style={styles.cardHeaderWithToggle}>
+            <Text style={styles.cardTitleNoMargin}>EMERGENCIAS POR TIPO</Text>
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, chartView === 'bar' && styles.toggleBtnActive]}
+                onPress={() => setChartView('bar')}
+              >
+                <MaterialCommunityIcons name="chart-bar" size={16} color={chartView === 'bar' ? '#fff' : '#94a3b8'} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, chartView === 'pie' && styles.toggleBtnActive]}
+                onPress={() => setChartView('pie')}
+              >
+                <MaterialCommunityIcons name="chart-pie" size={16} color={chartView === 'pie' ? '#fff' : '#94a3b8'} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, chartView === 'list' && styles.toggleBtnActive]}
+                onPress={() => setChartView('list')}
+              >
+                <MaterialCommunityIcons name="format-list-bulleted" size={16} color={chartView === 'list' ? '#fff' : '#94a3b8'} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {Object.keys(statsTipos).length > 0 ? (
+            <View style={styles.chartContentWrapper}>
+              {chartView === 'bar' && (
+                <View style={styles.chartWrapper}>
+                  <BarChart
+                    data={{
+                      labels: Object.keys(statsTipos),
+                      datasets: [{ data: Object.values(statsTipos) }]
+                    }}
+                    width={width - 80}
+                    height={220}
+                    chartConfig={{
+                      backgroundColor: '#1b1d24',
+                      backgroundGradientFrom: '#1b1d24',
+                      backgroundGradientTo: '#1b1d24',
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => `rgba(225, 29, 72, ${opacity})`,
+                      labelColor: (opacity = 1) => `rgba(148, 163, 184, ${opacity})`,
+                      style: { borderRadius: 8 },
+                      fillShadowGradient: '#e11d48',
+                      fillShadowGradientOpacity: 0.6,
+                    }}
+                    fromZero
+                    segments={
+                      Math.max(...Object.values(statsTipos), 0) < 5
+                        ? Math.max(...Object.values(statsTipos), 1)
+                        : 4
+                    }
+                    style={styles.chart}
+                  />
+                </View>
+              )}
+
+              {chartView === 'pie' && (
+                <View style={styles.chartWrapper}>
+                  <PieChart
+                    data={Object.entries(statsTipos).map(([tipo, count], idx) => {
+                      const colors = ['#e11d48', '#3b82f6', '#10b981', '#fbbf24', '#8b5cf6', '#a855f7'];
+                      return {
+                        name: tipo.length > 12 ? tipo.substring(0, 10) + '..' : tipo,
+                        population: count,
+                        color: colors[idx % colors.length],
+                        legendFontColor: '#94a3b8',
+                        legendFontSize: 10
+                      };
+                    })}
+                    width={width - 80}
+                    height={180}
+                    chartConfig={{
+                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                    }}
+                    accessor="population"
+                    backgroundColor="transparent"
+                    paddingLeft="10"
+                    absolute
+                  />
+                </View>
+              )}
+
+              {chartView === 'list' && (
+                <View style={styles.customChartContainer}>
+                  {Object.entries(statsTipos).map(([tipo, count], idx) => {
+                    const total = alerts.length;
+                    const percentage = total > 0 ? (count / total) * 100 : 0;
+                    
+                    const colors = ['#e11d48', '#3b82f6', '#10b981', '#fbbf24', '#8b5cf6', '#a855f7'];
+                    const color = colors[idx % colors.length];
+                    const iconName = getTipoIcon(tipo);
+
+                    return (
+                      <View key={tipo} style={styles.chartRow}>
+                        <View style={styles.chartRowHeader}>
+                          <View style={styles.chartLabelGroup}>
+                            <View style={[styles.colorIndicator, { backgroundColor: color }]} />
+                            <MaterialCommunityIcons name={iconName} size={15} color={color} style={{ marginRight: 2 }} />
+                            <Text style={styles.chartLabel} numberOfLines={1}>{tipo}</Text>
+                          </View>
+                          <Text style={styles.chartValue}>
+                            {count} {count === 1 ? 'alerta' : 'alertas'} ({percentage.toFixed(0)}%)
+                          </Text>
+                        </View>
+                        <View style={styles.barContainer}>
+                          <View style={[styles.barFill, { width: `${percentage}%`, backgroundColor: color }]} />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No hay emergencias registradas en este período.</Text>
@@ -502,6 +719,39 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20
   },
+  kpisGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 20,
+  },
+  kpiCard: {
+    width: '48%',
+    backgroundColor: '#1b1d24',
+    borderWidth: 1,
+    borderColor: '#26282f',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    gap: 6,
+  },
+  kpiHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kpiValue: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#f8fafc',
+  },
+  kpiLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 0.5,
+  },
   filterSelector: {
     flex: 1,
     flexDirection: 'row',
@@ -527,6 +777,93 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     marginBottom: 20
+  },
+  cardHeaderWithToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#e11d48',
+    paddingLeft: 10
+  },
+  cardTitleNoMargin: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#16181d',
+    borderRadius: 6,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  toggleBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#e11d48',
+  },
+  chartContentWrapper: {
+    paddingTop: 4,
+  },
+  chartWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  chart: {
+    borderRadius: 8,
+  },
+  customChartContainer: {
+    paddingVertical: 4,
+    gap: 16,
+  },
+  chartRow: {
+    gap: 8,
+  },
+  chartRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  chartLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  colorIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  chartLabel: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  chartValue: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  barContainer: {
+    height: 6,
+    backgroundColor: '#1e293b',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   cardTitle: {
     color: '#f8fafc',
