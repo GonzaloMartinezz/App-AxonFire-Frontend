@@ -403,13 +403,11 @@ export default function EmergencyScreen({ route, navigation }) {
       // 2. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
       if (!activeAlertaId) {
         try {
-          const resAlertas = await axios.post(`${API_BASE_URL}/alerta/rango`, 
-            {
+          const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          params: {
               fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
               fecha_hasta: new Date().toISOString()
-            },
-            { headers }
-          );
+            }, headers });
           const data = resAlertas.data;
           const alertas = data.alertas || [];
           if (alertas.length > 0) {

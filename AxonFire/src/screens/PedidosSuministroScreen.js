@@ -64,10 +64,11 @@ export default function PedidosSuministroScreen({ navigation }) {
     setCargando(true);
     try {
       // 1. Buscar alerta activa (la más reciente que no sea FINALIZADO)
-      const resAlertas = await axios.post(`${API_BASE_URL}/alerta/rango`, {
+      const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          params: {
         fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
         fecha_hasta: new Date().toISOString()
-      }, { headers: { Authorization: `Bearer ${token}` } });
+      }, headers: { Authorization: `Bearer ${token}` } });
       
       const activas = (resAlertas.data?.alertas || []).filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
       if (activas.length > 0) {

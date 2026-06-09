@@ -137,10 +137,8 @@ export default function PanelControlScreen({ navigation }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await axios.post(
-        `${API_BASE_URL}/alerta/rango`,
-        { fecha_desde: desde, fecha_hasta: hasta },
-        {
+      const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          params: { fecha_desde: desde, fecha_hasta: hasta },
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),

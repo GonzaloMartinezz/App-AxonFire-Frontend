@@ -113,15 +113,13 @@ export default function AlertsScreen({ navigation }) {
   const fetchAlerts = async () => {
     try {
       setLoading(true);
-      const res = await axios.post(`${API_BASE_URL}/alerta/rango`, 
-        {
+      const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          params: {
           fecha_desde: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
           fecha_hasta: new Date().toISOString()
         },
-        {
           headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+        });
       if (res.data && (res.data.alertas || Array.isArray(res.data))) {
         const list = Array.isArray(res.data.alertas) ? res.data.alertas : Array.isArray(res.data) ? res.data : [];
         

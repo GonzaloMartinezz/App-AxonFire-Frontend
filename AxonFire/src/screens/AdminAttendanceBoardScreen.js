@@ -258,13 +258,11 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         try {
           const hasta = new Date().toISOString();
           const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-          const resAlertas = await axios.post(`${API_BASE_URL}/alerta/rango`, 
-            { fecha_desde: desde, fecha_hasta: hasta },
-            {
+          const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          params: { fecha_desde: desde, fecha_hasta: hasta },
               headers: authHeaders(),
               timeout: 15000
-            }
-          );
+            });
           const data = resAlertas.data;
           const alertas = data.alertas || [];
           if (alertas.length > 0) {

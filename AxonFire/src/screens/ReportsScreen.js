@@ -78,13 +78,11 @@ export default function ReportsScreen({ navigation }) {
 
       // 2. Fetch Alertas por rango
       try {
-        const resAlerts = await axios.post(`${API_BASE_URL}/alerta/rango`, 
-          { fecha_desde: desde, fecha_hasta: hasta },
-          {
+        const resAlerts = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          params: { fecha_desde: desde, fecha_hasta: hasta },
             headers,
             timeout: 5000
-          }
-        );
+          });
         alertsData = resAlerts.data?.alertas || [];
       } catch (err) {
         console.log('Error loading range alerts for reports:', err?.message || err);

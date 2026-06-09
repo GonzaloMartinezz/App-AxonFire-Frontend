@@ -869,8 +869,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3, borderLeftColor: '#dc2626', marginBottom: 12,
   },
   errorText: { color: '#f87171', fontSize: 12, fontWeight: '600', flex: 1 },
-<<<<<<< HEAD
-=======
 
   // ── Modo Admin ────────────────────────────────────────────────────────────────
   iconBtnActive: { backgroundColor: '#451a03' },
@@ -967,5 +965,4 @@ const styles = StyleSheet.create({
     backgroundColor: '#f59e0b',
   },
   modalBtnCrearText: { color: '#000', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
->>>>>>> carona
 });
