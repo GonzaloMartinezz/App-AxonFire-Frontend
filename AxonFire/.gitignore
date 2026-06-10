@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Config
+src/config/api.js
+
 # Native
 .kotlin/
 *.orig.*
@@ -39,3 +42,4 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+.claude/

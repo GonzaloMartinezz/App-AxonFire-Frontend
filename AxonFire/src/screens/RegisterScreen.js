@@ -24,8 +24,8 @@ const DropdownField = ({ label, icon, value, onSelect, options, showPicker, setS
   return (
     <View style={styles.inputGroup}>
       <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity 
-        style={styles.inputWrapper} 
+      <TouchableOpacity
+        style={styles.inputWrapper}
         onPress={() => setShowPicker(true)}
       >
         <MaterialCommunityIcons name={icon} size={20} color="#90a4ae" style={styles.inputIcon} />
@@ -40,8 +40,8 @@ const DropdownField = ({ label, icon, value, onSelect, options, showPicker, setS
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>SELECCIONAR RANGO</Text>
             {options.map((opt) => (
-              <TouchableOpacity 
-                key={opt.id} 
+              <TouchableOpacity
+                key={opt.id}
                 style={styles.modalOption}
                 onPress={() => { onSelect(opt.id); setShowPicker(false); }}
               >
@@ -92,7 +92,7 @@ export default function RegisterScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showRangoPicker, setShowRangoPicker] = useState(false);
 
-    const rangosDisponibles = [
+  const rangosDisponibles = [
     { id: 'CAD', nombre: 'CADETE' },
     { id: 'BOM', nombre: 'BOMBERO' },
     { id: 'OFI', nombre: 'OFICIAL' }
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 20,
   },
-  
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',

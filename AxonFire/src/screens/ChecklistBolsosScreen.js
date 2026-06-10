@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { API_BASE_URL } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,10 @@ function getIconoHerramienta(nombre = '') {
 export default function ChecklistBolsosScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
 
-  const token = route?.params?.token || '';
+  const camionNombre = route?.params?.camionNombre || 'Móvil';
+  const { user, token: userToken } = useAuth();
+  const token = userToken ?? user?.token ?? '';
+
   // Si viene con un bolsoId fijo (desde el disparador de emergencia), lo usamos
   const bolsoIdParam = route?.params?.bolsoId || null;
 

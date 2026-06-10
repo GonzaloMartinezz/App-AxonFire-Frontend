@@ -45,9 +45,19 @@ import { API_BASE_URL } from '../config/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function parseDateLocal(dateInput) {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput !== 'string') return new Date(dateInput);
+  
+  // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
+  const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
+  return new Date(cleaned);
+}
+
 function formatFecha(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('es-AR', {
+  return parseDateLocal(iso).toLocaleString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });

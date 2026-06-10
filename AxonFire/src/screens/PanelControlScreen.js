@@ -137,10 +137,8 @@ export default function PanelControlScreen({ navigation }) {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const res = await axios.post(
-        `${API_BASE_URL}/alerta/rango`,
-        { fecha_desde: desde, fecha_hasta: hasta },
-        {
+      const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
+          params: { fecha_desde: desde, fecha_hasta: hasta },
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -330,7 +328,7 @@ export default function PanelControlScreen({ navigation }) {
             <View style={styles.grilla}>
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Activas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Activas' })}
                 style={[styles.cardStat, { borderLeftColor: '#ef4444' }]}
               >
                 <View style={styles.cardStatHeader}>
@@ -342,7 +340,7 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Despachadas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Despachadas' })}
                 style={[styles.cardStat, { borderLeftColor: '#3b82f6' }]}
               >
                 <View style={styles.cardStatHeader}>
@@ -354,7 +352,7 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Resueltas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Resueltas' })}
                 style={[styles.cardStat, { borderLeftColor: '#10b981' }]}
               >
                 <View style={styles.cardStatHeader}>
@@ -366,7 +364,7 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => navigation.navigate('AlertasVisuales', { filtro: 'Todas' })}
+                onPress={() => navigation.navigate('Alertas', { filtro: 'Todas' })}
                 style={[styles.cardStat, { borderLeftColor: '#94a3b8' }]}
               >
                 <View style={styles.cardStatHeader}>
@@ -508,6 +506,21 @@ export default function PanelControlScreen({ navigation }) {
                 </View>
                 <Text style={styles.gridItemTitle}>Reportes Legales</Text>
                 <Text style={styles.gridItemSub}>Historial de actas</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('Estadisticas')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(225, 29, 72, 0.12)' }]}>
+                    <MaterialCommunityIcons name="chart-bar" size={18} color="#e11d48" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Métricas y Reportes</Text>
+                <Text style={styles.gridItemSub}>Estadísticas RUBA</Text>
               </TouchableOpacity>
             </View>
 
