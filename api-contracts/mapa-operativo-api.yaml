@@ -111,8 +111,8 @@ paths:
 
   /api/maps/pois:
     get:
-      summary: Puntos de Interés (POIs) y Red de Cuarteles
-      description: Lista los elementos estratégicos de la zona para asistir en la toma de decisiones. Permite filtrar por tipo.
+      summary: Puntos de Interés (POIs)
+      description: Lista los elementos estratégicos de la zona para asistir en la toma de decisiones. Los Cuarteles y dependencias de la red están unificados bajo este endpoint como una categoría más de POI. Permite filtrar por tipo.
       security:
         - bearerAuth: []
       parameters:
@@ -283,10 +283,10 @@ components:
         id:
           type: string
           format: uuid
-          description: Identificador único del POI o del cuartel.
+          description: Identificador único del POI (puede ser el ID de un Cuartel, Hidrante, Hospital, etc.).
         categoria:
           type: string
-          description: Clasificación del punto de interés para aplicar la iconografía correcta en frontend.
+          description: Clasificación del punto de interés. Los Cuarteles se incluyen aquí como un POI más para estandarizar el renderizado en el mapa.
           enum:
             - HIDRANTES
             - HOSPITALES
