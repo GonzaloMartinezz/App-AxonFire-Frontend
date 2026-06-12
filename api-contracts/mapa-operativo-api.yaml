@@ -1,0 +1,213 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API Mapa Operativo
+  description: Contrato de API para la integración del mapa base, visualización de incidentes y renderizado de Puntos de Interés (POIs).
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+    description: Servidor Local
+paths:
+  /api/maps/config:
+    get:
+      summary: Configuración inicial y Centro del Mapa
+      description: Devuelve las coordenadas iniciales para centrar el mapa basándose en la sesión activa (ubicación del cuartel).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Coordenadas iniciales obtenidas correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapConfig'
+        '401':
+          description: No autorizado (Token inválido o ausente).
+        '500':
+          description: Error interno del servidor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/maps/incidents/{id}:
+    get:
+      summary: Datos del Incidente Activo
+      description: Provee la ubicación e información detallada de la emergencia actual (basado en la alerta) para graficarla en el mapa.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la alerta/incidente activo (uuid).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Datos del incidente obtenidos correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentLocation'
+        '400':
+          description: El incidente no tiene coordenadas válidas o la petición es incorrecta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: El incidente no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/maps/pois:
+    get:
+      summary: Puntos de Interés (POIs) y Red de Cuarteles
+      description: Lista los elementos estratégicos de la zona para asistir en la toma de decisiones. Permite filtrar por tipo.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: Filtro opcional por categoría de POI. Si no se envía, retorna todos.
+          schema:
+            type: string
+            enum:
+              - HIDRANTES
+              - HOSPITALES
+              - RIESGOS
+              - CUARTELES
+      responses:
+        '200':
+          description: Arreglo JSON estandarizado de POIs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PointOfInterest'
+        '401':
+          description: No autorizado.
+        '500':
+          description: Error interno del servidor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Mensaje de error detallado.
+          example: 'Mensaje de error claro'
+
+    MapConfig:
+      type: object
+      required:
+        - latitud
+        - longitud
+      properties:
+        latitud:
+          type: number
+          format: float
+          description: Latitud del cuartel al que pertenece el usuario logueado.
+          example: -34.6037
+        longitud:
+          type: number
+          format: float
+          description: Longitud del cuartel al que pertenece el usuario logueado.
+          example: -58.3816
+
+    IncidentLocation:
+      type: object
+      required:
+        - latitud
+        - longitud
+        - tipo_emergencia
+        - direccion_exacta
+        - nivel_prioridad
+      properties:
+        latitud:
+          type: number
+          format: float
+          description: Latitud exacta de la emergencia.
+          example: -34.6040
+        longitud:
+          type: number
+          format: float
+          description: Longitud exacta de la emergencia.
+          example: -58.3820
+        tipo_emergencia:
+          type: string
+          description: Clasificación de la emergencia basada en la sub_categoria_alerta.
+          example: 'Incendio Estructural'
+        direccion_exacta:
+          type: string
+          description: Corresponde a la ubicación de la alerta original.
+          example: 'Av. Siempreviva 742'
+        nivel_prioridad:
+          type: string
+          description: Nivel de urgencia del incidente.
+          enum:
+            - ALTA
+            - MEDIA
+            - BAJA
+          example: 'ALTA'
+
+    PointOfInterest:
+      type: object
+      required:
+        - id
+        - categoria
+        - latitud
+        - longitud
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único del POI o del cuartel.
+        categoria:
+          type: string
+          description: Clasificación del punto de interés para aplicar la iconografía correcta en frontend.
+          enum:
+            - HIDRANTES
+            - HOSPITALES
+            - RIESGOS
+            - CUARTELES
+        nombre:
+          type: string
+          description: Nombre del hospital, descripción del riesgo, o nombre de la estación/cuartel.
+          example: 'Hospital General San Martín'
+        descripcion:
+          type: string
+          description: Información extra opcional relevante.
+        latitud:
+          type: number
+          format: float
+          description: Latitud del punto estratégico.
+          example: -34.6055
+        longitud:
+          type: number
+          format: float
+          description: Longitud del punto estratégico.
+          example: -58.3800
