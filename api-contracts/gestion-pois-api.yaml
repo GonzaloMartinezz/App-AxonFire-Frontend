@@ -1,0 +1,170 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API Gestión de POIs (Admin)
+  description: Contrato de API para el módulo de Alta, Baja y Modificación de Puntos de Interés (Rol Administrador).
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+    description: Servidor Local
+paths:
+  /api/maps/pois:
+    get:
+      summary: Obtener Lista de POIs para Grilla (Admin)
+      description: Lista los elementos existentes para la tabla de administración.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de POIs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PointOfInterest'
+    post:
+      summary: Crear Punto de Interés (POI)
+      description: Registra un nuevo POI interactuando desde el formulario con mapa embebido. Requiere rol Administrador.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/POICreation'
+      responses:
+        '201':
+          description: POI creado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PointOfInterest'
+        '403':
+          description: Prohibido (El usuario no tiene rol de Administrador).
+        '500':
+          description: Error interno del servidor.
+          
+  /api/maps/pois/{id}:
+    patch:
+      summary: Actualizar Punto de Interés (POI)
+      description: Modifica los datos (nombre, categoría, coordenadas) de un POI existente cargado desde la tabla. Requiere rol de Administrador.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del POI a editar.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/POICreation'
+      responses:
+        '200':
+          description: POI actualizado correctamente.
+        '403':
+          description: Prohibido (El usuario no tiene rol de Administrador).
+        '404':
+          description: POI no encontrado.
+        '500':
+          description: Error interno del servidor.
+    delete:
+      summary: Eliminar Punto de Interés (POI)
+      description: Realiza un borrado lógico del POI (lo quita del mapa pero lo mantiene en la DB por auditoría) tras la confirmación en el modal. Requiere rol de Administrador.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del POI a eliminar.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: POI eliminado exitosamente.
+        '403':
+          description: Prohibido (El usuario no tiene rol de Administrador).
+        '404':
+          description: POI no encontrado.
+        '500':
+          description: Error interno del servidor.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    POICreation:
+      type: object
+      required:
+        - nombre
+        - categoria
+        - latitud
+        - longitud
+      properties:
+        nombre:
+          type: string
+          description: Nombre descriptivo del POI.
+          example: 'Hospital General San Martín'
+        categoria:
+          type: string
+          description: Clasificación del punto de interés.
+          enum:
+            - HIDRANTE
+            - SALUD
+            - MATERIAL_PELIGROSO
+            - CUARTEL_APOYO
+        descripcion:
+          type: string
+          description: Detalles opcionales.
+        latitud:
+          type: number
+          format: float
+        longitud:
+          type: number
+          format: float
+
+    PointOfInterest:
+      type: object
+      required:
+        - id
+        - categoria
+        - nombre
+        - latitud
+        - longitud
+        - creado_por
+      properties:
+        id:
+          type: string
+          format: uuid
+        categoria:
+          type: string
+          enum:
+            - HIDRANTE
+            - SALUD
+            - MATERIAL_PELIGROSO
+            - CUARTEL_APOYO
+        nombre:
+          type: string
+        descripcion:
+          type: string
+        latitud:
+          type: number
+          format: float
+        longitud:
+          type: number
+          format: float
+        creado_por:
+          type: string
+          format: uuid
+          description: ID del Administrador que creó este POI. Queda vinculado para mantener auditoría y ser visible por toda la red.

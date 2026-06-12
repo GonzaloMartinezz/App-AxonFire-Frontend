@@ -119,14 +119,14 @@ paths:
         - name: type
           in: query
           required: false
-          description: Filtro opcional por categoría de POI. Si no se envía, retorna todos.
+          description: Filtro opcional por categoría de POI. Si no se envía, retorna todos (activos).
           schema:
             type: string
             enum:
-              - HIDRANTES
-              - HOSPITALES
-              - RIESGOS
-              - CUARTELES
+              - HIDRANTE
+              - SALUD
+              - MATERIAL_PELIGROSO
+              - CUARTEL_APOYO
       responses:
         '200':
           description: Arreglo JSON estandarizado de POIs.
@@ -277,6 +277,7 @@ components:
       required:
         - id
         - categoria
+        - nombre
         - latitud
         - longitud
       properties:
@@ -288,10 +289,10 @@ components:
           type: string
           description: Clasificación del punto de interés. Los Cuarteles se incluyen aquí como un POI más para estandarizar el renderizado en el mapa.
           enum:
-            - HIDRANTES
-            - HOSPITALES
-            - RIESGOS
-            - CUARTELES
+            - HIDRANTE
+            - SALUD
+            - MATERIAL_PELIGROSO
+            - CUARTEL_APOYO
         nombre:
           type: string
           description: Nombre del hospital, descripción del riesgo, o nombre de la estación/cuartel.
@@ -306,6 +307,5 @@ components:
           example: -34.6055
         longitud:
           type: number
-          format: float
           description: Longitud del punto estratégico.
           example: -58.3800
