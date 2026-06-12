@@ -7,6 +7,46 @@ servers:
   - url: 'http://localhost:3000'
     description: Servidor Local
 paths:
+  /alerta/crear:
+    post:
+      summary: Crear Alerta Simple
+      description: Registra una nueva alerta recibiendo la dirección y sus coordenadas (latitud y longitud).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertCreation'
+      responses:
+        '200':
+          description: Alerta creada correctamente.
+        '401':
+          description: No autorizado.
+        '500':
+          description: Error interno del servidor.
+
+  /alerta/crear-con-notificacion:
+    post:
+      summary: Crear Alerta y Notificar
+      description: Registra la alerta con coordenadas y envía notificaciones push a los destinatarios.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertCreationWithNotification'
+      responses:
+        '200':
+          description: Alerta creada y notificaciones enviadas.
+        '401':
+          description: No autorizado.
+        '500':
+          description: Error interno del servidor.
+
   /api/maps/config:
     get:
       summary: Configuración inicial y Centro del Mapa
@@ -120,6 +160,64 @@ components:
           type: string
           description: Mensaje de error detallado.
           example: 'Mensaje de error claro'
+
+    AlertCreationBase:
+      type: object
+      required:
+        - sub_categoria_alerta_id
+        - ubicacion
+        - latitud
+        - longitud
+      properties:
+        sub_categoria_alerta_id:
+          type: string
+          format: uuid
+        ubicacion:
+          type: string
+          description: Dirección en lenguaje natural de la emergencia.
+          example: 'Av. Siempreviva 742'
+        latitud:
+          type: number
+          format: float
+          description: Latitud convertida a partir de la dirección ingresada.
+          example: -34.6040
+        longitud:
+          type: number
+          format: float
+          description: Longitud convertida a partir de la dirección ingresada.
+          example: -58.3820
+        observaciones:
+          type: string
+          description: Detalles opcionales de la alerta.
+          example: 'Fuego en estructura'
+
+    AlertCreation:
+      allOf:
+        - $ref: '#/components/schemas/AlertCreationBase'
+        - type: object
+          required:
+            - estado_alerta_id
+          properties:
+            fecha_hora:
+              type: string
+              format: date-time
+            estado_alerta_id:
+              type: string
+              format: uuid
+
+    AlertCreationWithNotification:
+      allOf:
+        - $ref: '#/components/schemas/AlertCreationBase'
+        - type: object
+          required:
+            - destinatariosIds
+          properties:
+            destinatariosIds:
+              type: array
+              items:
+                type: string
+                format: uuid
+              description: IDs de los usuarios a notificar.
 
     MapConfig:
       type: object
