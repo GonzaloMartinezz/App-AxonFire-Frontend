@@ -12,6 +12,7 @@ import {
   Animated,
   RefreshControl,
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,6 +41,28 @@ function formatCoord(val) {
   if (val == null) return '—';
   return Number(val).toFixed(5);
 }
+
+// ── Map Style ────────────────────────────────────────────────────────────────
+const tacticalMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
+  { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
+];
 
 // ── Toast Component ──────────────────────────────────────────────────────────
 function Toast({ visible, message, type, onHide }) {
@@ -138,6 +161,9 @@ export default function GestionPoisScreen({ navigation }) {
   const [deletingPoi, setDeletingPoi] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Map
+  const mapRef = useRef(null);
+
   // Toast
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
 
@@ -206,6 +232,28 @@ export default function GestionPoisScreen({ navigation }) {
     setFormVisible(false);
     setEditingPoi(null);
   }
+
+  // Handle map press
+  function handleMapPress(e) {
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+    setFormLatitud(latitude.toFixed(6));
+    setFormLongitud(longitude.toFixed(6));
+  }
+
+  // Update map when inputs change manually
+  useEffect(() => {
+    if (!formVisible || !mapRef.current) return;
+    const lat = parseFloat(formLatitud);
+    const lng = parseFloat(formLongitud);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      mapRef.current.animateToRegion({
+        latitude: lat,
+        longitude: lng,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 500);
+    }
+  }, [formLatitud, formLongitud, formVisible]);
 
   async function handleSubmitForm() {
     // Validation
@@ -553,6 +601,44 @@ export default function GestionPoisScreen({ navigation }) {
                 onChangeText={setFormDescripcion}
                 multiline
               />
+
+              {/* Mapa Interactivo */}
+              <Text style={[styles.fieldLabel, { marginTop: 8 }]}>UBICACIÓN EN MAPA</Text>
+              <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, marginTop: -4 }}>
+                Tocá el mapa para ubicar el POI rápidamente.
+              </Text>
+              <View style={styles.mapContainer}>
+                <MapView
+                  ref={mapRef}
+                  style={styles.map}
+                  provider={PROVIDER_GOOGLE}
+                  customMapStyle={tacticalMapStyle}
+                  initialRegion={{
+                    latitude: editingPoi?.latitud || -34.60368,
+                    longitude: editingPoi?.longitud || -58.38159,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  }}
+                  onPress={handleMapPress}
+                >
+                  {(parseFloat(formLatitud) && parseFloat(formLongitud)) ? (
+                    <Marker
+                      coordinate={{
+                        latitude: parseFloat(formLatitud),
+                        longitude: parseFloat(formLongitud)
+                      }}
+                    >
+                      <View style={[styles.markerIcon, { backgroundColor: getCategoriaInfo(formCategoria).bg }]}>
+                        <MaterialCommunityIcons 
+                          name={getCategoriaInfo(formCategoria).icon} 
+                          size={18} 
+                          color={getCategoriaInfo(formCategoria).color} 
+                        />
+                      </View>
+                    </Marker>
+                  ) : null}
+                </MapView>
+              </View>
 
               {/* Coordenadas */}
               <View style={styles.coordRow}>
@@ -1085,6 +1171,27 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 8,
   },
+  
+  // Map Container
+  mapContainer: {
+    height: 180,
+    width: '100%',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  map: {
+    flex: 1,
+  },
+  markerIcon: {
+    padding: 6,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#1e293b',
+  },
+
   modalBtn: {
     flex: 1,
     paddingVertical: 14,
