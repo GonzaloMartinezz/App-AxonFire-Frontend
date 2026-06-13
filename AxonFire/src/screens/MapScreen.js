@@ -1,3 +1,12 @@
+// src/screens/MapScreen.js
+// F1: Integración de mapa base
+// F3: Renderizado de capas operativas (POIs con íconos SVG + toggle por capa)
+//
+// ENDPOINTS:
+//   GET /api/maps/config    → { latitud, longitud }
+//   GET /api/maps/pois      → [{ id, categoria, nombre, descripcion, latitud, longitud }]
+//   GET /alerta/rango       → alertas activas (contador del banner)
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -15,148 +24,240 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '../theme';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-const BASE_URL = 'http://localhost:3000';
+// const BASE_URL = 'http://localhost:3000'; // Eliminado en favor de API_BASE_URL
 const FALLBACK_LAT = -26.8083;
 const FALLBACK_LNG = -65.2176;
 const DEFAULT_ZOOM = 15;
 
-// ─── HTML + CSS de Leaflet ────────────────────────────────────────────────────
+// F3 — Configuración de cada capa de POI (enum del contrato gestion-pois-api.yaml)
+const CAPAS_CONFIG = [
+  { value: 'HIDRANTE', label: 'Hidrantes', icono: 'water', color: '#1565c0' },
+  { value: 'SALUD', label: 'Salud', icono: 'hospital-box', color: '#2e7d32' },
+  { value: 'MATERIAL_PELIGROSO', label: 'Mat. Peligroso', icono: 'alert-octagon', color: '#c2410c' },
+  { value: 'CUARTEL_APOYO', label: 'Cuarteles', icono: 'shield', color: '#37474f' },
+];
+
+// ─── HTML de Leaflet (F1 + F3) ────────────────────────────────────────────────
 function generarMapaHTML(lat, lng, zoom) {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        html, body {
-          width: 100%;
-          height: 100%;
-          background: #5a7055;
-        }
-        #map {
-          width: 100%;
-          height: 100vh;
-        }
-        /* Filtro táctico — convierte los tiles en verde sage militar */
-        .leaflet-tile-pane {
-          filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
-        }
-        /* Ocultamos el zoom nativo — usamos los botones del panel de RN */
-        .leaflet-control-zoom {
-          display: none !important;
-        }
-        .leaflet-control-attribution {
-          font-size: 8px !important;
-          background: rgba(26, 28, 35, 0.6) !important;
-          color: #475569 !important;
-        }
-        .leaflet-control-attribution a {
-          color: #64748b !important;
-        }
-        .leaflet-popup-content-wrapper {
-          background: #1a1c23;
-          border: 1px solid #334155;
-          border-radius: 10px;
-          color: #e2e8f0;
-          font-family: sans-serif;
-          font-size: 12px;
-        }
-        .leaflet-popup-tip {
-          background: #1a1c23;
-        }
-      </style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        var map = L.map('map', {
-          center: [${lat}, ${lng}],
-          zoom: ${zoom},
-          zoomControl: false,
-          attributionControl: true,
-        });
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #5a7055; }
+    #map { width: 100%; height: 100vh; }
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; OSM &copy; CartoDB',
-          maxZoom: 19,
-          minZoom: 8,
-          subdomains: 'abcd',
-        }).addTo(map);
+    /* F1 — Filtro táctico verde sage */
+    .leaflet-tile-pane {
+      filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
+    }
 
-        // Marcador del cuartel del usuario logueado
-        var iconCuartel = L.divIcon({
-          className: '',
-          html: '<div style="width:14px;height:14px;background:#263238;border:2.5px solid #dc2626;border-radius:50%;box-shadow:0 0 8px rgba(220,38,38,0.65)"></div>',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-        });
+    /* F1 — Zoom nativo oculto: usamos los botones del panel de RN */
+    .leaflet-control-zoom { display: none !important; }
 
-        L.marker([${lat}, ${lng}], { icon: iconCuartel })
-          .addTo(map)
-          .bindPopup('<b>Tu cuartel</b>');
+    .leaflet-control-attribution {
+      font-size: 8px !important;
+      background: rgba(26, 28, 35, 0.6) !important;
+      color: #475569 !important;
+    }
+    .leaflet-control-attribution a { color: #64748b !important; }
 
-        // Funciones llamadas desde React Native vía injectJavaScript
-        window.zoomIn = function() {
-          map.zoomIn();
-        };
-        window.zoomOut = function() {
-          map.zoomOut();
-        };
-        window.centrarEnCuartel = function() {
-          map.flyTo([${lat}, ${lng}], ${zoom}, { animate: true, duration: 1.0 });
-        };
+    .leaflet-popup-content-wrapper {
+      background: #1a1c23;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #e2e8f0;
+      font-family: sans-serif;
+      font-size: 12px;
+    }
+    .leaflet-popup-tip { background: #1a1c23; }
+    .leaflet-popup-content b { color: #fff; font-size: 13px; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  // ── F1: Inicializar el mapa ────────────────────────────────────────────────
+  var map = L.map('map', {
+    center: [${lat}, ${lng}],
+    zoom: ${zoom},
+    zoomControl: false,
+    attributionControl: true,
+  });
 
-        // Avisa a React Native que Leaflet terminó de cargar
-        setTimeout(function() {
-          try {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ tipo: 'MAPA_LISTO' }));
-          } catch(e) {}
-        }, 400);
-      </script>
-    </body>
-    </html>
-  `;
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OSM &copy; CartoDB',
+    maxZoom: 19,
+    minZoom: 8,
+    subdomains: 'abcd',
+  }).addTo(map);
+
+  // F1 — Marcador del cuartel del usuario logueado
+  var iconCuartel = L.divIcon({
+    className: '',
+    html: '<div style="width:14px;height:14px;background:#263238;border:2.5px solid #dc2626;border-radius:50%;box-shadow:0 0 8px rgba(220,38,38,0.65)"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+  L.marker([${lat}, ${lng}], { icon: iconCuartel })
+    .addTo(map)
+    .bindPopup('<b>Tu cuartel</b>');
+
+  // ── F3: LayerGroups — uno por categoría de POI ────────────────────────────
+  // Permite activar/desactivar cada capa sin recargar datos del backend
+  var capas = {
+    'HIDRANTE':           L.layerGroup().addTo(map),
+    'SALUD':              L.layerGroup().addTo(map),
+    'MATERIAL_PELIGROSO': L.layerGroup().addTo(map),
+    'CUARTEL_APOYO':      L.layerGroup().addTo(map),
+  };
+
+  // ── F3: Íconos SVG por categoría ──────────────────────────────────────────
+  // Gota de agua / Cruz médica / Triángulo de peligro / Escudo de cuartel
+  var ICONOS = {
+    'HIDRANTE': [
+      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+        '<circle cx="14" cy="14" r="13" fill="#1565c0" stroke="white" stroke-width="2"/>',
+        '<path d="M14 6 Q9 12 9 16 Q9 22 14 23 Q19 22 19 16 Q19 12 14 6Z" fill="white"/>',
+      '</svg>',
+    ].join(''),
+    'SALUD': [
+      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+        '<rect x="1" y="1" width="26" height="26" rx="6" fill="#2e7d32" stroke="white" stroke-width="2"/>',
+        '<rect x="12" y="5" width="4" height="18" fill="white"/>',
+        '<rect x="5" y="12" width="18" height="4" fill="white"/>',
+      '</svg>',
+    ].join(''),
+    'MATERIAL_PELIGROSO': [
+      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+        '<polygon points="14,1 27,26 1,26" fill="#c2410c" stroke="white" stroke-width="2"/>',
+        '<rect x="13" y="10" width="2" height="9" fill="white"/>',
+        '<circle cx="14" cy="22" r="1.5" fill="white"/>',
+      '</svg>',
+    ].join(''),
+    'CUARTEL_APOYO': [
+      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+        '<path d="M14 2 L24 6 L24 16 Q24 23 14 26 Q4 23 4 16 L4 6 Z" fill="#37474f" stroke="white" stroke-width="2"/>',
+        '<text x="14" y="18" text-anchor="middle" fill="white" font-size="10" font-weight="bold" font-family="sans-serif">C</text>',
+      '</svg>',
+    ].join(''),
+  };
+
+  // ── F3: Agregar un POI a su LayerGroup ────────────────────────────────────
+  function agregarPOIInterno(lat, lng, categoria, nombre, descripcion) {
+    var grupo = capas[categoria];
+    if (!grupo) return;
+
+    var svgHtml = ICONOS[categoria] || ICONOS['CUARTEL_APOYO'];
+    var icon = L.divIcon({
+      className: '',
+      html: svgHtml,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -16],
+    });
+
+    L.marker([lat, lng], { icon: icon })
+      .addTo(grupo)
+      .bindPopup(
+        '<b>' + (nombre || categoria) + '</b>' +
+        (descripcion ? '<br><span style="color:#9ca3af">' + descripcion + '</span>' : '')
+      );
+  }
+
+  // ── F3: Carga en lote con requestAnimationFrame ────────────────────────────
+  // Procesa 15 POIs por frame → la UI nunca se congela con muchos marcadores
+  window.cargarPOIsEnLote = function(poisArray) {
+    if (!Array.isArray(poisArray) || poisArray.length === 0) return;
+    var i = 0;
+    var LOTE = 15;
+
+    function procesarChunk() {
+      var fin = Math.min(i + LOTE, poisArray.length);
+      for (; i < fin; i++) {
+        var p = poisArray[i];
+        agregarPOIInterno(
+          p.latitud,
+          p.longitud,
+          p.categoria,
+          p.nombre || '',
+          p.descripcion || ''
+        );
+      }
+      if (i < poisArray.length) {
+        window.requestAnimationFrame(procesarChunk);
+      }
+    }
+    window.requestAnimationFrame(procesarChunk);
+  };
+
+  // ── F3: Toggle de visibilidad por capa ────────────────────────────────────
+  window.toggleCapa = function(categoria, visible) {
+    var grupo = capas[categoria];
+    if (!grupo) return;
+    if (visible && !map.hasLayer(grupo)) map.addLayer(grupo);
+    if (!visible && map.hasLayer(grupo)) map.removeLayer(grupo);
+  };
+
+  // ── F1: Funciones del panel de controles ──────────────────────────────────
+  window.zoomIn           = function() { map.zoomIn(); };
+  window.zoomOut          = function() { map.zoomOut(); };
+  window.centrarEnCuartel = function() {
+    map.flyTo([${lat}, ${lng}], ${zoom}, { animate: true, duration: 1.0 });
+  };
+
+  // F1 — Avisa a React Native que el mapa cargó
+  setTimeout(function() {
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ tipo: 'MAPA_LISTO' }));
+    } catch(e) {}
+  }, 400);
+</script>
+</body>
+</html>`;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 export default function MapScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
-
+  const { user, token, logout } = useAuth();
   const webViewRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // F1 — Estado base
   const [coords, setCoords] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mapaListo, setMapaListo] = useState(false);
   const [alertasActivas, setAlertasActivas] = useState(0);
 
+  // F3 — Estado del panel de capas
+  const [panelCapasVisible, setPanelCapasVisible] = useState(false);
+  const [capasActivas, setCapasActivas] = useState({
+    HIDRANTE: true,
+    SALUD: true,
+    MATERIAL_PELIGROSO: true,
+    CUARTEL_APOYO: true,
+  });
+
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
   const headers = {
     'Content-Type': 'application/json',
-    ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   // ─── Handlers auth (igual que antes) ─────────────────────────────────────
   const handleAdminPress = () => {
     if (user?.rol === 'ADMIN') {
-      if (isCurrentlyAdmin) {
-        navigation.navigate('MainApp');
-      } else {
-        navigation.navigate('AdminApp');
-      }
+      navigation.navigate(isCurrentlyAdmin ? 'MainApp' : 'AdminApp');
     } else {
       if (Platform.OS === 'web') alert('Esta sección es exclusiva para administradores.');
       else Alert.alert('Acceso Denegado', 'Esta sección es exclusiva para administradores.');
@@ -165,9 +266,7 @@ export default function MapScreen({ navigation }) {
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
-      if (window.confirm('¿Deseas cerrar sesión?')) {
-        logout();
-      }
+      if (window.confirm('¿Deseas cerrar sesión?')) logout();
     } else {
       Alert.alert('Cerrar Sesión', '¿Deseas cerrar sesión?', [
         { text: 'Cancelar', style: 'cancel' },
@@ -188,34 +287,38 @@ export default function MapScreen({ navigation }) {
     return () => loop.stop();
   }, []);
 
-  // ─── GET /api/maps/config — centrar en el cuartel del usuario ─────────────
+  // ─── F1: GET /api/maps/config ─────────────────────────────────────────────
   async function cargarConfig() {
     setCargando(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE_URL}/api/maps/config`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/maps/config`, { headers });
       if (res.status === 401) throw new Error('No autorizado. Volvé a iniciar sesión.');
+      if (res.status === 404) {
+        // Endpoint no existe en el backend, usamos fallback silenciosamente
+        setCoords({ latitud: FALLBACK_LAT, longitud: FALLBACK_LNG });
+        return;
+      }
       if (!res.ok) throw new Error(`Error ${res.status} al obtener la configuración del mapa.`);
       const data = await res.json();
       if (typeof data.latitud !== 'number' || typeof data.longitud !== 'number') {
-        throw new Error('El servidor no devolvió coordenadas válidas.');
+        throw new Error('Coordenadas inválidas en la respuesta del servidor.');
       }
       setCoords({ latitud: data.latitud, longitud: data.longitud });
     } catch (err) {
       setError(err.message);
-      // Fallback: igual se muestra el mapa, centrado en Tucumán
       setCoords({ latitud: FALLBACK_LAT, longitud: FALLBACK_LNG });
     } finally {
       setCargando(false);
     }
   }
 
-  // ─── Contador de alertas activas (últimas 24hs) ───────────────────────────
+  // ─── F1: Contador de alertas activas ─────────────────────────────────────
   async function cargarAlertasActivas() {
     try {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 86400000).toISOString();
-      const res = await fetch(`${BASE_URL}/alerta/rango`, {
+      const res = await fetch(`${API_BASE_URL}/alerta/rango`, {
         method: 'GET',
         headers,
         body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
@@ -226,12 +329,53 @@ export default function MapScreen({ navigation }) {
     } catch (_) { }
   }
 
+  // ─── F3: GET /api/maps/pois → inyección en lote ──────────────────────────
+  // Una sola llamada a injectJavaScript con TODOS los POIs.
+  // Leaflet los procesa en chunks de 15 con requestAnimationFrame → sin freeze.
+  async function cargarPOIs() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/maps/pois`, { headers });
+      if (!res.ok) return;
+      const pois = await res.json();
+      if (!Array.isArray(pois) || pois.length === 0) return;
+
+      const poisSanitizados = pois.map(p => ({
+        latitud: p.latitud,
+        longitud: p.longitud,
+        categoria: p.categoria,
+        nombre: (p.nombre || '').replace(/'/g, "\\'"),
+        descripcion: (p.descripcion || '').replace(/'/g, "\\'"),
+      }));
+
+      const json = JSON.stringify(poisSanitizados);
+      webViewRef.current?.injectJavaScript(`cargarPOIsEnLote(${json}); true;`);
+    } catch (err) {
+      console.warn('[MapScreen/F3] POIs:', err.message);
+    }
+  }
+
+  // ─── F3: Toggle de visibilidad de una capa ───────────────────────────────
+  function handleToggleCapa(categoria) {
+    const nuevoEstado = !capasActivas[categoria];
+    setCapasActivas(prev => ({ ...prev, [categoria]: nuevoEstado }));
+    webViewRef.current?.injectJavaScript(
+      `toggleCapa('${categoria}', ${nuevoEstado}); true;`
+    );
+  }
+
+  // ─── Effects ──────────────────────────────────────────────────────────────
   useEffect(() => {
     cargarConfig();
     cargarAlertasActivas();
   }, []);
 
-  // ─── Mensajes desde Leaflet → React Native ────────────────────────────────
+  // Cuando Leaflet confirma que cargó → inyectar los POIs
+  useEffect(() => {
+    if (!mapaListo) return;
+    cargarPOIs();
+  }, [mapaListo]);
+
+  // ─── Handler de mensajes Leaflet → React Native ───────────────────────────
   function onMensajeWebView({ nativeEvent: { data } }) {
     try {
       const msg = JSON.parse(data);
@@ -248,7 +392,7 @@ export default function MapScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ── Mapa Leaflet real — reemplaza el LinearGradient anterior ── */}
+      {/* F1 — Mapa Leaflet real */}
       {mapHTML && (
         <WebView
           ref={webViewRef}
@@ -264,7 +408,7 @@ export default function MapScreen({ navigation }) {
         />
       )}
 
-      {/* ── Top Overlay (igual que antes) ── */}
+      {/* Header + Mission card (igual que antes) */}
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerBar}>
           <View style={styles.headerLeft}>
@@ -289,7 +433,6 @@ export default function MapScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Mission Status Card (igual que antes) */}
         <View style={styles.missionCard}>
           <View style={styles.missionLeft}>
             <Text style={styles.missionLabel}>ESTADO DE MISIÓN</Text>
@@ -318,23 +461,66 @@ export default function MapScreen({ navigation }) {
         </View>
       </View>
 
-      {/* ── Map Controls — botones ahora conectados a Leaflet ── */}
+      {/* F3 — Panel de capas (aparece cuando se toca el botón layers) */}
+      {panelCapasVisible && mapaListo && (
+        <View style={[styles.panelCapas, { bottom: 180 }]}>
+          <Text style={styles.panelCapasTitulo}>CAPAS</Text>
+          {CAPAS_CONFIG.map(capa => {
+            const activa = capasActivas[capa.value];
+            return (
+              <TouchableOpacity
+                key={capa.value}
+                style={[styles.filaToggle, activa && { borderLeftColor: capa.color }]}
+                onPress={() => handleToggleCapa(capa.value)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons
+                  name={capa.icono}
+                  size={15}
+                  color={activa ? capa.color : '#475569'}
+                />
+                <Text style={[styles.filaToggleTexto, !activa && styles.filaToggleTextoInactivo]}>
+                  {capa.label}
+                </Text>
+                <View style={[styles.toggleDot, activa && { backgroundColor: capa.color }]} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* F1 + F3 — Panel de controles */}
       <View style={[styles.mapControls, { bottom: 120 }]}>
-        <TouchableOpacity style={styles.controlBtn} onPress={() => {/* F3: toggle capas */ }}>
-          <MaterialCommunityIcons name="layers-outline" size={20} color={Colors.onSurface} />
+
+        {/* F3: Botón capas — ahora abre/cierra el panel */}
+        <TouchableOpacity
+          style={[styles.controlBtn, panelCapasVisible && styles.controlBtnActivo]}
+          onPress={() => setPanelCapasVisible(v => !v)}
+        >
+          <MaterialCommunityIcons
+            name="layers-outline"
+            size={20}
+            color={panelCapasVisible ? '#fff' : Colors.onSurface}
+          />
         </TouchableOpacity>
+
+        {/* F1: Centrar en cuartel */}
         <TouchableOpacity
           style={styles.controlBtn}
           onPress={() => webViewRef.current?.injectJavaScript('centrarEnCuartel(); true;')}
         >
           <MaterialIcons name="my-location" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
+
+        {/* F1: Zoom in */}
         <TouchableOpacity
           style={styles.controlBtn}
           onPress={() => webViewRef.current?.injectJavaScript('zoomIn(); true;')}
         >
           <MaterialCommunityIcons name="plus" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
+
+        {/* F1: Zoom out */}
         <TouchableOpacity
           style={styles.controlBtn}
           onPress={() => webViewRef.current?.injectJavaScript('zoomOut(); true;')}
@@ -343,7 +529,7 @@ export default function MapScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Admin FAB (igual que antes) ── */}
+      {/* Admin FAB (igual que antes) */}
       {user?.rol === 'ADMIN' && (
         <TouchableOpacity
           style={styles.floatingMapFab}
@@ -354,7 +540,7 @@ export default function MapScreen({ navigation }) {
         </TouchableOpacity>
       )}
 
-      {/* ── Banner alertas activas ── */}
+      {/* F1 — Banner alertas activas */}
       {mapaListo && alertasActivas > 0 && (
         <View style={[styles.bannerAlertas, { top: insets.top + 14 }]}>
           <Animated.View style={[styles.puntoPulso, { opacity: pulseAnim }]} />
@@ -364,7 +550,7 @@ export default function MapScreen({ navigation }) {
         </View>
       )}
 
-      {/* ── Loading overlay ── */}
+      {/* F1 — Loading overlay */}
       {(cargando || (!mapaListo && !error)) && (
         <View style={styles.overlayLoading}>
           <ActivityIndicator size="large" color="#dc2626" />
@@ -375,7 +561,7 @@ export default function MapScreen({ navigation }) {
         </View>
       )}
 
-      {/* ── Error no bloqueante ── */}
+      {/* F1 — Error no bloqueante */}
       {error && mapaListo && (
         <View style={[styles.bannerError, { top: insets.top + 14 }]}>
           <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#fca5a5" />
@@ -394,12 +580,14 @@ export default function MapScreen({ navigation }) {
   );
 }
 
-// ─── ESTILOS CORRESPONDIENTES , SIGO LA ESTRUCTURA DE LAS DEMAS SCREENS  ───────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#5a7055',
   },
+
+  // ── Header ──────────────────────────────────────────────────────────────────
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -443,6 +631,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // ── Mission card ─────────────────────────────────────────────────────────────
   missionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -451,9 +641,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
   },
-  missionLeft: {
-    flex: 1,
-  },
+  missionLeft: { flex: 1 },
   missionLabel: {
     fontSize: 8,
     fontWeight: '800',
@@ -486,9 +674,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     marginHorizontal: Spacing.sm,
   },
-  missionRight: {
-    alignItems: 'flex-start',
-  },
+  missionRight: { alignItems: 'flex-start' },
   respondersCount: {
     fontSize: 12,
     fontWeight: '900',
@@ -519,6 +705,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+
+  // ── Panel de controles ────────────────────────────────────────────────────────
   mapControls: {
     position: 'absolute',
     right: Spacing.lg,
@@ -533,6 +721,69 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  controlBtnActivo: {
+    backgroundColor: '#1d4ed8',
+  },
+
+  // ── F3: Panel de capas ────────────────────────────────────────────────────────
+  panelCapas: {
+    position: 'absolute',
+    right: Spacing.lg + 48,  // a la izquierda del panel de controles
+    backgroundColor: '#1a1c23',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    overflow: 'hidden',
+    minWidth: 155,
+    zIndex: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+      },
+      android: { elevation: 10 },
+    }),
+  },
+  panelCapasTitulo: {
+    color: '#64748b',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    textTransform: 'uppercase',
+  },
+  filaToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#1f2937',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f2937',
+  },
+  filaToggleTexto: {
+    flex: 1,
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  filaToggleTextoInactivo: {
+    color: '#475569',
+  },
+  toggleDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#1f2937',
+  },
+
+  // ── Admin FAB ────────────────────────────────────────────────────────────────
   floatingMapFab: {
     position: 'absolute',
     bottom: 120,
@@ -557,7 +808,7 @@ const styles = StyleSheet.create({
     }),
   },
 
-  // ── Nuevos estilos F1 ─────────────────────────────────────────────────────
+  // ── F1: Banner alertas ───────────────────────────────────────────────────────
   bannerAlertas: {
     position: 'absolute',
     left: 16,
@@ -591,6 +842,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+
+  // ── F1: Loading overlay ──────────────────────────────────────────────────────
   overlayLoading: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0a0f12',
@@ -611,6 +864,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
+
+  // ── F1: Error banner ─────────────────────────────────────────────────────────
   bannerError: {
     position: 'absolute',
     left: 16,
