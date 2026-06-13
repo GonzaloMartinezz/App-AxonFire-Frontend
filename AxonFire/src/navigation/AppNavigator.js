@@ -143,7 +143,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
 
   // Icon pairs: [inactive (outline), active (filled)]
   const ICON_MAP = {
-    Panel: ['monitor-dashboard-outline', 'monitor-dashboard'],
+    Panel: ['monitor-dashboard', 'monitor-dashboard'],
     Mapa: ['map-outline', 'map'],
     Alertas: ['bell-outline', 'bell'],
     Asistencia: ['clipboard-list-outline', 'clipboard-list'],
