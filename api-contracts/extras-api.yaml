@@ -1,0 +1,117 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API Extras (Notificaciones, Métricas e Informes)
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /notificaciones/registrar-token:
+    post:
+      summary: Registrar Token de Dispositivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usuario_id:
+                  type: string
+                token:
+                  type: string
+                plataforma:
+                  type: string
+      responses:
+        '200':
+          description: OK
+  /metricas/mensuales:
+    get:
+      summary: Obtener Métricas Mensuales
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: mes
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: anio
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /informes/{alertaId}/pdf:
+    get:
+      summary: Generar PDF de Informe de Emergencia
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: alertaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /informes/{alertaId}/datos:
+    get:
+      summary: Obtener Datos del Informe (JSON)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: alertaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /informes/{alertaId}/borrador:
+    get:
+      summary: Obtener o Crear Borrador de Informe
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: alertaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Actualizar Borrador de Informe
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: alertaId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                observaciones_admin:
+                  type: string
+                detalles_propiedad:
+                  type: string
+      responses:
+        '200':
+          description: OK

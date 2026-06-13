@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API de Camiones y Sectores
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /camiones/:
+    get:
+      summary: Obtener Todos los Camiones
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Crear Camión
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_camion:
+                  type: string
+                estado:
+                  type: string
+                  enum: [ACTIVO, INACTIVO]
+      responses:
+        '200':
+          description: OK
+  /camiones/activos:
+    get:
+      summary: Obtener Solo Camiones Activos
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /camiones/{id}:
+    get:
+      summary: Obtener Camión por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Actualizar Camión
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_camion:
+                  type: string
+                estado:
+                  type: string
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Eliminar Camión
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /sectores/:
+    post:
+      summary: Crear Sector
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                camionId:
+                  type: string
+                nombre_sector:
+                  type: string
+      responses:
+        '200':
+          description: OK
+  /sectores/camion/{camionId}:
+    get:
+      summary: Obtener Sectores por Camión
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: camionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /sectores/{id}:
+    delete:
+      summary: Eliminar Sector
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /camiones_inventario/:
+    post:
+      summary: Agregar Herramienta a Inventario de Camión
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                camionId:
+                  type: string
+                herramientaId:
+                  type: string
+                sectorId:
+                  type: string
+                cantidad:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+  /camiones_inventario/camion/{camionId}:
+    get:
+      summary: Obtener Inventario por Camión
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: camionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /camiones_inventario/camion/{camionId}/agrupado:
+    get:
+      summary: Obtener Inventario Agrupado por Sector
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: camionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /camiones_inventario/{id}:
+    patch:
+      summary: Actualizar Cantidad de Inventario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cantidad:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Eliminar del Inventario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK

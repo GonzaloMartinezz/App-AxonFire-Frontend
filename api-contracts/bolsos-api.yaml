@@ -1,0 +1,153 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API de Bolsos y su Inventario
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /bolsos/:
+    get:
+      summary: Obtener Todos los Bolsos
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Crear Bolso
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_bolso:
+                  type: string
+                estado:
+                  type: string
+                  enum: [ACTIVO, INACTIVO]
+      responses:
+        '200':
+          description: OK
+  /bolsos/{id}:
+    get:
+      summary: Obtener Bolso por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Actualizar Bolso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Eliminar Bolso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /bolsos_inventario/:
+    post:
+      summary: Agregar Herramienta a Inventario de Bolso
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bolsoId:
+                  type: string
+                herramientaId:
+                  type: string
+                cantidad:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+  /bolsos_inventario/bolso/{bolsoId}:
+    get:
+      summary: Obtener Inventario por Bolso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bolsoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /bolsos_inventario/{id}:
+    patch:
+      summary: Actualizar Inventario de Bolso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cantidad:
+                  type: integer
+                herramientaId:
+                  type: string
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Eliminar del Inventario de Bolso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK

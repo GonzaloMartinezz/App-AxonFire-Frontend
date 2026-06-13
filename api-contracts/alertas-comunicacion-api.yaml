@@ -1,0 +1,190 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API de Alertas y Comunicación
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /alerta/rango:
+    get:
+      summary: Obtener Alertas por Rango de Fecha
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fecha_desde:
+                  type: string
+                  format: date-time
+                fecha_hasta:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: OK
+  /alerta/{id_alerta}:
+    get:
+      summary: Obtener Alerta por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id_alerta
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /alerta/usuario/{id_usuario}:
+    get:
+      summary: Obtener Alertas por Usuario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id_usuario
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /alerta/{id_alerta}/finalizar:
+    patch:
+      summary: Finalizar Alerta
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id_alerta
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+  /respuestas_alertas/{id_alerta}:
+    get:
+      summary: Obtener Respuestas por Alerta
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id_alerta
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /respuestas_alertas/responder/{alerta_id}:
+    post:
+      summary: Responder a un Aviso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: alerta_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estado_respuesta:
+                  type: string
+                  enum: [PENDIENTE, ACEPTADO, RECHAZADO]
+                fecha_hora:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: OK
+  /respuestas_alertas/{id}:
+    delete:
+      summary: Eliminar Respuesta
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /respuestas_alertas/{id_alerta}/asistencias/count:
+    get:
+      summary: Contar Asistencias por Alerta
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id_alerta
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /registros_comunicacion/crear:
+    post:
+      summary: Crear Registro de Comunicación
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alerta_id:
+                  type: string
+                mensaje:
+                  type: string
+                tipo_comunicacion:
+                  type: string
+                  enum: [SUMINISTROS, APOYO, INFORMACION]
+                fecha_hora:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: OK
+  /registros_comunicacion/alerta/{id_alerta}:
+    get:
+      summary: Obtener Registros por Alerta
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id_alerta
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK

@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API de Autenticación
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+paths:
+  /auth/login:
+    post:
+      summary: Iniciar Sesión
+      description: Verifica las credenciales del usuario y genera un JWT para mantener la sesión.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - nombre_usuario
+                - password
+              properties:
+                nombre_usuario:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  rol:
+                    type: string
+                  token:
+                    type: string
+                  msj:
+                    type: string

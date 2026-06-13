@@ -1,0 +1,55 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API de Usuarios
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /usuarios/crear:
+    post:
+      summary: Crear Usuario
+      description: Crea un nuevo usuario en el sistema. Opcionalmente, se pueden pasar los datos de bombero.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_usuario:
+                  type: string
+                password:
+                  type: string
+                rol:
+                  type: string
+                bombero:
+                  type: object
+                  properties:
+                    nombre:
+                      type: string
+                    apellido:
+                      type: string
+                    rango:
+                      type: string
+      responses:
+        '200':
+          description: Usuario creado exitosamente
+        '500':
+          description: Error del servidor
+  /usuarios/bomberos:
+    get:
+      summary: Obtener Todos los Bomberos
+      description: Obtiene una lista de todos los bomberos registrados.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK

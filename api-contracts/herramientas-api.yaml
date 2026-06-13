@@ -1,0 +1,90 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API de Herramientas
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /herramientas/:
+    get:
+      summary: Obtener Todas las Herramientas
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Crear Herramienta
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_herramienta:
+                  type: string
+                cantidad_disponible:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+  /herramientas/{id}:
+    get:
+      summary: Obtener Herramienta por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Actualizar Herramienta
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_herramienta:
+                  type: string
+                cantidad_disponible:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Eliminar Herramienta
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK

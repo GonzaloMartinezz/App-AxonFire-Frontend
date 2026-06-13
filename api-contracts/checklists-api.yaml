@@ -1,0 +1,168 @@
+openapi: 3.0.3
+info:
+  title: Axion Fire - API de Checklists
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:3000'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /checklist/guardar:
+    post:
+      summary: Guardar Checklist Diario Camión
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                camionId:
+                  type: string
+                detalles:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      inventarioId:
+                        type: string
+                      controlado:
+                        type: string
+                        enum: [CHEQUEADO, FALTANTE]
+                      observaciones:
+                        type: string
+      responses:
+        '200':
+          description: OK
+  /checklist/historial/{camionId}:
+    get:
+      summary: Obtener Historial de Checklist por Camión
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: camionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /checklist_bolsos/bolsos/guardar:
+    post:
+      summary: Guardar Checklist de Bolso
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bolsoId:
+                  type: string
+                detalles:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      inventarioId:
+                        type: string
+                      controlado:
+                        type: string
+                        enum: [CHEQUEADO, FALTANTE]
+                      observaciones:
+                        type: string
+      responses:
+        '200':
+          description: OK
+  /checklist_bolsos/bolsos/historial/{bolsoId}:
+    get:
+      summary: Obtener Historial de Checklist por Bolso
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bolsoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /checklist_cuartel/:
+    post:
+      summary: Guardar Checklist de Cuartel
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usuarioId:
+                  type: string
+                detalles:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      herramientaId:
+                        type: string
+                      controlado:
+                        type: string
+                        enum: [CHEQUEADO, FALTANTE]
+                      observaciones:
+                        type: string
+      responses:
+        '200':
+          description: OK
+    get:
+      summary: Obtener Historial de Checklists de Cuartel
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+  /checklist_cuartel/{id}:
+    get:
+      summary: Obtener Detalle de Checklist Cuartel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /checklist_cuartel/recordatorio:
+    post:
+      summary: Enviar Recordatorio de Checklist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usuariosIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: OK
