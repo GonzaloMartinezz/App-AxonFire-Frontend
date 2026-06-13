@@ -17,7 +17,6 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -69,11 +68,11 @@ const PREDEFINED_RECOMMENDATIONS = [
     longitud: -65.29103,
   },
   {
-    nombre: 'Cuartel de Bomberos Voluntarios de Yerba Buena',
+    nombre: 'Cuartel de Bomberos Voluntarios de Yerba Buena (Sede Central)',
     categoria: 'CUARTEL_APOYO',
-    descripcion: 'Base operativa principal de Bomberos Voluntarios de Yerba Buena.',
-    latitud: -26.81502,
-    longitud: -65.29505,
+    descripcion: 'Nueva sede central de Bomberos Voluntarios de Yerba Buena (Perú y Thames).',
+    latitud: -26.8118,
+    longitud: -65.2975,
   },
   {
     nombre: 'Hidrante Central Plaza Marcos Paz',
@@ -266,40 +265,12 @@ export default function GestionPoisScreen({ navigation }) {
       const res = await fetch(`${API_BASE_URL}/api/maps/pois`, {
         headers: authHeaders(),
       });
-      if (res.status === 404) {
-        console.warn('API /api/maps/pois returned 404. Falling back to AsyncStorage.');
-        const localData = await AsyncStorage.getItem('local_pois');
-        if (localData) {
-          setPois(JSON.parse(localData));
-        } else {
-          const initialPois = PREDEFINED_RECOMMENDATIONS.map((r, index) => ({
-            id: `mock-poi-${index}`,
-            nombre: r.nombre,
-            categoria: r.categoria,
-            descripcion: r.descripcion,
-            latitud: r.latitud,
-            longitud: r.longitud,
-            creado_por: 'mock-admin'
-          }));
-          await AsyncStorage.setItem('local_pois', JSON.stringify(initialPois));
-          setPois(initialPois);
-        }
-        return;
-      }
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setPois(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Error fetching POIs, using AsyncStorage fallback:', err);
-      try {
-        const localData = await AsyncStorage.getItem('local_pois');
-        if (localData) {
-          setPois(JSON.parse(localData));
-        }
-      } catch (storageErr) {
-        console.error('Error reading from AsyncStorage:', storageErr);
-      }
-      setError('No se pudieron cargar los puntos del servidor (Modo offline activo).');
+      console.error('Error fetching POIs:', err);
+      setError('No se pudieron cargar los puntos de interés.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -322,12 +293,12 @@ export default function GestionPoisScreen({ navigation }) {
     setShowSuggestions(false);
     setFormVisible(true);
 
-    // Initial center on Yerba Buena with close zoom
+    // Initial center on Yerba Buena (Perú and Thames) with close zoom
     setTimeout(() => {
       if (mapRef.current) {
         mapRef.current.animateToRegion({
-          latitude: -26.81667,
-          longitude: -65.31667,
+          latitude: -26.8118,
+          longitude: -65.2975,
           latitudeDelta: 0.004,
           longitudeDelta: 0.004,
         }, 500);
@@ -454,38 +425,12 @@ export default function GestionPoisScreen({ navigation }) {
 
     try {
       if (editingPoi) {
-        // Check if editing a mock POI
-        if (String(editingPoi.id).startsWith('mock-')) {
-          const updatedPois = pois.map(p =>
-            p.id === editingPoi.id
-              ? { ...p, ...body }
-              : p
-          );
-          setPois(updatedPois);
-          await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
-          showToast('Punto de interés actualizado localmente.');
-          closeForm();
-          return;
-        }
-
         // PATCH
         const res = await fetch(`${API_BASE_URL}/api/maps/pois/${editingPoi.id}`, {
           method: 'PATCH',
           headers: authHeaders(),
           body: JSON.stringify(body),
         });
-        if (res.status === 404) {
-          const updatedPois = pois.map(p =>
-            p.id === editingPoi.id
-              ? { ...p, ...body }
-              : p
-          );
-          setPois(updatedPois);
-          await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
-          showToast('Punto de interés actualizado localmente.');
-          closeForm();
-          return;
-        }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || `Error ${res.status}`);
@@ -506,19 +451,6 @@ export default function GestionPoisScreen({ navigation }) {
           headers: authHeaders(),
           body: JSON.stringify(body),
         });
-        if (res.status === 404) {
-          const newPoi = {
-            id: `mock-poi-${Date.now()}`,
-            ...body,
-            creado_por: 'mock-admin'
-          };
-          const updatedPois = [...pois, newPoi];
-          setPois(updatedPois);
-          await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
-          showToast('Punto de interés registrado localmente.');
-          closeForm();
-          return;
-        }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || `Error ${res.status}`);
@@ -529,22 +461,8 @@ export default function GestionPoisScreen({ navigation }) {
       }
       closeForm();
     } catch (err) {
-      console.error('Error saving POI, using AsyncStorage fallback:', err);
-      const newPoi = {
-        id: editingPoi ? editingPoi.id : `mock-poi-${Date.now()}`,
-        ...body,
-        creado_por: 'mock-admin'
-      };
-      let updatedPois;
-      if (editingPoi) {
-        updatedPois = pois.map(p => p.id === editingPoi.id ? { ...p, ...body } : p);
-      } else {
-        updatedPois = [...pois, newPoi];
-      }
-      setPois(updatedPois);
-      await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
-      showToast('Guardado en almacenamiento local (offline).');
-      closeForm();
+      console.error('Error saving POI:', err);
+      showToast(err.message || 'Error al guardar el punto de interés.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -561,29 +479,10 @@ export default function GestionPoisScreen({ navigation }) {
     setDeleting(true);
 
     try {
-      if (String(deletingPoi.id).startsWith('mock-')) {
-        const updatedPois = pois.filter(p => p.id !== deletingPoi.id);
-        setPois(updatedPois);
-        await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
-        showToast('Punto de interés eliminado localmente.');
-        setDeleteModalVisible(false);
-        setDeletingPoi(null);
-        return;
-      }
-
       const res = await fetch(`${API_BASE_URL}/api/maps/pois/${deletingPoi.id}`, {
         method: 'DELETE',
         headers: authHeaders(),
       });
-      if (res.status === 404) {
-        const updatedPois = pois.filter(p => p.id !== deletingPoi.id);
-        setPois(updatedPois);
-        await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
-        showToast('Punto de interés eliminado localmente.');
-        setDeleteModalVisible(false);
-        setDeletingPoi(null);
-        return;
-      }
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `Error ${res.status}`);
@@ -592,11 +491,8 @@ export default function GestionPoisScreen({ navigation }) {
       setPois(prev => prev.filter(p => p.id !== deletingPoi.id));
       showToast('Punto de interés eliminado con éxito.');
     } catch (err) {
-      console.error('Error deleting POI, using AsyncStorage fallback:', err);
-      const updatedPois = pois.filter(p => p.id !== deletingPoi.id);
-      setPois(updatedPois);
-      await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
-      showToast('Eliminado localmente (offline).');
+      console.error('Error deleting POI:', err);
+      showToast(err.message || 'Error al eliminar el recurso.', 'error');
     } finally {
       setDeleting(false);
       setDeleteModalVisible(false);
@@ -910,8 +806,8 @@ export default function GestionPoisScreen({ navigation }) {
                     provider={PROVIDER_GOOGLE}
                     customMapStyle={tacticalMapStyle}
                     initialRegion={{
-                      latitude: editingPoi?.latitud || -26.81667,
-                      longitude: editingPoi?.longitud || -65.31667,
+                      latitude: editingPoi?.latitud || -26.8118,
+                      longitude: editingPoi?.longitud || -65.2975,
                       latitudeDelta: 0.004,
                       longitudeDelta: 0.004,
                     }}
@@ -952,7 +848,7 @@ export default function GestionPoisScreen({ navigation }) {
                     <Text style={styles.fieldLabel}>LATITUD</Text>
                     <TextInput
                       style={styles.modalInput}
-                      placeholder="-26.81667"
+                      placeholder="-26.81180"
                       placeholderTextColor="#64748b"
                       value={formLatitud}
                       onChangeText={setFormLatitud}
@@ -964,7 +860,7 @@ export default function GestionPoisScreen({ navigation }) {
                     <Text style={styles.fieldLabel}>LONGITUD</Text>
                     <TextInput
                       style={styles.modalInput}
-                      placeholder="-65.31667"
+                      placeholder="-65.29750"
                       placeholderTextColor="#64748b"
                       value={formLongitud}
                       onChangeText={setFormLongitud}

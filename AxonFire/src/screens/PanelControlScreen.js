@@ -22,34 +22,6 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 
-function getMockAlerts() {
-  return [
-    {
-      id: 'a1',
-      observaciones: 'Incendio Estructural',
-      fecha_hora: new Date().toISOString(),
-      estadoAlerta: { nombre_estado: 'ACTIVA' },
-      subCategoriaAlerta: { nombre_sub_categoria: 'INCENDIO', prioridad: '1' },
-      ubicacion: 'Av. Corrientes 1234'
-    },
-    {
-      id: 'a2',
-      observaciones: 'Accidente de Tránsito',
-      fecha_hora: new Date(Date.now() - 3600000).toISOString(),
-      estadoAlerta: { nombre_estado: 'DESPACHADA' },
-      subCategoriaAlerta: { nombre_sub_categoria: 'RESCATE', prioridad: '2' },
-      ubicacion: 'Ruta 9 Km 45'
-    },
-    {
-      id: 'a3',
-      observaciones: 'Derrame de Químicos',
-      fecha_hora: new Date(Date.now() - 7200000).toISOString(),
-      estadoAlerta: { nombre_estado: 'RESUELTA' },
-      subCategoriaAlerta: { nombre_sub_categoria: 'HAZMAT', prioridad: '1' },
-      ubicacion: 'Parque Industrial'
-    }
-  ];
-}
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function clasificarEstado(nombreEstado = '') {
@@ -167,9 +139,9 @@ export default function PanelControlScreen({ navigation }) {
 
       setAlertas(resolvedLista);
     } catch (err) {
-      console.error('Error cargando datos del panel, usando mock data:', err);
-      setAlertas(getMockAlerts());
-      setError(null);
+      console.error('Error cargando datos del panel:', err);
+      setAlertas([]);
+      setError('Servidor no disponible o sesión expirada. Desliza hacia abajo para reintentar.');
     } finally {
       setCargando(false);
       setRefrescando(false);
