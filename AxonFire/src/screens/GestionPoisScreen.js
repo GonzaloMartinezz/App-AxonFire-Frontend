@@ -11,16 +11,85 @@ import {
   TextInput,
   Animated,
   RefreshControl,
+  KeyboardAvoidingView,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 
 // ── Category helpers ─────────────────────────────────────────────────────────
 const CATEGORIAS = ['HIDRANTE', 'SALUD', 'MATERIAL_PELIGROSO', 'CUARTEL_APOYO'];
+
+// Recomendaciones predefinidas en Yerba Buena, Tucumán
+const PREDEFINED_RECOMMENDATIONS = [
+  {
+    nombre: 'Hospital Ramón Carrillo (Yerba Buena)',
+    categoria: 'SALUD',
+    descripcion: 'Centro asistencial público y guardia médica de Yerba Buena.',
+    latitud: -26.81432,
+    longitud: -65.29051,
+  },
+  {
+    nombre: 'Centro de Salud Dr. Ramón Carrillo',
+    categoria: 'SALUD',
+    descripcion: 'CAPS local y atención primaria de salud.',
+    latitud: -26.81524,
+    longitud: -65.29128,
+  },
+  {
+    nombre: 'Sanatorio Parque - Sucursal Yerba Buena',
+    categoria: 'SALUD',
+    descripcion: 'Clínica y centro de emergencias privado.',
+    latitud: -26.81235,
+    longitud: -65.28546,
+  },
+  {
+    nombre: 'Estación de Servicio YPF (Av. Aconquija)',
+    categoria: 'MATERIAL_PELIGROSO',
+    descripcion: 'Combustibles líquidos y gaseosos. Punto de abastecimiento crítico.',
+    latitud: -26.81895,
+    longitud: -65.28854,
+  },
+  {
+    nombre: 'Estación de Servicio Shell (Av. Aconquija)',
+    categoria: 'MATERIAL_PELIGROSO',
+    descripcion: 'Combustibles de alto octanaje y tienda 24hs.',
+    latitud: -26.81652,
+    longitud: -65.29913,
+  },
+  {
+    nombre: 'Estación de Servicio Refinor (Av. Perón)',
+    categoria: 'MATERIAL_PELIGROSO',
+    descripcion: 'Suministro de combustibles líquidos y GNC.',
+    latitud: -26.79951,
+    longitud: -65.29103,
+  },
+  {
+    nombre: 'Cuartel de Bomberos Voluntarios de Yerba Buena',
+    categoria: 'CUARTEL_APOYO',
+    descripcion: 'Base operativa principal de Bomberos Voluntarios de Yerba Buena.',
+    latitud: -26.81502,
+    longitud: -65.29505,
+  },
+  {
+    nombre: 'Hidrante Central Plaza Marcos Paz',
+    categoria: 'HIDRANTE',
+    descripcion: 'Hidrante de acople rápido en sector este de la plaza.',
+    latitud: -26.81154,
+    longitud: -65.28628,
+  },
+  {
+    nombre: 'Hidrante Av. Aconquija y Solano Vera',
+    categoria: 'HIDRANTE',
+    descripcion: 'Boca de incendio de red de agua municipal.',
+    latitud: -26.81921,
+    longitud: -65.28912,
+  },
+];
 
 function getCategoriaInfo(cat = '') {
   switch (cat) {
@@ -31,7 +100,7 @@ function getCategoriaInfo(cat = '') {
     case 'MATERIAL_PELIGROSO':
       return { icon: 'biohazard', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', label: 'Mat. Peligroso' };
     case 'CUARTEL_APOYO':
-      return { icon: 'office-building', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', label: 'Cuartel Apoyo' };
+      return { icon: 'fire-station', color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)', label: 'Cuartel de Bomberos' };
     default:
       return { icon: 'map-marker', color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', label: cat || 'Sin categoría' };
   }
@@ -156,6 +225,10 @@ export default function GestionPoisScreen({ navigation }) {
   const [submitting, setSubmitting] = useState(false);
   const [catPickerOpen, setCatPickerOpen] = useState(false);
 
+  // Auto-completado y sugerencias
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   // Delete confirmation modal
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deletingPoi, setDeletingPoi] = useState(null);
@@ -163,6 +236,8 @@ export default function GestionPoisScreen({ navigation }) {
 
   // Map
   const mapRef = useRef(null);
+  const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
+  const [currentDeltas, setCurrentDeltas] = useState({ latitudeDelta: 0.004, longitudeDelta: 0.004 });
 
   // Toast
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
@@ -191,12 +266,40 @@ export default function GestionPoisScreen({ navigation }) {
       const res = await fetch(`${API_BASE_URL}/api/maps/pois`, {
         headers: authHeaders(),
       });
+      if (res.status === 404) {
+        console.warn('API /api/maps/pois returned 404. Falling back to AsyncStorage.');
+        const localData = await AsyncStorage.getItem('local_pois');
+        if (localData) {
+          setPois(JSON.parse(localData));
+        } else {
+          const initialPois = PREDEFINED_RECOMMENDATIONS.map((r, index) => ({
+            id: `mock-poi-${index}`,
+            nombre: r.nombre,
+            categoria: r.categoria,
+            descripcion: r.descripcion,
+            latitud: r.latitud,
+            longitud: r.longitud,
+            creado_por: 'mock-admin'
+          }));
+          await AsyncStorage.setItem('local_pois', JSON.stringify(initialPois));
+          setPois(initialPois);
+        }
+        return;
+      }
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
       setPois(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Error fetching POIs:', err);
-      setError('No se pudieron cargar los puntos de interés.');
+      console.error('Error fetching POIs, using AsyncStorage fallback:', err);
+      try {
+        const localData = await AsyncStorage.getItem('local_pois');
+        if (localData) {
+          setPois(JSON.parse(localData));
+        }
+      } catch (storageErr) {
+        console.error('Error reading from AsyncStorage:', storageErr);
+      }
+      setError('No se pudieron cargar los puntos del servidor (Modo offline activo).');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -215,7 +318,43 @@ export default function GestionPoisScreen({ navigation }) {
     setFormDescripcion('');
     setFormLatitud('');
     setFormLongitud('');
+    setSuggestions([]);
+    setShowSuggestions(false);
     setFormVisible(true);
+
+    // Initial center on Yerba Buena with close zoom
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude: -26.81667,
+          longitude: -65.31667,
+          latitudeDelta: 0.004,
+          longitudeDelta: 0.004,
+        }, 500);
+      }
+    }, 300);
+  }
+
+  // Auto-completar POI sugerido
+  function selectRecommendation(item) {
+    setFormNombre(item.nombre);
+    setFormCategoria(item.categoria);
+    setFormDescripcion(item.descripcion || '');
+    setFormLatitud(String(item.latitud));
+    setFormLongitud(String(item.longitud));
+    setSuggestions([]);
+    setShowSuggestions(false);
+    showToast(`Autocompletado: ${item.nombre}`);
+
+    // Animate camera to recommendation location with close zoom
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: item.latitud,
+        longitude: item.longitud,
+        latitudeDelta: 0.003,
+        longitudeDelta: 0.003,
+      }, 500);
+    }
   }
 
   function openEditForm(poi) {
@@ -225,12 +364,47 @@ export default function GestionPoisScreen({ navigation }) {
     setFormDescripcion(poi.descripcion || '');
     setFormLatitud(poi.latitud != null ? String(poi.latitud) : '');
     setFormLongitud(poi.longitud != null ? String(poi.longitud) : '');
+    setSuggestions([]);
+    setShowSuggestions(false);
     setFormVisible(true);
+
+    // Animate camera to edited location with close zoom
+    if (poi.latitud != null && poi.longitud != null) {
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.animateToRegion({
+            latitude: poi.latitud,
+            longitude: poi.longitud,
+            latitudeDelta: 0.003,
+            longitudeDelta: 0.003,
+          }, 500);
+        }
+      }, 300);
+    }
   }
 
   function closeForm() {
     setFormVisible(false);
     setEditingPoi(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }
+
+  // Controlador de escritura para el autocompletado
+  function handleNombreChange(text) {
+    setFormNombre(text);
+    if (text.trim().length > 1) {
+      const filtered = PREDEFINED_RECOMMENDATIONS.filter(item =>
+        item.nombre.toLowerCase().includes(text.toLowerCase()) ||
+        item.categoria.toLowerCase().includes(text.toLowerCase()) ||
+        (item.descripcion && item.descripcion.toLowerCase().includes(text.toLowerCase()))
+      );
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
   }
 
   // Handle map press
@@ -240,20 +414,20 @@ export default function GestionPoisScreen({ navigation }) {
     setFormLongitud(longitude.toFixed(6));
   }
 
-  // Update map when inputs change manually
-  useEffect(() => {
-    if (!formVisible || !mapRef.current) return;
+  // Centrar mapa cuando se terminan de escribir las coordenadas
+  function handleCoordInputEnd() {
+    if (!mapRef.current) return;
     const lat = parseFloat(formLatitud);
     const lng = parseFloat(formLongitud);
     if (!isNaN(lat) && !isNaN(lng)) {
       mapRef.current.animateToRegion({
         latitude: lat,
         longitude: lng,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
+        latitudeDelta: currentDeltas.latitudeDelta,
+        longitudeDelta: currentDeltas.longitudeDelta,
       }, 500);
     }
-  }, [formLatitud, formLongitud, formVisible]);
+  }
 
   async function handleSubmitForm() {
     // Validation
@@ -280,12 +454,38 @@ export default function GestionPoisScreen({ navigation }) {
 
     try {
       if (editingPoi) {
+        // Check if editing a mock POI
+        if (String(editingPoi.id).startsWith('mock-')) {
+          const updatedPois = pois.map(p =>
+            p.id === editingPoi.id
+              ? { ...p, ...body }
+              : p
+          );
+          setPois(updatedPois);
+          await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
+          showToast('Punto de interés actualizado localmente.');
+          closeForm();
+          return;
+        }
+
         // PATCH
         const res = await fetch(`${API_BASE_URL}/api/maps/pois/${editingPoi.id}`, {
           method: 'PATCH',
           headers: authHeaders(),
           body: JSON.stringify(body),
         });
+        if (res.status === 404) {
+          const updatedPois = pois.map(p =>
+            p.id === editingPoi.id
+              ? { ...p, ...body }
+              : p
+          );
+          setPois(updatedPois);
+          await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
+          showToast('Punto de interés actualizado localmente.');
+          closeForm();
+          return;
+        }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || `Error ${res.status}`);
@@ -294,7 +494,7 @@ export default function GestionPoisScreen({ navigation }) {
         setPois(prev =>
           prev.map(p =>
             p.id === editingPoi.id
-              ? { ...p, nombre: body.nombre, categoria: body.categoria, descripcion: body.descripcion || p.descripcion, latitud: body.latitud, longitud: body.longitud }
+              ? { ...p, ...body }
               : p
           )
         );
@@ -306,6 +506,19 @@ export default function GestionPoisScreen({ navigation }) {
           headers: authHeaders(),
           body: JSON.stringify(body),
         });
+        if (res.status === 404) {
+          const newPoi = {
+            id: `mock-poi-${Date.now()}`,
+            ...body,
+            creado_por: 'mock-admin'
+          };
+          const updatedPois = [...pois, newPoi];
+          setPois(updatedPois);
+          await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
+          showToast('Punto de interés registrado localmente.');
+          closeForm();
+          return;
+        }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || `Error ${res.status}`);
@@ -316,8 +529,22 @@ export default function GestionPoisScreen({ navigation }) {
       }
       closeForm();
     } catch (err) {
-      console.error('Error saving POI:', err);
-      showToast(err.message || 'Error al guardar el punto de interés.', 'error');
+      console.error('Error saving POI, using AsyncStorage fallback:', err);
+      const newPoi = {
+        id: editingPoi ? editingPoi.id : `mock-poi-${Date.now()}`,
+        ...body,
+        creado_por: 'mock-admin'
+      };
+      let updatedPois;
+      if (editingPoi) {
+        updatedPois = pois.map(p => p.id === editingPoi.id ? { ...p, ...body } : p);
+      } else {
+        updatedPois = [...pois, newPoi];
+      }
+      setPois(updatedPois);
+      await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
+      showToast('Guardado en almacenamiento local (offline).');
+      closeForm();
     } finally {
       setSubmitting(false);
     }
@@ -334,10 +561,29 @@ export default function GestionPoisScreen({ navigation }) {
     setDeleting(true);
 
     try {
+      if (String(deletingPoi.id).startsWith('mock-')) {
+        const updatedPois = pois.filter(p => p.id !== deletingPoi.id);
+        setPois(updatedPois);
+        await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
+        showToast('Punto de interés eliminado localmente.');
+        setDeleteModalVisible(false);
+        setDeletingPoi(null);
+        return;
+      }
+
       const res = await fetch(`${API_BASE_URL}/api/maps/pois/${deletingPoi.id}`, {
         method: 'DELETE',
         headers: authHeaders(),
       });
+      if (res.status === 404) {
+        const updatedPois = pois.filter(p => p.id !== deletingPoi.id);
+        setPois(updatedPois);
+        await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
+        showToast('Punto de interés eliminado localmente.');
+        setDeleteModalVisible(false);
+        setDeletingPoi(null);
+        return;
+      }
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `Error ${res.status}`);
@@ -346,8 +592,11 @@ export default function GestionPoisScreen({ navigation }) {
       setPois(prev => prev.filter(p => p.id !== deletingPoi.id));
       showToast('Punto de interés eliminado con éxito.');
     } catch (err) {
-      console.error('Error deleting POI:', err);
-      showToast(err.message || 'Error al eliminar el recurso.', 'error');
+      console.error('Error deleting POI, using AsyncStorage fallback:', err);
+      const updatedPois = pois.filter(p => p.id !== deletingPoi.id);
+      setPois(updatedPois);
+      await AsyncStorage.setItem('local_pois', JSON.stringify(updatedPois));
+      showToast('Eliminado localmente (offline).');
     } finally {
       setDeleting(false);
       setDeleteModalVisible(false);
@@ -456,78 +705,54 @@ export default function GestionPoisScreen({ navigation }) {
             <Text style={styles.emptySubtext}>Agregá el primer POI con el botón superior</Text>
           </View>
         ) : (
-          /* ── POI Table ──────────────────────────────────────────── */
-          <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.thText, { flex: 2 }]}>NOMBRE</Text>
-              <Text style={[styles.thText, { flex: 1.5 }]}>CATEGORÍA</Text>
-              <Text style={[styles.thText, { flex: 1.5 }]}>COORDENADAS</Text>
-              <Text style={[styles.thText, { width: 90, textAlign: 'center' }]}>ACCIONES</Text>
-            </View>
-
-            {/* Table Rows */}
+          /* ── POI Cards List ──────────────────────────────────────────── */
+          <View style={styles.cardsListContainer}>
             {pois.map((poi, idx) => {
               const catInfo = getCategoriaInfo(poi.categoria);
               return (
-                <View
-                  key={poi.id || idx}
-                  style={[
-                    styles.tableRow,
-                    idx % 2 === 0 && styles.tableRowAlt,
-                  ]}
-                >
-                  {/* Nombre */}
-                  <View style={[styles.tdCell, { flex: 2 }]}>
-                    <View style={[styles.poiIcon, { backgroundColor: catInfo.bg }]}>
-                      <MaterialCommunityIcons name={catInfo.icon} size={16} color={catInfo.color} />
+                <View key={poi.id || idx} style={styles.poiCard}>
+                  <View style={[styles.poiCardLeftBorder, { backgroundColor: catInfo.color }]} />
+                  <View style={styles.poiCardContent}>
+                    <View style={styles.poiCardHeader}>
+                      <View style={[styles.poiIconBox, { backgroundColor: catInfo.bg }]}>
+                        <MaterialCommunityIcons name={catInfo.icon} size={18} color={catInfo.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.poiCardName} numberOfLines={2}>{poi.nombre || '—'}</Text>
+                        <Text style={{ color: catInfo.color, fontSize: 10, fontWeight: '700', marginTop: 2 }}>
+                          {catInfo.label.toUpperCase()}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.poiName} numberOfLines={1}>{poi.nombre || '—'}</Text>
-                      {poi.descripcion ? (
-                        <Text style={styles.poiDesc} numberOfLines={1}>{poi.descripcion}</Text>
-                      ) : null}
+                    
+                    {poi.descripcion ? (
+                      <Text style={styles.poiCardDesc}>{poi.descripcion}</Text>
+                    ) : null}
+                    
+                    <View style={styles.poiCardFooter}>
+                      <View style={styles.poiCardCoords}>
+                        <MaterialCommunityIcons name="compass-outline" size={12} color="#64748b" />
+                        <Text style={styles.poiCardCoordText}>
+                          {formatCoord(poi.latitud)}, {formatCoord(poi.longitud)}
+                        </Text>
+                      </View>
+                      <View style={styles.poiCardActions}>
+                        <TouchableOpacity
+                          style={styles.poiCardEditBtn}
+                          onPress={() => openEditForm(poi)}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons name="pencil" size={14} color="#3b82f6" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.poiCardDeleteBtn}
+                          onPress={() => confirmDelete(poi)}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons name="trash-can-outline" size={14} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-
-                  {/* Categoría */}
-                  <View style={[styles.tdCell, { flex: 1.5 }]}>
-                    <View style={[styles.catBadge, { backgroundColor: catInfo.bg }]}>
-                      <View style={[styles.catDot, { backgroundColor: catInfo.color }]} />
-                      <Text style={[styles.catBadgeText, { color: catInfo.color }]} numberOfLines={1}>
-                        {catInfo.label}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Coordenadas */}
-                  <View style={[styles.tdCell, { flex: 1.5, flexDirection: 'column', alignItems: 'flex-start' }]}>
-                    <Text style={styles.coordText}>
-                      <Text style={styles.coordLabel}>Lat </Text>
-                      {formatCoord(poi.latitud)}
-                    </Text>
-                    <Text style={styles.coordText}>
-                      <Text style={styles.coordLabel}>Lng </Text>
-                      {formatCoord(poi.longitud)}
-                    </Text>
-                  </View>
-
-                  {/* Actions */}
-                  <View style={[styles.tdCell, { width: 90, justifyContent: 'center', gap: 6 }]}>
-                    <TouchableOpacity
-                      style={styles.editBtn}
-                      onPress={() => openEditForm(poi)}
-                      activeOpacity={0.7}
-                    >
-                      <MaterialCommunityIcons name="pencil" size={14} color="#3b82f6" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteBtn}
-                      onPress={() => confirmDelete(poi)}
-                      activeOpacity={0.7}
-                    >
-                      <MaterialCommunityIcons name="trash-can-outline" size={14} color="#ef4444" />
-                    </TouchableOpacity>
                   </View>
                 </View>
               );
@@ -544,198 +769,237 @@ export default function GestionPoisScreen({ navigation }) {
         onRequestClose={closeForm}
       >
         <View style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={styles.modalScrollContent} keyboardShouldPersistTaps="handled">
-            <View style={styles.modalView}>
-              {/* Header */}
-              <View style={styles.modalHeader}>
-                <MaterialCommunityIcons
-                  name={editingPoi ? 'pencil-circle' : 'map-marker-plus'}
-                  size={24}
-                  color="#e11d48"
-                />
-                <Text style={styles.modalTitle}>
-                  {editingPoi ? 'EDITAR POI' : 'NUEVO PUNTO DE INTERÉS'}
-                </Text>
-              </View>
-              <Text style={styles.modalDesc}>
-                {editingPoi
-                  ? 'Modificá los datos del punto de interés seleccionado.'
-                  : 'Completá los campos para registrar un nuevo punto de interés en el mapa operativo.'}
-              </Text>
-
-              {/* Nombre */}
-              <Text style={styles.fieldLabel}>NOMBRE</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Ej. Hospital General San Martín"
-                placeholderTextColor="#64748b"
-                value={formNombre}
-                onChangeText={setFormNombre}
-              />
-
-              {/* Categoría */}
-              <Text style={styles.fieldLabel}>CATEGORÍA</Text>
-              <TouchableOpacity
-                style={styles.pickerBtn}
-                onPress={() => setCatPickerOpen(true)}
-                activeOpacity={0.7}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={parentScrollEnabled}
+            >
+              <View style={styles.modalView}>
+                {/* Header */}
+                <View style={styles.modalHeader}>
                   <MaterialCommunityIcons
-                    name={getCategoriaInfo(formCategoria).icon}
-                    size={18}
-                    color={getCategoriaInfo(formCategoria).color}
+                    name={editingPoi ? 'pencil-circle' : 'map-marker-plus'}
+                    size={24}
+                    color="#e11d48"
                   />
-                  <Text style={styles.pickerBtnText}>{getCategoriaInfo(formCategoria).label}</Text>
+                  <Text style={styles.modalTitle}>
+                    {editingPoi ? 'EDITAR POI' : 'NUEVO PUNTO DE INTERÉS'}
+                  </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-down" size={18} color="#64748b" />
-              </TouchableOpacity>
+                <Text style={styles.modalDesc}>
+                  {editingPoi
+                    ? 'Modificá los datos del punto de interés seleccionado.'
+                    : 'Completá los campos para registrar un nuevo punto de interés en el mapa operativo.'}
+                </Text>
 
-              {/* Descripción */}
-              <Text style={styles.fieldLabel}>DESCRIPCIÓN (OPCIONAL)</Text>
-              <TextInput
-                style={[styles.modalInput, { minHeight: 60, textAlignVertical: 'top' }]}
-                placeholder="Detalles adicionales..."
-                placeholderTextColor="#64748b"
-                value={formDescripcion}
-                onChangeText={setFormDescripcion}
-                multiline
-              />
+                {/* Nombre */}
+                <Text style={styles.fieldLabel}>NOMBRE</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Ej. Hospital General San Martín"
+                  placeholderTextColor="#64748b"
+                  value={formNombre}
+                  onChangeText={handleNombreChange}
+                />
 
-              {/* Mapa Interactivo */}
-              <Text style={[styles.fieldLabel, { marginTop: 8 }]}>UBICACIÓN EN MAPA</Text>
-              <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, marginTop: -4 }}>
-                Tocá el mapa para ubicar el POI rápidamente.
-              </Text>
-              <View style={styles.mapContainer}>
-                <MapView
-                  ref={mapRef}
-                  style={styles.map}
-                  provider={PROVIDER_GOOGLE}
-                  customMapStyle={tacticalMapStyle}
-                  initialRegion={{
-                    latitude: editingPoi?.latitud || -26.81667,
-                    longitude: editingPoi?.longitud || -65.31667,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                  }}
-                  onPress={handleMapPress}
-                >
-                  {(parseFloat(formLatitud) && parseFloat(formLongitud)) ? (
-                    <Marker
-                      coordinate={{
-                        latitude: parseFloat(formLatitud),
-                        longitude: parseFloat(formLongitud)
-                      }}
-                    >
-                      <View style={[styles.markerIcon, { backgroundColor: getCategoriaInfo(formCategoria).bg }]}>
-                        <MaterialCommunityIcons 
-                          name={getCategoriaInfo(formCategoria).icon} 
-                          size={18} 
-                          color={getCategoriaInfo(formCategoria).color} 
-                        />
-                      </View>
-                    </Marker>
-                  ) : null}
-                </MapView>
-              </View>
+                {/* Auto-completado y Sugerencias */}
+                {showSuggestions && (
+                  <View style={styles.suggestionsContainer}>
+                    {suggestions.map((item, idx) => {
+                      const catInfo = getCategoriaInfo(item.categoria);
+                      return (
+                        <TouchableOpacity
+                          key={idx}
+                          style={styles.suggestionOption}
+                          onPress={() => selectRecommendation(item)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[styles.poiIconBox, { backgroundColor: catInfo.bg, width: 28, height: 28 }]}>
+                            <MaterialCommunityIcons name={catInfo.icon} size={14} color={catInfo.color} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.suggestionName}>{item.nombre}</Text>
+                            <Text style={styles.suggestionDesc}>{item.descripcion || catInfo.label}</Text>
+                          </View>
+                          <MaterialCommunityIcons name="arrow-up-left" size={14} color="#64748b" />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
 
-              {/* Coordenadas */}
-              <View style={styles.coordRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>LATITUD</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="-26.81667"
-                    placeholderTextColor="#64748b"
-                    value={formLatitud}
-                    onChangeText={setFormLatitud}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>LONGITUD</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="-65.31667"
-                    placeholderTextColor="#64748b"
-                    value={formLongitud}
-                    onChangeText={setFormLongitud}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              {/* Actions */}
-              <View style={styles.modalActions}>
+                {/* Categoría (Inline Dropdown) */}
+                <Text style={styles.fieldLabel}>CATEGORÍA</Text>
                 <TouchableOpacity
-                  style={[styles.modalBtn, styles.modalBtnCancel]}
-                  onPress={closeForm}
-                  disabled={submitting}
-                >
-                  <Text style={styles.modalBtnTextCancel}>CANCELAR</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalBtn, styles.modalBtnConfirm, submitting && { opacity: 0.6 }]}
-                  onPress={handleSubmitForm}
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.modalBtnTextConfirm}>
-                      {editingPoi ? 'GUARDAR CAMBIOS' : 'REGISTRAR POI'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* ── Category Picker Modal ─────────────────────────────────── */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={catPickerOpen}
-        onRequestClose={() => setCatPickerOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.pickerModal}>
-            <Text style={styles.pickerModalTitle}>SELECCIONAR CATEGORÍA</Text>
-            {CATEGORIAS.map(cat => {
-              const info = getCategoriaInfo(cat);
-              const isSelected = formCategoria === cat;
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-                  onPress={() => {
-                    setFormCategoria(cat);
-                    setCatPickerOpen(false);
-                  }}
+                  style={styles.pickerBtn}
+                  onPress={() => setCatPickerOpen(!catPickerOpen)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.pickerOptionIcon, { backgroundColor: info.bg }]}>
-                    <MaterialCommunityIcons name={info.icon} size={20} color={info.color} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <MaterialCommunityIcons
+                      name={getCategoriaInfo(formCategoria).icon}
+                      size={18}
+                      color={getCategoriaInfo(formCategoria).color}
+                    />
+                    <Text style={styles.pickerBtnText}>{getCategoriaInfo(formCategoria).label}</Text>
                   </View>
-                  <Text style={[styles.pickerOptionText, isSelected && { color: '#f8fafc' }]}>
-                    {info.label}
-                  </Text>
-                  {isSelected && (
-                    <MaterialCommunityIcons name="check-circle" size={18} color="#10b981" />
-                  )}
+                  <MaterialCommunityIcons name={catPickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#64748b" />
                 </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity
-              style={[styles.modalBtn, styles.modalBtnCancel, { marginTop: 16 }]}
-              onPress={() => setCatPickerOpen(false)}
-            >
-              <Text style={styles.modalBtnTextCancel}>CERRAR</Text>
-            </TouchableOpacity>
-          </View>
+
+                {catPickerOpen && (
+                  <View style={styles.inlinePickerContainer}>
+                    {CATEGORIAS.map(cat => {
+                      const info = getCategoriaInfo(cat);
+                      const isSelected = formCategoria === cat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          style={[styles.inlinePickerOption, isSelected && styles.inlinePickerOptionSelected]}
+                          onPress={() => {
+                            setFormCategoria(cat);
+                            setCatPickerOpen(false);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[styles.pickerOptionIcon, { backgroundColor: info.bg, width: 28, height: 28 }]}>
+                            <MaterialCommunityIcons name={info.icon} size={14} color={info.color} />
+                          </View>
+                          <Text style={[styles.inlinePickerOptionText, isSelected && { color: '#f8fafc' }]}>
+                            {info.label}
+                          </Text>
+                          {isSelected && (
+                            <MaterialCommunityIcons name="check" size={14} color="#10b981" />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* Descripción */}
+                <Text style={styles.fieldLabel}>DESCRIPCIÓN (OPCIONAL)</Text>
+                <TextInput
+                  style={[styles.modalInput, { minHeight: 60, textAlignVertical: 'top' }]}
+                  placeholder="Detalles adicionales..."
+                  placeholderTextColor="#64748b"
+                  value={formDescripcion}
+                  onChangeText={setFormDescripcion}
+                  multiline
+                />
+
+                {/* Mapa Interactivo */}
+                <Text style={[styles.fieldLabel, { marginTop: 8 }]}>UBICACIÓN EN MAPA</Text>
+                <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, marginTop: -4 }}>
+                  Tocá el mapa para ubicar el POI rápidamente.
+                </Text>
+                <View 
+                  style={styles.mapContainer}
+                  onTouchStart={() => setParentScrollEnabled(false)}
+                  onTouchEnd={() => setParentScrollEnabled(true)}
+                  onTouchCancel={() => setParentScrollEnabled(true)}
+                >
+                  <MapView
+                    ref={mapRef}
+                    style={styles.map}
+                    provider={PROVIDER_GOOGLE}
+                    customMapStyle={tacticalMapStyle}
+                    initialRegion={{
+                      latitude: editingPoi?.latitud || -26.81667,
+                      longitude: editingPoi?.longitud || -65.31667,
+                      latitudeDelta: 0.004,
+                      longitudeDelta: 0.004,
+                    }}
+                    onRegionChangeComplete={(region) => {
+                      setCurrentDeltas({
+                        latitudeDelta: region.latitudeDelta,
+                        longitudeDelta: region.longitudeDelta,
+                      });
+                    }}
+                    onPress={handleMapPress}
+                  >
+                    {(parseFloat(formLatitud) && parseFloat(formLongitud)) ? (
+                      <Marker
+                        coordinate={{
+                          latitude: parseFloat(formLatitud),
+                          longitude: parseFloat(formLongitud)
+                        }}
+                        anchor={{ x: 0.5, y: 1.0 }}
+                      >
+                        <View style={styles.customMarkerContainer}>
+                          <View style={[styles.customMarkerBubble, { backgroundColor: getCategoriaInfo(formCategoria).color }]}>
+                            <MaterialCommunityIcons 
+                              name={getCategoriaInfo(formCategoria).icon} 
+                              size={16} 
+                              color="#ffffff"
+                            />
+                          </View>
+                          <View style={[styles.customMarkerArrow, { borderTopColor: getCategoriaInfo(formCategoria).color }]} />
+                        </View>
+                      </Marker>
+                    ) : null}
+                  </MapView>
+                </View>
+
+                {/* Coordenadas */}
+                <View style={styles.coordRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>LATITUD</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="-26.81667"
+                      placeholderTextColor="#64748b"
+                      value={formLatitud}
+                      onChangeText={setFormLatitud}
+                      onEndEditing={handleCoordInputEnd}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>LONGITUD</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="-65.31667"
+                      placeholderTextColor="#64748b"
+                      value={formLongitud}
+                      onChangeText={setFormLongitud}
+                      onEndEditing={handleCoordInputEnd}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* Actions */}
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalBtnCancel]}
+                    onPress={closeForm}
+                    disabled={submitting}
+                  >
+                    <Text style={styles.modalBtnTextCancel}>CANCELAR</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalBtnConfirm, submitting && { opacity: 0.6 }]}
+                    onPress={handleSubmitForm}
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.modalBtnTextConfirm}>
+                        {editingPoi ? 'GUARDAR CAMBIOS' : 'REGISTRAR POI'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -973,111 +1237,147 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
 
-  // ── Table ────────────────────────────────────────────────────
-  tableContainer: {
+  // ── Card-based List ──────────────────────────────────────────
+  cardsListContainer: {
+    gap: 12,
+  },
+  poiCard: {
+    backgroundColor: '#1b1d24',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#26282f',
+    flexDirection: 'row',
     overflow: 'hidden',
+    minHeight: 80,
   },
-  tableHeader: {
+  poiCardLeftBorder: {
+    width: 4,
+    height: '100%',
+  },
+  poiCardContent: {
+    flex: 1,
+    padding: 14,
+    justifyContent: 'space-between',
+  },
+  poiCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1c23',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
+    gap: 10,
   },
-  thText: {
-    color: '#94a3b8',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e2028',
-    backgroundColor: '#16181d',
-  },
-  tableRowAlt: {
-    backgroundColor: '#1b1d24',
-  },
-  tdCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  // POI row
-  poiIcon: {
-    width: 30,
-    height: 30,
+  poiIconBox: {
+    width: 32,
+    height: 32,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  poiName: {
+  poiCardName: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  poiCardDesc: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  poiCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#26282f',
+    paddingTop: 8,
+  },
+  poiCardCoords: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  poiCardCoordText: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  poiCardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  poiCardEditBtn: {
+    padding: 6,
+    backgroundColor: 'rgba(59,130,246,0.12)',
+    borderRadius: 4,
+  },
+  poiCardDeleteBtn: {
+    padding: 6,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderRadius: 4,
+  },
+
+  // Inline Picker
+  inlinePickerContainer: {
+    backgroundColor: '#16181d',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+    padding: 8,
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  inlinePickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    marginBottom: 2,
+  },
+  inlinePickerOptionSelected: {
+    backgroundColor: '#26282f',
+  },
+  inlinePickerOptionText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+
+  // Suggestions
+  suggestionsContainer: {
+    backgroundColor: '#16181d',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+    padding: 6,
+    marginTop: -12,
+    marginBottom: 16,
+    maxHeight: 180,
+    overflow: 'hidden',
+  },
+  suggestionOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  suggestionName: {
     color: '#f8fafc',
     fontSize: 12,
     fontWeight: '700',
   },
-  poiDesc: {
+  suggestionDesc: {
     color: '#64748b',
     fontSize: 10,
     marginTop: 1,
-  },
-  catBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  catDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  catBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  coordText: {
-    color: '#cbd5e1',
-    fontSize: 10,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  coordLabel: {
-    color: '#64748b',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-
-  // Action Buttons
-  editBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: 'rgba(59,130,246,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   // ── Modals ───────────────────────────────────────────────────
@@ -1086,12 +1386,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    padding: 20,
+  },
+  modalScroll: {
+    width: '100%',
   },
   modalScrollContent: {
-    flexGrow: 1,
+    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    flexGrow: 1,
   },
   modalView: {
     width: '100%',
@@ -1115,14 +1418,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: '#f8fafc',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
   },
   modalDesc: {
     color: '#94a3b8',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
     marginBottom: 20,
   },
   fieldLabel: {
@@ -1139,10 +1442,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 6,
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     marginBottom: 16,
   },
   pickerBtn: {
@@ -1153,13 +1456,13 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
     borderWidth: 1,
     borderRadius: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     marginBottom: 16,
   },
   pickerBtnText: {
     color: '#f8fafc',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   coordRow: {
@@ -1194,7 +1497,7 @@ const styles = StyleSheet.create({
 
   modalBtn: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1221,48 +1524,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // Category Picker Modal
-  pickerModal: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#1b1d24',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    padding: 20,
-  },
-  pickerModalTitle: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 1,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  pickerOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    marginBottom: 4,
-  },
-  pickerOptionSelected: {
-    backgroundColor: '#26282f',
-  },
+  // Category Picker Modal (pickerModal is now pickerOptionIcon inside inline list)
   pickerOptionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pickerOptionText: {
-    color: '#94a3b8',
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
   },
 
   // Delete Modal
@@ -1272,7 +1538,7 @@ const styles = StyleSheet.create({
   },
   deleteModalTitle: {
     color: '#f8fafc',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '900',
     letterSpacing: 1,
     textAlign: 'center',
@@ -1280,9 +1546,39 @@ const styles = StyleSheet.create({
   },
   deleteModalDesc: {
     color: '#94a3b8',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
     textAlign: 'center',
     marginBottom: 20,
+  },
+  customMarkerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 4,
+  },
+  customMarkerBubble: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3 },
+      android: { elevation: 4 },
+    }),
+  },
+  customMarkerArrow: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 5,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -1,
   },
 });
