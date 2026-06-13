@@ -273,6 +273,7 @@ export default function AppNavigator() {
           <Stack.Screen name="Logistica" component={ResourcesScreen} />
           <Stack.Screen name="Estadisticas" component={EstadisticasScreen} />
           <Stack.Screen name="GestionPois" component={GestionPoisScreen} />
+          <Stack.Screen name="NuevoPOI" component={NuevoPOIScreen} />
         </>
       )}
     </Stack.Navigator>

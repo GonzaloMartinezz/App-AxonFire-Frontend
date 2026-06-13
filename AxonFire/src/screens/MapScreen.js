@@ -394,7 +394,7 @@ export default function MapScreen({ navigation }) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── ESTILOS CORRESPONDIENTES , SIGO LA ESTRUCTURA DE LAS DEMAS SCREENS  ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
