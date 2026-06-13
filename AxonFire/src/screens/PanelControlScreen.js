@@ -522,6 +522,21 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemTitle}>Métricas y Reportes</Text>
                 <Text style={styles.gridItemSub}>Estadísticas RUBA</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('GestionPois')}
+                style={styles.gridItem}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+                    <MaterialCommunityIcons name="map-marker-radius" size={18} color="#3b82f6" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Gestión de POIs</Text>
+                <Text style={styles.gridItemSub}>Puntos de interés</Text>
+              </TouchableOpacity>
             </View>
 
             {/* ── Actividad reciente ────────────────────────────────────── */}
