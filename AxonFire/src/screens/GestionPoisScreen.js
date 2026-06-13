@@ -614,8 +614,8 @@ export default function GestionPoisScreen({ navigation }) {
                   provider={PROVIDER_GOOGLE}
                   customMapStyle={tacticalMapStyle}
                   initialRegion={{
-                    latitude: editingPoi?.latitud || -34.60368,
-                    longitude: editingPoi?.longitud || -58.38159,
+                    latitude: editingPoi?.latitud || -26.81667,
+                    longitude: editingPoi?.longitud || -65.31667,
                     latitudeDelta: 0.05,
                     longitudeDelta: 0.05,
                   }}
@@ -646,7 +646,7 @@ export default function GestionPoisScreen({ navigation }) {
                   <Text style={styles.fieldLabel}>LATITUD</Text>
                   <TextInput
                     style={styles.modalInput}
-                    placeholder="-34.60368"
+                    placeholder="-26.81667"
                     placeholderTextColor="#64748b"
                     value={formLatitud}
                     onChangeText={setFormLatitud}
@@ -657,7 +657,7 @@ export default function GestionPoisScreen({ navigation }) {
                   <Text style={styles.fieldLabel}>LONGITUD</Text>
                   <TextInput
                     style={styles.modalInput}
-                    placeholder="-58.38159"
+                    placeholder="-65.31667"
                     placeholderTextColor="#64748b"
                     value={formLongitud}
                     onChangeText={setFormLongitud}
