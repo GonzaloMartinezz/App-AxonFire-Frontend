@@ -909,7 +909,10 @@ export default function AlertDetailScreen({ route, navigation }) {
             <TouchableOpacity style={styles.mapFab}>
               <MaterialCommunityIcons name="layers" size={22} color="#e2e8f0" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.mapFab}>
+            <TouchableOpacity
+              style={styles.mapFab}
+              onPress={() => navigation.navigate('Mapa', { alertaId: alerta?.id })}
+            >
               <MaterialCommunityIcons name="crosshairs-gps" size={22} color="#e2e8f0" />
             </TouchableOpacity>
           </View>
@@ -918,6 +921,17 @@ export default function AlertDetailScreen({ route, navigation }) {
             <Text style={styles.impactValue}>250 METROS</Text>
           </View>
         </View>
+
+        {/* Botón Ver en mapa táctico */}
+        <TouchableOpacity
+          style={styles.verEnMapaBtn}
+          onPress={() => navigation.navigate('Mapa', { alertaId: alerta?.id })}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="map-marker-radius-outline" size={16} color="#38bdf8" />
+          <Text style={styles.verEnMapaBtnTexto}>VER UBICACIÓN EN MAPA</Text>
+          <MaterialCommunityIcons name="chevron-right" size={16} color="#38bdf8" />
+        </TouchableOpacity>
 
         {/* Personnel Section */}
         <View style={styles.sectionContainer}>
@@ -1157,5 +1171,24 @@ container:         { flex: 1, backgroundColor: '#16181d' },
     fontSize: 12, 
     fontWeight: '900', 
     letterSpacing: 1,
+  },
+  verEnMapaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.25)',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  verEnMapaBtnTexto: {
+    flex: 1,
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
 });
