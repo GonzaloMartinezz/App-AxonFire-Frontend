@@ -27,15 +27,14 @@ import AdminAttendanceBoardScreen from '../screens/AdminAttendanceBoardScreen';
 import EmergencyScreen from '../screens/EmergencyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import InformePostEmergenciaScreen from '../screens/InformePostEmergenciaScreen';
-
-
-// ── JUAMPI ESTAS SON LAS 4 TAREAS NUEVAS. ────────────────────────────────────────
 import PanelControlScreen from '../screens/PanelControlScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
 import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
 import GestionPoisScreen from '../screens/GestionPoisScreen';
+import NuevoPOIScreen from '../screens/NuevoPOIScreen';
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
