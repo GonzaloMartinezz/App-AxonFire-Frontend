@@ -185,11 +185,13 @@ function generarMapaHTML(lat, lng, zoom) {
           map.flyTo([${lat}, ${lng}], ${zoom}, { animate: true, duration: 1.0 });
         };
 
-        // ── F2: Marcador de incidente ──────────────────────────────────────
+        // ── F2: Marcador de incidente + ruta cuartel→incidente ────────────
         var incidentMarker = null;
+        var routeLine = null;
 
         window.mostrarIncidente = function(data) {
           if (incidentMarker) { map.removeLayer(incidentMarker); }
+          if (routeLine) { map.removeLayer(routeLine); }
 
           var iconHtml = '<div class="incident-marker">' +
             '<div class="pulse-ring"></div>' +
@@ -216,8 +218,42 @@ function generarMapaHTML(lat, lng, zoom) {
             .addTo(map)
             .bindPopup(popupHtml, { maxWidth: 260, closeButton: true });
 
-          // Auto-zoom animado a la zona del incidente
-          map.flyTo([data.latitud, data.longitud], 17, { animate: true, duration: 1.5 });
+          // Ruta real por calles cuartel → incidente (OSRM, gratuito)
+          var cuartelLat = ${lat}, cuartelLng = ${lng};
+          var incLat = data.latitud, incLng = data.longitud;
+
+          var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/' +
+            cuartelLng + ',' + cuartelLat + ';' +
+            incLng + ',' + incLat +
+            '?overview=full&geometries=geojson';
+
+          fetch(osrmUrl)
+            .then(function(res) { return res.json(); })
+            .then(function(json) {
+              if (json.code === 'Ok' && json.routes && json.routes.length > 0) {
+                var coords = json.routes[0].geometry.coordinates.map(function(c) {
+                  return [c[1], c[0]]; // GeoJSON is [lng,lat], Leaflet needs [lat,lng]
+                });
+                routeLine = L.polyline(coords, {
+                  color: '#dc2626', weight: 4, opacity: 0.85,
+                  dashArray: null, lineJoin: 'round', lineCap: 'round'
+                }).addTo(map);
+
+                // Encuadrar la ruta completa
+                map.fitBounds(routeLine.getBounds(), { padding: [50, 50], animate: true, duration: 1.5 });
+              } else {
+                throw new Error('No route');
+              }
+            })
+            .catch(function() {
+              // Fallback: línea recta si OSRM falla
+              routeLine = L.polyline(
+                [[cuartelLat, cuartelLng], [incLat, incLng]],
+                { color: '#dc2626', weight: 3, dashArray: '10,8', opacity: 0.8 }
+              ).addTo(map);
+              var bounds = L.latLngBounds([cuartelLat, cuartelLng], [incLat, incLng]);
+              map.fitBounds(bounds, { padding: [50, 50], animate: true, duration: 1.5 });
+            });
         };
 
         // ── F3: LayerGroups — uno por categoría de POI ────────────────────────────

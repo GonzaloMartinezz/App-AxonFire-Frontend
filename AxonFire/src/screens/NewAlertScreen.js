@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ScrollView,
   View,
@@ -17,24 +17,28 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import SelectorBomberos from '../components/SelectorBomberos';
 
-const InputField = ({ label, placeholder, value, onChangeText, multiline = false }) => (
+// ── Reusable Input ─────────────────────────────────────────────────────────
+const InputField = ({ label, placeholder, value, onChangeText, multiline = false, editable = true }) => (
   <View style={styles.inputGroup}>
     <Text style={styles.label}>{label}</Text>
     <View style={[styles.inputWrapper, multiline && styles.inputWrapperMultiline]}>
       <TextInput
-        style={[styles.input, multiline && styles.inputMultiline]}
+        style={[styles.input, multiline && styles.inputMultiline, !editable && { color: '#64748b' }]}
         placeholder={placeholder}
         placeholderTextColor="#52525b"
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
+        editable={editable}
       />
     </View>
   </View>
 );
 
+// ── Reusable Dropdown ──────────────────────────────────────────────────────
 const DropdownField = ({ label, value, onPress }) => (
   <View style={styles.inputGroup}>
     <Text style={styles.label}>{label}</Text>
@@ -45,21 +49,137 @@ const DropdownField = ({ label, value, onPress }) => (
   </View>
 );
 
+// ── Leaflet Map HTML for the picker ────────────────────────────────────────
+function generarMapaPickerHTML(initialLat, initialLng) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #map { width: 100%; height: 100%; background: #16181d; }
+        .leaflet-tile-pane {
+          filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
+        }
+        .leaflet-control-zoom { display: none !important; }
+        .leaflet-control-attribution {
+          font-size: 8px !important;
+          background: rgba(26, 28, 35, 0.6) !important;
+          color: #475569 !important;
+        }
+        .crosshair-hint {
+          position: absolute;
+          bottom: 8px; left: 50%;
+          transform: translateX(-50%);
+          background: rgba(26,28,35,0.85);
+          color: #94a3b8;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 4px 12px;
+          border-radius: 12px;
+          z-index: 1000;
+          pointer-events: none;
+          font-family: sans-serif;
+        }
+        .selected-marker {
+          width: 32px; height: 32px;
+          position: relative;
+        }
+        .selected-marker .ring {
+          position: absolute; top: 0; left: 0;
+          width: 32px; height: 32px;
+          border-radius: 50%;
+          border: 3px solid #dc2626;
+          background: rgba(220,38,38,0.15);
+        }
+        .selected-marker .dot {
+          position: absolute; top: 50%; left: 50%;
+          width: 10px; height: 10px;
+          margin: -5px 0 0 -5px;
+          background: #dc2626;
+          border-radius: 50%;
+          box-shadow: 0 0 8px rgba(220,38,38,0.7);
+        }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <div class="crosshair-hint">Tocá el mapa para ubicar la emergencia</div>
+      <script>
+        var map = L.map('map', { zoomControl: false }).setView([${initialLat}, ${initialLng}], 15);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 20,
+          attribution: '&copy; OSM &copy; CartoDB',
+          subdomains: 'abcd',
+        }).addTo(map);
+
+        var marker = null;
+
+        function placeMarker(lat, lng) {
+          if (marker) map.removeLayer(marker);
+          var icon = L.divIcon({
+            className: '',
+            html: '<div class="selected-marker"><div class="ring"></div><div class="dot"></div></div>',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          });
+          marker = L.marker([lat, lng], { icon: icon }).addTo(map);
+        }
+
+        map.on('click', function(e) {
+          placeMarker(e.latlng.lat, e.latlng.lng);
+          window.parent.postMessage({
+            type: 'MAP_PICK',
+            latitude: e.latlng.lat,
+            longitude: e.latlng.lng
+          }, '*');
+        });
+
+        window.addEventListener('message', function(event) {
+          var data = event.data;
+          if (data.type === 'FLY_TO') {
+            map.flyTo([data.latitude, data.longitude], data.zoom || 17, { animate: true, duration: 0.8 });
+            placeMarker(data.latitude, data.longitude);
+          }
+          if (data.type === 'PLACE_MARKER') {
+            placeMarker(data.latitude, data.longitude);
+            map.setView([data.latitude, data.longitude], data.zoom || 17);
+          }
+        });
+      </script>
+    </body>
+    </html>
+  `;
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
 export default function NewAlertScreen({ navigation }) {
   const [formData, setFormData] = useState({
     type: 'Incendio Estructural',
     severity: 'NIVEL 4 - CRÍTICO',
     location: '',
     description: '',
+    latitud: null,
+    longitud: null,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showSeverityPicker, setShowSeverityPicker] = useState(false);
+  const [destinatarios, setDestinatarios] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const iframeRef = useRef(null);
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
 
   const parentState = navigation.getParent()?.getState();
   const isCurrentlyAdmin = parentState?.routeNames?.includes('Panel') || navigation.getState()?.routeNames?.includes('Panel') || false;
+
+  const accentColor = isCurrentlyAdmin ? '#dc2626' : '#0284c7';
 
   const tiposIncidente = [
     { label: 'Incendio Estructural', id: '1' },
@@ -82,29 +202,71 @@ export default function NewAlertScreen({ navigation }) {
     setFormData({ ...formData, [key]: value });
   };
 
-  const handleGeoLocate = async () => {
-    setIsLocating(true);
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Necesitamos acceso a la ubicación para geolocalizar la alerta.');
-        return;
+  // ── Handle map pick from iframe ────────────────────────────────────────
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'MAP_PICK') {
+        setFormData(prev => ({
+          ...prev,
+          latitud: parseFloat(event.data.latitude.toFixed(6)),
+          longitud: parseFloat(event.data.longitude.toFixed(6)),
+        }));
       }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
-      let location = await Location.getCurrentPositionAsync({});
-      const coords = `${location.coords.latitude}, ${location.coords.longitude}`;
-      updateForm('location', coords);
+  // ── Geocode search (Nominatim) ─────────────────────────────────────────
+  const handleSearchLocation = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const query = encodeURIComponent(searchQuery.trim());
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1&countrycodes=ar`,
+        { headers: { 'User-Agent': 'AxonFire/1.0' } }
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        const parsedLat = parseFloat(lat);
+        const parsedLng = parseFloat(lon);
+        setFormData(prev => ({
+          ...prev,
+          latitud: parseFloat(parsedLat.toFixed(6)),
+          longitud: parseFloat(parsedLng.toFixed(6)),
+          location: display_name || searchQuery,
+        }));
+        // Fly to the location on the map
+        if (iframeRef.current && iframeRef.current.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({
+            type: 'FLY_TO',
+            latitude: parsedLat,
+            longitude: parsedLng,
+            zoom: 17,
+          }, '*');
+        }
+      } else {
+        Alert.alert('Sin resultados', 'No se encontró la ubicación. Intentá con otro nombre o tocá directamente en el mapa.');
+      }
     } catch (error) {
-      console.error('Error obteniendo ubicación:', error);
-      Alert.alert('Error', 'No se pudo obtener la ubicación actual.');
+      console.error('Geocode error:', error);
+      Alert.alert('Error', 'No se pudo buscar la ubicación.');
     } finally {
-      setIsLocating(false);
+      setSearching(false);
     }
   };
 
+  // ── Submit ─────────────────────────────────────────────────────────────
   const submitAlertData = async () => {
     if (!formData.location) {
       Alert.alert('Error', 'Por favor completa la ubicación de la emergencia.');
+      return;
+    }
+    if (formData.latitud == null || formData.longitud == null) {
+      Alert.alert('Error', 'Seleccioná un punto en el mapa o buscá una dirección para establecer las coordenadas.');
       return;
     }
 
@@ -123,8 +285,13 @@ export default function NewAlertScreen({ navigation }) {
         body: JSON.stringify({
           sub_categoria_alerta_id: subCategoriaId,
           ubicacion: formData.location,
+          latitud: formData.latitud,
+          longitud: formData.longitud,
           observaciones: `[${formData.severity}] - ${formData.description || 'Sin descripción'}`,
-          usuario_alta_alerta: user?.id || 'abc1'
+          usuario_alta_alerta: user?.id || 'abc1',
+          destinatariosIds: destinatarios.length > 0
+            ? destinatarios.map(b => b.id)
+            : undefined,
         }),
       });
 
@@ -140,7 +307,10 @@ export default function NewAlertScreen({ navigation }) {
         severity: 'NIVEL 4 - CRÍTICO',
         location: '',
         description: '',
+        latitud: null,
+        longitud: null,
       });
+      setDestinatarios([]);
       navigation.goBack();
     } catch (error) {
       Alert.alert('Error', error.message || 'No se pudo crear la alerta.');
@@ -148,6 +318,10 @@ export default function NewAlertScreen({ navigation }) {
       setIsLoading(false);
     }
   };
+
+  // Default center for the map (Yerba Buena, Tucumán)
+  const mapCenterLat = -26.8083;
+  const mapCenterLng = -65.2176;
 
   return (
     <View style={styles.container}>
@@ -165,8 +339,6 @@ export default function NewAlertScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-
-
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -174,10 +346,11 @@ export default function NewAlertScreen({ navigation }) {
         >
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.headerTitleBox}>
-              <View style={[styles.redBorder, { backgroundColor: isCurrentlyAdmin ? '#dc2626' : '#0284c7' }]} />
+              <View style={[styles.redBorder, { backgroundColor: accentColor }]} />
             </View>
 
             <View style={styles.formContainer}>
+              {/* Tipo de incidente */}
               <DropdownField
                 label="TIPO DE INCIDENTE"
                 value={formData.type}
@@ -201,6 +374,7 @@ export default function NewAlertScreen({ navigation }) {
                 </View>
               )}
 
+              {/* Nivel de severidad */}
               <DropdownField
                 label="NIVEL DE SEVERIDAD"
                 value={formData.severity}
@@ -224,13 +398,76 @@ export default function NewAlertScreen({ navigation }) {
                 </View>
               )}
 
+              {/* Ubicación */}
               <InputField
                 label="UBICACIÓN EXACTA"
-                placeholder="COODENADAS O DIRECCIÓN..."
+                placeholder="DIRECCIÓN DE LA EMERGENCIA..."
                 value={formData.location}
                 onChangeText={(text) => updateForm('location', text)}
               />
 
+              {/* ── Map Picker ─────────────────────────────────────────────── */}
+              <Text style={styles.label}>UBICACIÓN EN MAPA</Text>
+              <Text style={styles.mapHint}>
+                Buscá una dirección o tocá el mapa para marcar las coordenadas de la emergencia.
+              </Text>
+
+              {/* Search bar */}
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Buscar dirección... (ej: UNSTA Tucumán)"
+                  placeholderTextColor="#52525b"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onSubmitEditing={handleSearchLocation}
+                  returnKeyType="search"
+                />
+                <TouchableOpacity
+                  style={[styles.searchBtn, { backgroundColor: accentColor }]}
+                  onPress={handleSearchLocation}
+                  disabled={searching}
+                >
+                  {searching ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialCommunityIcons name="magnify" size={18} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Leaflet map iframe */}
+              {Platform.OS === 'web' && (
+                <View style={styles.mapContainer}>
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={generarMapaPickerHTML(mapCenterLat, mapCenterLng)}
+                    style={{ width: '100%', height: '100%', border: 'none', borderRadius: 4 }}
+                  />
+                </View>
+              )}
+
+              {/* Coordinates display */}
+              {formData.latitud != null && formData.longitud != null && (
+                <View style={styles.coordsRow}>
+                  <View style={styles.coordBadge}>
+                    <MaterialCommunityIcons name="latitude" size={12} color="#22c55e" />
+                    <Text style={styles.coordText}>{formData.latitud}</Text>
+                  </View>
+                  <View style={styles.coordBadge}>
+                    <MaterialCommunityIcons name="longitude" size={12} color="#3b82f6" />
+                    <Text style={styles.coordText}>{formData.longitud}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.coordClear}
+                    onPress={() => setFormData(prev => ({ ...prev, latitud: null, longitud: null }))}
+                  >
+                    <MaterialCommunityIcons name="close-circle" size={14} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Descripción */}
               <InputField
                 label="EVALUACIÓN INICIAL / DESCRIPCIÓN"
                 placeholder="DETALLES TÁCTICOS DEL INCIDENTE..."
@@ -239,8 +476,28 @@ export default function NewAlertScreen({ navigation }) {
                 multiline={true}
               />
 
+              {/* ── Selector de Destinatarios (Bomberos) ────────────────── */}
+              <View style={styles.sectionDivider}>
+                <View style={styles.sectionLine} />
+                <Text style={styles.sectionLabel}>NOTIFICACIONES</Text>
+                <View style={styles.sectionLine} />
+              </View>
+
+              <SelectorBomberos
+                token={token}
+                seleccionados={destinatarios}
+                onChange={setDestinatarios}
+              />
+
+              <Text style={styles.destinatariosHint}>
+                {destinatarios.length === 0
+                  ? 'Sin selección → se notificará a TODOS los bomberos.'
+                  : `${destinatarios.length} bombero(s) serán notificados.`}
+              </Text>
+
+              {/* Submit button */}
               <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: isCurrentlyAdmin ? '#dc2626' : '#0284c7' }]}
+                style={[styles.primaryButton, { backgroundColor: accentColor }]}
                 onPress={submitAlertData}
                 disabled={isLoading}
               >
@@ -270,6 +527,7 @@ export default function NewAlertScreen({ navigation }) {
   );
 }
 
+// ── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -454,5 +712,96 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     letterSpacing: 1.2,
+  },
+
+  // ── Map Picker styles ──────────────────────────────────────────────────
+  mapHint: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginBottom: 10,
+    marginTop: -4,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: '#26282f',
+    borderRadius: 4,
+    height: 40,
+    paddingHorizontal: 14,
+    color: '#e2e8f0',
+    fontSize: 13,
+  },
+  searchBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapContainer: {
+    height: 220,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: '#16181d',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  coordsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  coordBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#1e293b',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  coordText: {
+    color: '#e2e8f0',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  coordClear: {
+    marginLeft: 'auto',
+  },
+
+  // ── Section divider ────────────────────────────────────────────────────
+  sectionDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#26282f',
+  },
+  sectionLabel: {
+    color: '#475569',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  destinatariosHint: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: -8,
+    marginBottom: 16,
+    fontStyle: 'italic',
   },
 });
