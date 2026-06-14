@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -132,28 +133,95 @@ function generarMapaPickerHTML(initialLat, initialLng) {
 
         map.on('click', function(e) {
           placeMarker(e.latlng.lat, e.latlng.lng);
-          window.parent.postMessage({
-            type: 'MAP_PICK',
-            latitude: e.latlng.lat,
-            longitude: e.latlng.lng
-          }, '*');
+          
+          // Send to web parent iframe
+          try {
+            window.parent.postMessage({
+              type: 'MAP_PICK',
+              latitude: e.latlng.lat,
+              longitude: e.latlng.lng
+            }, '*');
+          } catch(err) {}
+
+          // Send to React Native webview
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'MAP_PICK',
+              latitude: e.latlng.lat,
+              longitude: e.latlng.lng
+            }));
+          } catch(err) {}
         });
+
+        // Add direct window methods for native bridge
+        window.flyTo = function(lat, lng, zoom) {
+          map.flyTo([lat, lng], zoom || 17, { animate: true, duration: 0.8 });
+          placeMarker(lat, lng);
+        };
+
+        window.placeMarker = function(lat, lng, zoom) {
+          placeMarker(lat, lng);
+          map.setView([lat, lng], zoom || 17);
+        };
 
         window.addEventListener('message', function(event) {
           var data = event.data;
+          if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch(e) {}
+          }
           if (data.type === 'FLY_TO') {
-            map.flyTo([data.latitude, data.longitude], data.zoom || 17, { animate: true, duration: 0.8 });
-            placeMarker(data.latitude, data.longitude);
+            window.flyTo(data.latitude, data.longitude, data.zoom);
           }
           if (data.type === 'PLACE_MARKER') {
-            placeMarker(data.latitude, data.longitude);
-            map.setView([data.latitude, data.longitude], data.zoom || 17);
+            window.placeMarker(data.latitude, data.longitude, data.zoom);
           }
         });
       </script>
     </body>
     </html>
   `;
+}
+
+// ── Helper: parse Nominatim display_name into readable parts ───────────────
+function parseDisplayName(displayName, resultClass, resultType) {
+  if (!displayName) return { street: 'Sin dirección', detail: '', category: '' };
+  // Nominatim returns comma-separated parts:
+  const parts = displayName.split(',').map(p => p.trim());
+  const filtered = parts.filter(p => !/^[A-Z]?\d{3,}$/.test(p));
+  const cleaned = filtered.filter(p => p !== 'Argentina' && !p.startsWith('Departamento '));
+
+  let street = cleaned[0] || displayName;
+  let detail = cleaned.slice(1).join(', ');
+
+  if (cleaned.length > 1) {
+    if (/^\d+$/.test(cleaned[0])) {
+      street = `${cleaned[1]} ${cleaned[0]}`;
+      detail = cleaned.slice(2).join(', ');
+    } else {
+      street = cleaned[0];
+      detail = cleaned.slice(1).join(', ');
+    }
+  }
+
+  const categoryNames = {
+    highway: 'Calle/Ruta',
+    amenity: 'Punto de Interés',
+    shop: 'Comercio',
+    tourism: 'Turismo',
+    place: 'Barrio/Zona',
+    boundary: 'Región',
+    railway: 'Estación/Vía',
+    leisure: 'Parque/Recreo',
+    building: 'Edificio',
+  };
+
+  const friendlyCategory = categoryNames[resultClass] || resultType || resultClass || '';
+
+  return {
+    street,
+    detail,
+    category: friendlyCategory,
+  };
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
@@ -172,7 +240,10 @@ export default function NewAlertScreen({ navigation }) {
   const [destinatarios, setDestinatarios] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const iframeRef = useRef(null);
+  const webViewRef = useRef(null);
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
 
@@ -202,7 +273,24 @@ export default function NewAlertScreen({ navigation }) {
     setFormData({ ...formData, [key]: value });
   };
 
-  // ── Handle map pick from iframe ────────────────────────────────────────
+  // Helper to post messages to both Web and Native maps safely
+  const postMessageToMap = (data) => {
+    if (Platform.OS === 'web') {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(data, '*');
+      }
+    } else {
+      if (webViewRef.current) {
+        if (data.type === 'FLY_TO') {
+          webViewRef.current.injectJavaScript(`window.flyTo(${data.latitude}, ${data.longitude}, ${data.zoom || 17}); true;`);
+        } else if (data.type === 'PLACE_MARKER') {
+          webViewRef.current.injectJavaScript(`window.placeMarker(${data.latitude}, ${data.longitude}, ${data.zoom || 17}); true;`);
+        }
+      }
+    }
+  };
+
+  // ── Handle map pick from iframe (Web) ───────────────────────────────────
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const handleMessage = (event) => {
@@ -218,35 +306,77 @@ export default function NewAlertScreen({ navigation }) {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // ── Geocode search (Nominatim) ─────────────────────────────────────────
+  // ── Handle map pick from WebView (Native) ──────────────────────────────
+  const handleNativeMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data && data.type === 'MAP_PICK') {
+        setFormData(prev => ({
+          ...prev,
+          latitud: parseFloat(data.latitude.toFixed(6)),
+          longitud: parseFloat(data.longitude.toFixed(6)),
+        }));
+      }
+    } catch (err) {
+      console.error('Native message error:', err);
+    }
+  };
+
+  // ── Select a geocode result ────────────────────────────────────────────
+  const selectGeoResult = (result) => {
+    const parsedLat = parseFloat(result.lat);
+    const parsedLng = parseFloat(result.lon);
+    setFormData(prev => ({
+      ...prev,
+      latitud: parseFloat(parsedLat.toFixed(6)),
+      longitud: parseFloat(parsedLng.toFixed(6)),
+      location: result.display_name,
+    }));
+    setSearchResults([]);
+    // Fly to the location on the map (both Web & Native)
+    postMessageToMap({
+      type: 'FLY_TO',
+      latitude: parsedLat,
+      longitude: parsedLng,
+      zoom: 17,
+    });
+  };
+
+  // ── Geocode search (Nominatim) — biased to Tucumán ────────────────────
+  // Viewbox covers Gran San Miguel de Tucumán + alrededores.
+  // bounded=1 restringe resultados estrictamente al viewbox.
+  // Si no encuentra nada en Tucumán, hace un segundo intento sin viewbox.
   const handleSearchLocation = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
+    setSearchResults([]);
     try {
       const query = encodeURIComponent(searchQuery.trim());
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1&countrycodes=ar`,
+      // Viewbox: lon_min, lat_min, lon_max, lat_max  (SW → NE de Gran Tucumán)
+      const viewbox = '-65.35,-26.95,-65.10,-26.72';
+      // Primer intento: buscar dentro del viewbox de Tucumán
+      let res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&countrycodes=ar&viewbox=${viewbox}&bounded=1`,
         { headers: { 'User-Agent': 'AxonFire/1.0' } }
       );
-      const data = await res.json();
+      let data = await res.json();
+
+      // Si no hay resultados dentro de Tucumán, buscar en toda Argentina
+      if (data.length === 0) {
+        res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&countrycodes=ar`,
+          { headers: { 'User-Agent': 'AxonFire/1.0' } }
+        );
+        data = await res.json();
+      }
+
       if (data.length > 0) {
-        const { lat, lon, display_name } = data[0];
-        const parsedLat = parseFloat(lat);
-        const parsedLng = parseFloat(lon);
-        setFormData(prev => ({
-          ...prev,
-          latitud: parseFloat(parsedLat.toFixed(6)),
-          longitud: parseFloat(parsedLng.toFixed(6)),
-          location: display_name || searchQuery,
-        }));
-        // Fly to the location on the map
-        if (iframeRef.current && iframeRef.current.contentWindow) {
-          iframeRef.current.contentWindow.postMessage({
-            type: 'FLY_TO',
-            latitude: parsedLat,
-            longitude: parsedLng,
-            zoom: 17,
-          }, '*');
+        if (data.length === 1) {
+          // Solo un resultado → seleccionar directamente
+          selectGeoResult(data[0]);
+        } else {
+          // Múltiples resultados → mostrar lista para que el usuario elija
+          setSearchResults(data);
         }
       } else {
         Alert.alert('Sin resultados', 'No se encontró la ubicación. Intentá con otro nombre o tocá directamente en el mapa.');
@@ -344,7 +474,11 @@ export default function NewAlertScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={scrollEnabled}
+          >
             <View style={styles.headerTitleBox}>
               <View style={[styles.redBorder, { backgroundColor: accentColor }]} />
             </View>
@@ -416,7 +550,7 @@ export default function NewAlertScreen({ navigation }) {
               <View style={styles.searchRow}>
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Buscar dirección... (ej: UNSTA Tucumán)"
+                  placeholder="Buscar dirección... (ej: San Martín 4020)"
                   placeholderTextColor="#52525b"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -436,16 +570,83 @@ export default function NewAlertScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
 
-              {/* Leaflet map iframe */}
-              {Platform.OS === 'web' && (
-                <View style={styles.mapContainer}>
+              {/* Search results dropdown (multiple matches) */}
+              {searchResults.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  <Text style={styles.searchResultsTitle}>
+                    <MaterialCommunityIcons name="map-marker-question" size={12} color="#f59e0b" />{' '}
+                    Se encontraron {searchResults.length} ubicaciones — elegí la correcta:
+                  </Text>
+                  {searchResults.map((result, index) => {
+                    const parsed = parseDisplayName(result.display_name, result.class, result.type);
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.searchResultItem}
+                        onPress={() => selectGeoResult(result)}
+                      >
+                        <View style={styles.searchResultIcon}>
+                          <MaterialCommunityIcons name="map-marker" size={16} color="#22c55e" />
+                        </View>
+                        <View style={styles.searchResultInfo}>
+                          <Text style={styles.searchResultStreet} numberOfLines={1}>
+                            {parsed.street}
+                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                            {parsed.category ? (
+                              <Text style={styles.searchResultCategoryBadge}>
+                                {parsed.category.toUpperCase()}
+                              </Text>
+                            ) : null}
+                            <Text style={styles.searchResultCoords}>
+                              ({parseFloat(result.lat).toFixed(4)}, {parseFloat(result.lon).toFixed(4)})
+                            </Text>
+                          </View>
+                          {parsed.detail ? (
+                            <Text style={styles.searchResultDetail} numberOfLines={1}>
+                              {parsed.detail}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <TouchableOpacity
+                    style={styles.searchResultsDismiss}
+                    onPress={() => setSearchResults([])}
+                  >
+                    <Text style={styles.searchResultsDismissText}>Cerrar</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Leaflet map picker (rendered on all platforms) */}
+              <View
+                style={styles.mapContainer}
+                onTouchStart={() => setScrollEnabled(false)}
+                onTouchEnd={() => setScrollEnabled(true)}
+                onTouchCancel={() => setScrollEnabled(true)}
+              >
+                {Platform.OS === 'web' ? (
                   <iframe
                     ref={iframeRef}
                     srcDoc={generarMapaPickerHTML(mapCenterLat, mapCenterLng)}
                     style={{ width: '100%', height: '100%', border: 'none', borderRadius: 4 }}
                   />
-                </View>
-              )}
+                ) : (
+                  <WebView
+                    ref={webViewRef}
+                    style={{ width: '100%', height: '100%', backgroundColor: '#16181d' }}
+                    source={{ html: generarMapaPickerHTML(mapCenterLat, mapCenterLng) }}
+                    originWhitelist={['*']}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    onMessage={handleNativeMessage}
+                    mixedContentMode="always"
+                  />
+                )}
+              </View>
 
               {/* Coordinates display */}
               {formData.latitud != null && formData.longitud != null && (
@@ -803,5 +1004,81 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 16,
     fontStyle: 'italic',
+  },
+
+  // ── Search results dropdown ───────────────────────────────────────────
+  searchResultsContainer: {
+    backgroundColor: '#1e293b',
+    borderRadius: 4,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    overflow: 'hidden',
+  },
+  searchResultsTitle: {
+    color: '#f59e0b',
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  searchResultIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultStreet: {
+    color: '#f1f5f9',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  searchResultCategoryBadge: {
+    backgroundColor: '#334155',
+    color: '#38bdf8',
+    fontSize: 9,
+    fontWeight: '800',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 3,
+    letterSpacing: 0.5,
+  },
+  searchResultCoords: {
+    color: '#64748b',
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  searchResultDetail: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  searchResultsDismiss: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#26282f',
+  },
+  searchResultsDismissText: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
