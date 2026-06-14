@@ -911,7 +911,13 @@ export default function AlertDetailScreen({ route, navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.mapFab}
-              onPress={() => navigation.navigate('Mapa', { alertaId: alerta?.id })}
+              onPress={() => {
+                const targetApp = rol === 'ADMIN' ? 'AdminApp' : 'MainApp';
+                navigation.navigate(targetApp, {
+                  screen: 'Mapa',
+                  params: { alertaId: alerta?.id }
+                });
+              }}
             >
               <MaterialCommunityIcons name="crosshairs-gps" size={22} color="#e2e8f0" />
             </TouchableOpacity>
@@ -925,7 +931,13 @@ export default function AlertDetailScreen({ route, navigation }) {
         {/* Botón Ver en mapa táctico */}
         <TouchableOpacity
           style={styles.verEnMapaBtn}
-          onPress={() => navigation.navigate('Mapa', { alertaId: alerta?.id })}
+          onPress={() => {
+            const targetApp = rol === 'ADMIN' ? 'AdminApp' : 'MainApp';
+            navigation.navigate(targetApp, {
+              screen: 'Mapa',
+              params: { alertaId: alerta?.id }
+            });
+          }}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="map-marker-radius-outline" size={16} color="#38bdf8" />

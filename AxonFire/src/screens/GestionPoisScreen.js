@@ -13,7 +13,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import GestionPoisMap from '../components/GestionPoisMap';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -800,11 +800,8 @@ export default function GestionPoisScreen({ navigation }) {
                   onTouchEnd={() => setParentScrollEnabled(true)}
                   onTouchCancel={() => setParentScrollEnabled(true)}
                 >
-                  <MapView
+                  <GestionPoisMap
                     ref={mapRef}
-                    style={styles.map}
-                    provider={PROVIDER_GOOGLE}
-                    customMapStyle={tacticalMapStyle}
                     initialRegion={{
                       latitude: editingPoi?.latitud || -26.8118,
                       longitude: editingPoi?.longitud || -65.2975,
@@ -818,28 +815,15 @@ export default function GestionPoisScreen({ navigation }) {
                       });
                     }}
                     onPress={handleMapPress}
-                  >
-                    {(parseFloat(formLatitud) && parseFloat(formLongitud)) ? (
-                      <Marker
-                        coordinate={{
-                          latitude: parseFloat(formLatitud),
-                          longitude: parseFloat(formLongitud)
-                        }}
-                        anchor={{ x: 0.5, y: 1.0 }}
-                      >
-                        <View style={styles.customMarkerContainer}>
-                          <View style={[styles.customMarkerBubble, { backgroundColor: getCategoriaInfo(formCategoria).color }]}>
-                            <MaterialCommunityIcons 
-                              name={getCategoriaInfo(formCategoria).icon} 
-                              size={16} 
-                              color="#ffffff"
-                            />
-                          </View>
-                          <View style={[styles.customMarkerArrow, { borderTopColor: getCategoriaInfo(formCategoria).color }]} />
-                        </View>
-                      </Marker>
-                    ) : null}
-                  </MapView>
+                    formLatitud={formLatitud}
+                    formLongitud={formLongitud}
+                    formCategoria={formCategoria}
+                    getCategoriaInfo={getCategoriaInfo}
+                    tacticalMapStyle={tacticalMapStyle}
+                    customMarkerContainerStyle={styles.customMarkerContainer}
+                    customMarkerBubbleStyle={styles.customMarkerBubble}
+                    customMarkerArrowStyle={styles.customMarkerArrow}
+                  />
                 </View>
 
                 {/* Coordenadas */}
