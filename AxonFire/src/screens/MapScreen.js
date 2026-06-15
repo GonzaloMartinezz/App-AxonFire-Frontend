@@ -481,17 +481,16 @@ export default function MapScreen({ navigation, route }) {
     try {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 86400000).toISOString();
-      const res = await fetch(`${API_BASE_URL}/alerta/rango`, {
+      const url = `${API_BASE_URL}/alerta/rango?fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}`;
+      const res = await fetch(url, {
         method: 'GET',
         headers,
-        body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
       });
       if (!res.ok) return;
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setAlertasActivas(data.length);
-        setAlertasData(data);
-      }
+      const list = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+      setAlertasActivas(list.length);
+      setAlertasData(list);
     } catch (_) { }
   }
 

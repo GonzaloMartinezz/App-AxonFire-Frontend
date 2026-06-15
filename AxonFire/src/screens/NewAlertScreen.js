@@ -219,7 +219,7 @@ export default function NewAlertScreen({ navigation }) {
     const viewbox = "-65.35,-26.88,-65.15,-26.75";
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&viewbox=${viewbox}&bounded=0&limit=5`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`,
         {
           headers: {
             'User-Agent': 'AxonFire-App',
@@ -255,8 +255,32 @@ export default function NewAlertScreen({ navigation }) {
   }
 
   const seleccionarSugerencia = (item) => {
-    const partes = item.display_name.split(',');
-    const nombreLimpio = partes.slice(0, 3).map(p => p.trim()).join(', ');
+    // 1. Extraer número de altura del input original (ej: "av aconquija 2300" -> "2300")
+    const matchNumero = formData.location.match(/\b\d+\b/);
+    const numero = matchNumero ? matchNumero[0] : null;
+
+    const addr = item.address || {};
+    const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
+    const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Tucumán';
+    const provincia = addr.state || 'Tucumán';
+
+    let nombreLimpio = '';
+    if (calle) {
+      // Inyectar el número después de la calle si se especificó y si la calle no lo incluye ya
+      nombreLimpio = (numero && !calle.includes(numero)) ? `${calle} ${numero}` : calle;
+      if (ciudad && ciudad !== calle) {
+        nombreLimpio += `, ${ciudad}`;
+      }
+      if (provincia && provincia !== ciudad) {
+        nombreLimpio += `, ${provincia}`;
+      }
+    } else {
+      const partes = item.display_name.split(',');
+      nombreLimpio = partes.slice(0, 3).map(p => p.trim()).join(', ');
+      if (numero && !nombreLimpio.includes(numero)) {
+        nombreLimpio = `${partes[0]} ${numero}, ${partes.slice(1, 3).join(', ')}`;
+      }
+    }
     
     updateForm('location', nombreLimpio);
     updateForm('latitud', item.lat);
