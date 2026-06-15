@@ -355,13 +355,13 @@ export default function AdminEquipmentScreen({ navigation }) {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-           <Image source={{ uri: 'https://randomuser.me/api/portraits/men/41.jpg' }} style={styles.avatarTop} />
-           <Text style={styles.topBarTitle}>AXON FIRE</Text>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+          <Image source={{ uri: 'https://randomuser.me/api/portraits/men/41.jpg' }} style={styles.avatarTop} />
+          <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
         <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('MainApp')}>
-            <MaterialCommunityIcons name="monitor-dashboard" size={20} color="#94a3b8" />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={confirmLogout}>
             <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
           </TouchableOpacity>

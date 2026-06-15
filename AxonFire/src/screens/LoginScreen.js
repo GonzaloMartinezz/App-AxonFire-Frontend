@@ -114,9 +114,6 @@ export default function LoginScreen({ navigation }) {
               <View style={styles.inputGroup}>
                 <View style={styles.labelRow}>
                   <Text style={styles.label}>CONTRASEÑA</Text>
-                  <TouchableOpacity>
-                    <Text style={styles.forgotText}>¿OLVIDASTE?</Text>
-                  </TouchableOpacity>
                 </View>
                 <View style={styles.inputWrapper}>
                   <MaterialCommunityIcons name="lock-outline" size={20} color="#90a4ae" style={styles.inputIcon} />

@@ -243,17 +243,7 @@ export default function AlertsScreen({ navigation, route }) {
                 <MaterialCommunityIcons name="clipboard-check-outline" size={18} color="#e11d48" />
                 <Text style={styles.dropdownItemText}>Cargar Inventario</Text>
               </TouchableOpacity>
-              <View style={styles.dropdownDivider} />
-              <TouchableOpacity 
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setShowMenu(false);
-                  navigation?.navigate('PanelControl');
-                }}
-              >
-                <MaterialCommunityIcons name="view-dashboard-outline" size={18} color="#e11d48" />
-                <Text style={styles.dropdownItemText}>Panel de Control</Text>
-              </TouchableOpacity>
+
               <View style={styles.dropdownDivider} />
               <TouchableOpacity 
                 style={styles.dropdownItem}
