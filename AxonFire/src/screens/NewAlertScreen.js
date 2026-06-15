@@ -218,9 +218,16 @@ export default function NewAlertScreen({ navigation }) {
   const buscarDirecciones = async (text) => {
     // Coordenadas base para priorizar búsqueda en Tucumán/Yerba Buena
     const viewbox = "-65.35,-26.88,-65.15,-26.75";
+    
+    // Si la búsqueda no incluye Tucumán, se la agregamos para forzar búsqueda local específica
+    let queryText = text;
+    if (!text.toLowerCase().includes("tucuman") && !text.toLowerCase().includes("tucumán")) {
+      queryText = `${text}, Yerba Buena, Tucumán, Argentina`;
+    }
+
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryText)}&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`,
         {
           headers: {
             'User-Agent': 'AxonFire-App',
@@ -516,18 +523,36 @@ export default function NewAlertScreen({ navigation }) {
                 
                 {suggestions.length > 0 && (
                   <View style={styles.suggestionsContainer}>
-                    {suggestions.map((item, index) => (
-                      <TouchableOpacity
-                        key={item.place_id || String(index)}
-                        style={styles.suggestionItem}
-                        onPress={() => seleccionarSugerencia(item)}
-                      >
-                        <MaterialCommunityIcons name="map-marker-outline" size={16} color={colorPrimario} />
-                        <Text style={styles.suggestionText} numberOfLines={2}>
-                          {item.display_name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                    {suggestions.map((item, index) => {
+                      const matchNumero = formData.location.match(/\b\d+\b/);
+                      const numero = matchNumero ? matchNumero[0] : null;
+
+                      const addr = item.address || {};
+                      const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
+                      const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
+
+                      let textoMostrar = item.display_name;
+                      if (calle) {
+                        const calleConNumero = (numero && !calle.includes(numero)) ? `${calle} ${numero}` : calle;
+                        textoMostrar = calleConNumero;
+                        if (ciudad && ciudad !== calle) {
+                          textoMostrar += `, ${ciudad}`;
+                        }
+                      }
+
+                      return (
+                        <TouchableOpacity
+                          key={item.place_id || String(index)}
+                          style={styles.suggestionItem}
+                          onPress={() => seleccionarSugerencia(item)}
+                        >
+                          <MaterialCommunityIcons name="map-marker-outline" size={16} color={colorPrimario} />
+                          <Text style={styles.suggestionText} numberOfLines={2}>
+                            {textoMostrar}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 )}
               </View>

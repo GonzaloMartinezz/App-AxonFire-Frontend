@@ -427,15 +427,25 @@ export default function MapScreen({ navigation, route }) {
       Alert.alert('Sin incidente', 'No hay ningún incidente activo seleccionado.');
       return;
     }
-    const { latitud, longitud } = incidente;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitud},${longitud}&travelmode=driving`;
+    const { latitud, longitud, direccion_exacta } = incidente;
+    
+    // Si la dirección tiene números (altura), es altamente probable que sea una dirección estructurada.
+    // Usamos el texto de la dirección directamente para que Google Maps geocodifique la altura exacta 
+    // y muestre el cartel correcto en lugar de renombrarla con un reverse-geocoding confuso (ej: "Las Rosas 800").
+    // Si es una descripción (no tiene números), usamos las coordenadas exactas de lat/lng.
+    const address = direccion_exacta || '';
+    const hasNumber = /\b\d+\b/.test(address);
+    const destination = hasNumber ? encodeURIComponent(address) : `${latitud},${longitud}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
     
     Linking.canOpenURL(url)
       .then((supported) => {
         if (supported) {
           Linking.openURL(url);
         } else {
-          const fallback = `http://maps.google.com/maps?daddr=${latitud},${longitud}`;
+          const fallback = hasNumber
+            ? `http://maps.google.com/maps?daddr=${encodeURIComponent(address)}`
+            : `http://maps.google.com/maps?daddr=${latitud},${longitud}`;
           Linking.openURL(fallback);
         }
       })
@@ -520,8 +530,14 @@ export default function MapScreen({ navigation, route }) {
       const res = await fetch(`${API_BASE_URL}/api/maps/incidents/${idIncidente}`, { headers });
       if (!res.ok) return;
       const data = await res.json();
-      if (typeof data.latitud === 'number' && typeof data.longitud === 'number') {
-        setIncidente(data);
+      const lat = parseFloat(data.latitud);
+      const lng = parseFloat(data.longitud);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setIncidente({
+          ...data,
+          latitud: lat,
+          longitud: lng,
+        });
       }
       cargarResponders(idIncidente);
     } catch (_) { }
