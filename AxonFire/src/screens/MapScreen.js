@@ -22,6 +22,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -488,7 +489,25 @@ export default function MapScreen({ navigation, route }) {
       });
       if (!res.ok) return;
       const data = await res.json();
-      const list = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+      const rawList = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+      
+      // Filtrar para excluir alertas finalizadas / resueltas / cerradas
+      const list = rawList.filter(a => {
+        const estadoObj = a.estadoAlerta || a.estado || {};
+        const nombreEstado = typeof estadoObj === 'string' 
+          ? estadoObj 
+          : (estadoObj.nombre_estado || estadoObj.nombre || '');
+        const e = nombreEstado.toUpperCase();
+        
+        if (e === 'FINALIZADO' || e.includes('RESUEL') || e.includes('CERRAD')) {
+          return false;
+        }
+        return true;
+      });
+      
+      // Ordenar por fecha_hora desc (de más nueva a más vieja)
+      list.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+      
       setAlertasActivas(list.length);
       setAlertasData(list);
     } catch (_) { }
@@ -551,10 +570,15 @@ export default function MapScreen({ navigation, route }) {
     }
   }
 
+  // Recargar alertas activas cada vez que la pantalla obtiene el foco (por ejemplo al volver de crear alerta)
+  useFocusEffect(
+    React.useCallback(() => {
+      cargarAlertasActivas();
+    }, [token])
+  );
+
   useEffect(() => {
     cargarConfig();
-    cargarAlertasActivas();
-
     // Si viene un incidenteId/alertaId por route params, cargarlo directamente
     const paramId = route?.params?.incidenteId || route?.params?.alertaId;
     if (paramId) {
@@ -573,12 +597,17 @@ export default function MapScreen({ navigation, route }) {
   // ─── Auto-carga de incidente desde alertas activas (sin ID explícito) ─────
   useEffect(() => {
     const paramId = route?.params?.incidenteId || route?.params?.alertaId;
-    if (!paramId && alertasData.length > 0 && !incidente) {
+    if (!paramId && alertasData.length > 0) {
       const primeraAlerta = alertasData[0];
       const id = primeraAlerta.id || primeraAlerta.id_alerta;
-      if (id) {
+      
+      const idIncidenteActual = incidente?.id || incidente?.id_alerta;
+      if (id && idIncidenteActual !== id) {
         cargarIncidente(id);
       }
+    } else if (!paramId && alertasData.length === 0 && incidente) {
+      // Si ya no quedan alertas activas, limpiar el incidente
+      setIncidente(null);
     }
   }, [alertasData]);
 

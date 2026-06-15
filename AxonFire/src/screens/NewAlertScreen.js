@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -254,14 +255,14 @@ export default function NewAlertScreen({ navigation }) {
     }, 600);
   }
 
-  const seleccionarSugerencia = (item) => {
+  const seleccionarSugerencia = async (item) => {
     // 1. Extraer número de altura del input original (ej: "av aconquija 2300" -> "2300")
     const matchNumero = formData.location.match(/\b\d+\b/);
     const numero = matchNumero ? matchNumero[0] : null;
 
     const addr = item.address || {};
     const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
-    const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Tucumán';
+    const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
     const provincia = addr.state || 'Tucumán';
 
     let nombreLimpio = '';
@@ -283,14 +284,28 @@ export default function NewAlertScreen({ navigation }) {
     }
     
     updateForm('location', nombreLimpio);
-    updateForm('latitud', item.lat);
-    updateForm('longitud', item.lon);
+    
+    // 2. Geocodificar usando el geocodificador nativo (Apple Maps en iOS, Google en Android)
+    // para obtener las coordenadas exactas de la altura
+    let lat = parseFloat(item.lat);
+    let lng = parseFloat(item.lon);
+
+    try {
+      const geocoded = await Location.geocodeAsync(nombreLimpio);
+      if (geocoded && geocoded.length > 0) {
+        lat = geocoded[0].latitude;
+        lng = geocoded[0].longitude;
+      }
+    } catch (err) {
+      console.warn('Geocodificación nativa falló, usando Nominatim:', err);
+    }
+    
+    updateForm('latitud', String(lat.toFixed(6)));
+    updateForm('longitud', String(lng.toFixed(6)));
     setCoordsSeleccionadas(true);
     
-    const lat = parseFloat(item.lat);
-    const lng = parseFloat(item.lon);
-    if (!isNaN(lat) && !isNaN(lng) && mapaAlertaListo) {
-      webViewRef.current?.injectJavaScript(`moverMarcador(${lat}, ${lng}); true;`);
+    if (mapaAlertaListo) {
+      webViewRef.current?.injectJavaScript(`moverMarcador(${lat.toFixed(6)}, ${lng.toFixed(6)}); true;`);
     }
     
     setSuggestions([]);
@@ -338,13 +353,26 @@ export default function NewAlertScreen({ navigation }) {
       return;
     }
 
-    const lat = parseFloat(formData.latitud);
-    const lng = parseFloat(formData.longitud);
+    let lat = parseFloat(formData.latitud);
+    let lng = parseFloat(formData.longitud);
+
+    // Si las coordenadas no están seteadas o falló antes, intentamos una geocodificación nativa de último momento
+    if (isNaN(lat) || isNaN(lng)) {
+      try {
+        const geocoded = await Location.geocodeAsync(formData.location);
+        if (geocoded && geocoded.length > 0) {
+          lat = geocoded[0].latitude;
+          lng = geocoded[0].longitude;
+        }
+      } catch (err) {
+        console.warn('Geocodificación nativa final falló:', err);
+      }
+    }
 
     if (isNaN(lat) || isNaN(lng)) {
       Alert.alert(
         'Coordenadas requeridas',
-        'Tocá el mapa para seleccionar las coordenadas de la emergencia, o ingresalas manualmente.'
+        'No pudimos determinar las coordenadas para esa dirección. Tocá el mapa para seleccionar la ubicación exacta.'
       );
       return;
     }
