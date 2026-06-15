@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   ScrollView,
   View,
@@ -13,12 +13,12 @@ import {
   Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { WebView } from 'react-native-webview';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import LocationPicker from '../components/LocationPicker';
 
 // ─── Componentes reutilizables (igual que antes) ──────────────────────────────
 const InputField = ({ label, placeholder, value, onChangeText, multiline = false }) => (
@@ -48,106 +48,6 @@ const DropdownField = ({ label, value, onPress }) => (
   </View>
 );
 
-// ─── HTML del mini-mapa para seleccionar coordenadas ─────────────────────────
-// El usuario toca el mapa → aparece un marcador rojo + se envían lat/lng a RN
-function generarMapaAlertaHTML(lat, lng) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    html, body { width:100%; height:100%; background:#26282f; }
-    #map { width:100%; height:100vh; cursor:crosshair; }
-    .leaflet-control-zoom { display:none !important; }
-    .leaflet-control-attribution {
-      font-size:7px !important;
-      background:rgba(26,28,35,0.7) !important;
-      color:#475569 !important;
-    }
-    #hint {
-      position:absolute; top:8px; left:50%;
-      transform:translateX(-50%);
-      background:rgba(26,28,35,0.88);
-      color:#94a3b8; font-size:10px; font-family:sans-serif;
-      padding:4px 12px; border-radius:12px; border:1px solid #334155;
-      pointer-events:none; z-index:1000; white-space:nowrap;
-    }
-    #hint.oculto { display:none; }
-    .leaflet-popup-content-wrapper {
-      background:#1a1c23; border:1px solid #334155;
-      border-radius:8px; color:#e2e8f0;
-      font-family:sans-serif; font-size:11px;
-    }
-    .leaflet-popup-tip { background:#1a1c23; }
-  </style>
-</head>
-<body>
-<div id="hint">Tocá el mapa para marcar la emergencia</div>
-<div id="map"></div>
-<script>
-  var map = L.map('map', { center:[${lat},${lng}], zoom:14, zoomControl:false });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution:'&copy; OSM &copy; CartoDB', maxZoom:19, subdomains:'abcd'
-  }).addTo(map);
-
-  var marker = null;
-  var iconEmergencia = L.divIcon({
-    className:'',
-    html:'<div style="width:22px;height:22px;background:#dc2626;border-radius:50%;border:3px solid white;box-shadow:0 2px 10px rgba(220,38,38,0.7)"></div>',
-    iconSize:[22,22], iconAnchor:[11,11], popupAnchor:[0,-14]
-  });
-
-  function colocarMarcador(lat, lng) {
-    if(marker) {
-      marker.setLatLng([lat, lng]);
-    } else {
-      marker = L.marker([lat,lng], { icon:iconEmergencia, draggable:true }).addTo(map);
-      marker.on('dragend', function(e) {
-        var p = e.target.getLatLng();
-        enviarCoords(parseFloat(p.lat.toFixed(6)), parseFloat(p.lng.toFixed(6)));
-      });
-    }
-    marker.bindPopup('<b>Emergencia</b><br>Lat: ' + lat.toFixed(5) + '<br>Lng: ' + lng.toFixed(5)).openPopup();
-    document.getElementById('hint').className = 'oculto';
-  }
-
-  function enviarCoords(lat, lng) {
-    try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        tipo: 'COORDS_ALERTA',
-        latitud: lat,
-        longitud: lng
-      }));
-    } catch(e) {}
-  }
-
-  map.on('click', function(e) {
-    var lat = parseFloat(e.latlng.lat.toFixed(6));
-    var lng = parseFloat(e.latlng.lng.toFixed(6));
-    colocarMarcador(lat, lng);
-    enviarCoords(lat, lng);
-  });
-
-  // Llamado desde RN cuando el usuario tipea coordenadas manualmente
-  window.moverMarcador = function(lat, lng) {
-    if(!isNaN(lat) && !isNaN(lng)) {
-      colocarMarcador(lat, lng);
-      map.setView([lat, lng], map.getZoom(), { animate:true });
-    }
-  };
-
-  setTimeout(function(){
-    try{ window.ReactNativeWebView.postMessage(JSON.stringify({ tipo:'MAPA_ALERTA_LISTO' })); } catch(e){}
-  }, 350);
-</script>
-</body>
-</html>`;
-}
-
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const DEFAULT_LAT = -26.8083;
 const DEFAULT_LNG = -65.2176;
@@ -173,7 +73,6 @@ const NIVELES_SEVERIDAD = [
 export default function NewAlertScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
-  const webViewRef = useRef(null);
 
   const [formData, setFormData] = useState({
     type: 'Incendio Estructural',
@@ -187,13 +86,6 @@ export default function NewAlertScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showSeverityPicker, setShowSeverityPicker] = useState(false);
-  const [mapaAlertaListo, setMapaAlertaListo] = useState(false);
-  const [coordsSeleccionadas, setCoordsSeleccionadas] = useState(false);
-
-  // ── NUEVO: Estados y ref para autocompletado de direcciones ────────────────
-  const searchTimeoutRef = useRef(null);
-  const [suggestions, setSuggestions] = useState([]);
-  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
 
   const parentState = navigation.getParent()?.getState();
   const isCurrentlyAdmin = parentState?.routeNames?.includes('Panel')
@@ -202,156 +94,16 @@ export default function NewAlertScreen({ navigation }) {
 
   const colorPrimario = isCurrentlyAdmin ? '#dc2626' : '#0284c7';
 
-  // Cleanup de timeout al desmontar
-  React.useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
-
   // ─── Helpers ───────────────────────────────────────────────────────────────
   const updateForm = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
 
-  // ── NUEVO: Búsqueda de direcciones y selección ────────────────────────────
-  const buscarDirecciones = async (text) => {
-    // Coordenadas base para priorizar búsqueda en Tucumán/Yerba Buena
-    const viewbox = "-65.35,-26.88,-65.15,-26.75";
-    
-    // Si la búsqueda no incluye Tucumán, se la agregamos para forzar búsqueda local específica
-    let queryText = text;
-    if (!text.toLowerCase().includes("tucuman") && !text.toLowerCase().includes("tucumán")) {
-      queryText = `${text}, Yerba Buena, Tucumán, Argentina`;
-    }
-
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryText)}&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'AxonFire-App',
-          }
-        }
-      );
-      const data = await response.json();
-      setSuggestions(data || []);
-    } catch (error) {
-      console.warn('Error al buscar dirección:', error);
-    } finally {
-      setIsSearchingAddress(false);
+  const handleLocationSelect = ({ latitude, longitude, address }) => {
+    updateForm('latitud', String(latitude));
+    updateForm('longitud', String(longitude));
+    if (address) {
+      updateForm('location', address);
     }
   };
-
-  function onCambioUbicacion(text) {
-    updateForm('location', text);
-    
-    if (!text || text.trim().length < 4) {
-      setSuggestions([]);
-      setIsSearchingAddress(false);
-      return;
-    }
-    
-    setIsSearchingAddress(true);
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    searchTimeoutRef.current = setTimeout(() => {
-      buscarDirecciones(text);
-    }, 600);
-  }
-
-  const seleccionarSugerencia = async (item) => {
-    // 1. Extraer número de altura del input original (ej: "av aconquija 2300" -> "2300")
-    const matchNumero = formData.location.match(/\b\d+\b/);
-    const numero = matchNumero ? matchNumero[0] : null;
-
-    const addr = item.address || {};
-    const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
-    const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
-    const provincia = addr.state || 'Tucumán';
-
-    let nombreLimpio = '';
-    if (calle) {
-      // Inyectar el número después de la calle si se especificó y si la calle no lo incluye ya
-      nombreLimpio = (numero && !calle.includes(numero)) ? `${calle} ${numero}` : calle;
-      if (ciudad && ciudad !== calle) {
-        nombreLimpio += `, ${ciudad}`;
-      }
-      if (provincia && provincia !== ciudad) {
-        nombreLimpio += `, ${provincia}`;
-      }
-    } else {
-      const partes = item.display_name.split(',');
-      nombreLimpio = partes.slice(0, 3).map(p => p.trim()).join(', ');
-      if (numero && !nombreLimpio.includes(numero)) {
-        nombreLimpio = `${partes[0]} ${numero}, ${partes.slice(1, 3).join(', ')}`;
-      }
-    }
-    
-    updateForm('location', nombreLimpio);
-    
-    // 2. Geocodificar usando el geocodificador nativo (Apple Maps en iOS, Google en Android)
-    // para obtener las coordenadas exactas de la altura
-    let lat = parseFloat(item.lat);
-    let lng = parseFloat(item.lon);
-
-    try {
-      const geocoded = await Location.geocodeAsync(nombreLimpio);
-      if (geocoded && geocoded.length > 0) {
-        lat = geocoded[0].latitude;
-        lng = geocoded[0].longitude;
-      }
-    } catch (err) {
-      console.warn('Geocodificación nativa falló, usando Nominatim:', err);
-    }
-    
-    updateForm('latitud', String(lat.toFixed(6)));
-    updateForm('longitud', String(lng.toFixed(6)));
-    setCoordsSeleccionadas(true);
-    
-    if (mapaAlertaListo) {
-      webViewRef.current?.injectJavaScript(`moverMarcador(${lat.toFixed(6)}, ${lng.toFixed(6)}); true;`);
-    }
-    
-    setSuggestions([]);
-  };
-
-  // ─── Mensajes del mini-mapa → React Native ────────────────────────────────
-  function onMensajeMapaAlerta({ nativeEvent: { data } }) {
-    try {
-      const msg = JSON.parse(data);
-      if (msg.tipo === 'MAPA_ALERTA_LISTO') {
-        setMapaAlertaListo(true);
-      }
-      if (msg.tipo === 'COORDS_ALERTA') {
-        updateForm('latitud', String(msg.latitud));
-        updateForm('longitud', String(msg.longitud));
-        setCoordsSeleccionadas(true);
-      }
-    } catch (_) { }
-  }
-
-  // Cuando el usuario toca el mapa, las coordenadas se pasan a los inputs.
-  // Si después tipea manualmente en los inputs, movemos el marcador en el mapa.
-  function onCambioLatitud(text) {
-    updateForm('latitud', text);
-    const lat = parseFloat(text);
-    const lng = parseFloat(formData.longitud);
-    if (!isNaN(lat) && !isNaN(lng) && mapaAlertaListo) {
-      webViewRef.current?.injectJavaScript(`moverMarcador(${lat}, ${lng}); true;`);
-    }
-  }
-
-  function onCambioLongitud(text) {
-    updateForm('longitud', text);
-    const lat = parseFloat(formData.latitud);
-    const lng = parseFloat(text);
-    if (!isNaN(lat) && !isNaN(lng) && mapaAlertaListo) {
-      webViewRef.current?.injectJavaScript(`moverMarcador(${lat}, ${lng}); true;`);
-    }
-  }
 
   // ─── Submit ────────────────────────────────────────────────────────────────
   const submitAlertData = async () => {
@@ -419,7 +171,6 @@ export default function NewAlertScreen({ navigation }) {
         latitud: '',
         longitud: '',
       });
-      setCoordsSeleccionadas(false);
       navigation.goBack();
     } catch (error) {
       Alert.alert('Error', error.message || 'No se pudo crear la alerta.');
@@ -427,8 +178,6 @@ export default function NewAlertScreen({ navigation }) {
       setIsLoading(false);
     }
   };
-
-  const mapaHTML = generarMapaAlertaHTML(DEFAULT_LAT, DEFAULT_LNG);
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
@@ -503,125 +252,20 @@ export default function NewAlertScreen({ navigation }) {
                 </View>
               )}
 
-              {/* Ubicación texto con autocompletado */}
-              <View style={styles.inputGroup}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={styles.label}>UBICACIÓN EXACTA</Text>
-                  {isSearchingAddress && (
-                    <ActivityIndicator size="small" color={colorPrimario} style={{ marginBottom: 8 }} />
-                  )}
-                </View>
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="DIRECCIÓN O DESCRIPCIÓN DEL LUGAR..."
-                    placeholderTextColor="#52525b"
-                    value={formData.location}
-                    onChangeText={onCambioUbicacion}
-                  />
-                </View>
-                
-                {suggestions.length > 0 && (
-                  <View style={styles.suggestionsContainer}>
-                    {suggestions.map((item, index) => {
-                      const matchNumero = formData.location.match(/\b\d+\b/);
-                      const numero = matchNumero ? matchNumero[0] : null;
-
-                      const addr = item.address || {};
-                      const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
-                      const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
-
-                      let textoMostrar = item.display_name;
-                      if (calle) {
-                        const calleConNumero = (numero && !calle.includes(numero)) ? `${calle} ${numero}` : calle;
-                        textoMostrar = calleConNumero;
-                        if (ciudad && ciudad !== calle) {
-                          textoMostrar += `, ${ciudad}`;
-                        }
+              {/* Ubicación y coordenadas */}
+              <LocationPicker
+                initialLocation={
+                  formData.latitud && formData.longitud
+                    ? {
+                        latitude: parseFloat(formData.latitud),
+                        longitude: parseFloat(formData.longitud),
                       }
-
-                      return (
-                        <TouchableOpacity
-                          key={item.place_id || String(index)}
-                          style={styles.suggestionItem}
-                          onPress={() => seleccionarSugerencia(item)}
-                        >
-                          <MaterialCommunityIcons name="map-marker-outline" size={16} color={colorPrimario} />
-                          <Text style={styles.suggestionText} numberOfLines={2}>
-                            {textoMostrar}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-
-              {/* ── NUEVO: Mini-mapa para seleccionar coordenadas ── */}
-              <View style={styles.inputGroup}>
-                <View style={styles.mapaLabel}>
-                  <MaterialCommunityIcons name="map-marker-radius" size={14} color={colorPrimario} />
-                  <Text style={styles.label}>COORDENADAS DE LA EMERGENCIA</Text>
-                  {coordsSeleccionadas && (
-                    <View style={styles.badgeCoords}>
-                      <MaterialCommunityIcons name="check" size={10} color="#22c55e" />
-                      <Text style={styles.badgeCoordsTexto}>SELECCIONADAS</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Mapa interactivo */}
-                <View style={styles.mapaContenedor}>
-                  {!mapaAlertaListo && (
-                    <View style={styles.mapaLoader}>
-                      <ActivityIndicator size="small" color={colorPrimario} />
-                      <Text style={styles.mapaLoaderTexto}>Cargando mapa...</Text>
-                    </View>
-                  )}
-                  <WebView
-                    ref={webViewRef}
-                    style={[styles.mapa, !mapaAlertaListo && { opacity: 0 }]}
-                    source={{ html: mapaHTML }}
-                    originWhitelist={['*']}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    scrollEnabled={false}
-                    onMessage={onMensajeMapaAlerta}
-                    mixedContentMode="always"
-                    {...(Platform.OS === 'android' && { androidLayerType: 'hardware' })}
-                  />
-                </View>
-
-                <Text style={styles.mapaHint}>
-                  Tocá el mapa para colocar el marcador de emergencia
-                </Text>
-
-                {/* Inputs manuales de lat/lng */}
-                <View style={styles.coordsRow}>
-                  <View style={styles.coordInput}>
-                    <Text style={styles.coordLabel}>LATITUD</Text>
-                    <TextInput
-                      style={styles.coordInputField}
-                      value={formData.latitud}
-                      onChangeText={onCambioLatitud}
-                      placeholder="-26.8083"
-                      placeholderTextColor="#52525b"
-                      keyboardType="numbers-and-punctuation"
-                    />
-                  </View>
-                  <View style={styles.coordInput}>
-                    <Text style={styles.coordLabel}>LONGITUD</Text>
-                    <TextInput
-                      style={styles.coordInputField}
-                      value={formData.longitud}
-                      onChangeText={onCambioLongitud}
-                      placeholder="-65.2176"
-                      placeholderTextColor="#52525b"
-                      keyboardType="numbers-and-punctuation"
-                    />
-                  </View>
-                </View>
-              </View>
+                    : undefined
+                }
+                initialAddress={formData.location}
+                onLocationSelect={handleLocationSelect}
+                mapHeight={350}
+              />
 
               {/* Descripción (igual que antes) */}
               <InputField
@@ -777,85 +421,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // ── Nuevo: mapa de coordenadas ─────────────────────────────────────────────
-  mapaLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  badgeCoords: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(34,197,94,0.12)',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeCoordsTexto: {
-    color: '#22c55e',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  mapaContenedor: {
-    height: 350,
-    borderRadius: 4,
-    overflow: 'hidden',
-    backgroundColor: '#26282f',
-    position: 'relative',
-  },
-  mapaLoader: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#26282f',
-    zIndex: 10,
-  },
-  mapaLoaderTexto: {
-    color: '#64748b',
-    fontSize: 11,
-  },
-  mapa: {
-    flex: 1,
-    backgroundColor: '#26282f',
-  },
-  mapaHint: {
-    color: '#475569',
-    fontSize: 9,
-    fontWeight: '500',
-    marginTop: 6,
-    marginBottom: 10,
-    fontStyle: 'italic',
-  },
-  coordsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  coordInput: {
-    flex: 1,
-  },
-  coordLabel: {
-    color: '#64748b',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  coordInputField: {
-    backgroundColor: '#26282f',
-    borderRadius: 4,
-    height: 40,
-    paddingHorizontal: 12,
-    color: '#22c55e',
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontWeight: '700',
-  },
-
   // ── Botones y acciones ────────────────────────────────────────────────────
   primaryButton: {
     borderRadius: 4,
@@ -891,29 +456,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
-  },
-  // ── Nuevo: autocompletado de direcciones ───────────────────────────────────
-  suggestionsContainer: {
-    backgroundColor: '#26282f',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-    marginTop: 4,
-    maxHeight: 220,
-    overflow: 'hidden',
-    zIndex: 1000,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1b1d24',
-    gap: 10,
-  },
-  suggestionText: {
-    color: '#e2e8f0',
-    fontSize: 13,
-    flex: 1,
   },
 });
