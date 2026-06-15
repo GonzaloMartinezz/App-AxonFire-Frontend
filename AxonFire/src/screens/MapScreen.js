@@ -359,7 +359,7 @@ function generarMapaHTML(lat, lng, zoom) {
 // ─── Componente ───────────────────────────────────────────────────────────────
 export default function MapScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const webViewRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
