@@ -32,9 +32,9 @@ function getMockTools() {
 function getIconoBolso(nombre = '') {
   const n = nombre.toLowerCase();
   if (n.includes('trauma') || n.includes('medic') || n.includes('primero')) return 'medical-bag';
-  if (n.includes('cuerda') || n.includes('soga') || n.includes('rescate'))   return 'rope';
-  if (n.includes('incendio') || n.includes('fuego'))                          return 'fire-extinguisher';
-  if (n.includes('herramienta') || n.includes('kit'))                         return 'toolbox-outline';
+  if (n.includes('cuerda') || n.includes('soga') || n.includes('rescate')) return 'rope';
+  if (n.includes('incendio') || n.includes('fuego')) return 'fire-extinguisher';
+  if (n.includes('herramienta') || n.includes('kit')) return 'toolbox-outline';
   return 'bag-personal-outline';
 }
 
@@ -72,9 +72,9 @@ export default function AdminEquipmentScreen({ navigation }) {
     setLoadingMoviles(true);
     try {
       const res = await fetch(`${API_BASE_URL}/camiones`, {
-        headers: { 
-          'Content-Type': 'application/json', 
-          ...(token ? { Authorization: `Bearer ${token}` } : {}) 
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
       });
       if (res.ok) {
@@ -197,7 +197,7 @@ export default function AdminEquipmentScreen({ navigation }) {
       } else {
         const hasRadio = tools.some(t => t.nombre_herramienta?.toUpperCase().includes('RADIO DE REPUESTO'));
         const hasMotosierra = tools.some(t => t.nombre_herramienta?.toUpperCase().includes('MOTOSIERRA DE CUARTEL'));
-        
+
         if (!hasRadio) {
           tools.push({ id: 'fixed_radio', nombre_herramienta: 'RADIO DE REPUESTO', cantidad_disponible: 5, descripcion: 'Equipo de comunicación base de repuesto' });
         }
@@ -351,7 +351,7 @@ export default function AdminEquipmentScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar style="light" backgroundColor="#16181d" />
-      
+
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
@@ -437,9 +437,9 @@ export default function AdminEquipmentScreen({ navigation }) {
                         </View>
                       </View>
                       <Text style={styles.vehicleType}>FLOTA TÁCTICA SECTOR 7G</Text>
-                      
+
                       <View style={[styles.vehicleActions, { marginTop: 16 }]}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={[styles.vehicleBtn, { backgroundColor: esActivo ? '#26282f' : '#052e16' }]}
                           onPress={() => toggleEstadoCamion(camion)}
                         >
@@ -447,8 +447,8 @@ export default function AdminEquipmentScreen({ navigation }) {
                             {esActivo ? 'DESACTIVAR' : 'ACTIVAR'}
                           </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[styles.vehicleBtn, { backgroundColor: '#2d1515' }]} 
+                        <TouchableOpacity
+                          style={[styles.vehicleBtn, { backgroundColor: '#2d1515' }]}
                           onPress={() => eliminarCamion(camion)}
                         >
                           <Text style={[styles.vehicleBtnText, { color: '#ef4444' }]}>ELIMINAR</Text>
@@ -552,9 +552,9 @@ export default function AdminEquipmentScreen({ navigation }) {
                         </View>
                       </View>
                       <Text style={styles.vehicleType}>KITS POST-EMERGENCIA (AFTER EMERGENCY)</Text>
-                      
+
                       <View style={[styles.vehicleActions, { marginTop: 16 }]}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={[styles.vehicleBtn, { backgroundColor: esActivo ? '#26282f' : '#052e16' }]}
                           onPress={() => toggleEstadoBolso(bolso)}
                         >
@@ -562,8 +562,8 @@ export default function AdminEquipmentScreen({ navigation }) {
                             {esActivo ? 'DESACTIVAR' : 'ACTIVAR'}
                           </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[styles.vehicleBtn, { backgroundColor: '#2d1515' }]} 
+                        <TouchableOpacity
+                          style={[styles.vehicleBtn, { backgroundColor: '#2d1515' }]}
                           onPress={() => eliminarBolso(bolso)}
                         >
                           <Text style={[styles.vehicleBtnText, { color: '#ef4444' }]}>ELIMINAR</Text>
@@ -652,8 +652,8 @@ export default function AdminEquipmentScreen({ navigation }) {
               autoCapitalize="characters"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalBtnCancel]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
                 onPress={() => {
                   setModalVisible(false);
                   setNuevoNombreCamion('');
@@ -661,8 +661,8 @@ export default function AdminEquipmentScreen({ navigation }) {
               >
                 <Text style={styles.modalBtnTextCancel}>CANCELAR</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalBtnConfirm]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm]}
                 onPress={crearCamion}
               >
                 <Text style={styles.modalBtnTextConfirm}>CREAR MÓVIL</Text>
@@ -697,8 +697,8 @@ export default function AdminEquipmentScreen({ navigation }) {
               autoCapitalize="characters"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalBtnCancel]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
                 onPress={() => {
                   setModalBolsoVisible(false);
                   setNuevoNombreBolso('');
@@ -706,8 +706,8 @@ export default function AdminEquipmentScreen({ navigation }) {
               >
                 <Text style={styles.modalBtnTextCancel}>CANCELAR</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalBtnConfirm]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm]}
                 onPress={crearBolso}
               >
                 <Text style={styles.modalBtnTextConfirm}>CREAR BOLSO</Text>

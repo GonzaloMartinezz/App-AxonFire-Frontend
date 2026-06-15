@@ -13,12 +13,12 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
 } from 'react-native';
-import GestionPoisMap from '../components/GestionPoisMap';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import LocationPicker from '../components/LocationPicker';
 
 // ── Category helpers ─────────────────────────────────────────────────────────
 const CATEGORIAS = ['HIDRANTE', 'SALUD', 'MATERIAL_PELIGROSO', 'CUARTEL_APOYO'];
@@ -109,28 +109,6 @@ function formatCoord(val) {
   if (val == null) return '—';
   return Number(val).toFixed(5);
 }
-
-// ── Map Style ────────────────────────────────────────────────────────────────
-const tacticalMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
-  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-  { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
-];
 
 // ── Toast Component ──────────────────────────────────────────────────────────
 function Toast({ visible, message, type, onHide }) {
@@ -233,11 +211,6 @@ export default function GestionPoisScreen({ navigation }) {
   const [deletingPoi, setDeletingPoi] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Map
-  const mapRef = useRef(null);
-  const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
-  const [currentDeltas, setCurrentDeltas] = useState({ latitudeDelta: 0.004, longitudeDelta: 0.004 });
-
   // Toast
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
 
@@ -292,18 +265,6 @@ export default function GestionPoisScreen({ navigation }) {
     setSuggestions([]);
     setShowSuggestions(false);
     setFormVisible(true);
-
-    // Initial center on Yerba Buena (Perú and Thames) with close zoom
-    setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude: -26.8118,
-          longitude: -65.2975,
-          latitudeDelta: 0.004,
-          longitudeDelta: 0.004,
-        }, 500);
-      }
-    }, 300);
   }
 
   // Auto-completar POI sugerido
@@ -316,16 +277,6 @@ export default function GestionPoisScreen({ navigation }) {
     setSuggestions([]);
     setShowSuggestions(false);
     showToast(`Autocompletado: ${item.nombre}`);
-
-    // Animate camera to recommendation location with close zoom
-    if (mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: item.latitud,
-        longitude: item.longitud,
-        latitudeDelta: 0.003,
-        longitudeDelta: 0.003,
-      }, 500);
-    }
   }
 
   function openEditForm(poi) {
@@ -338,20 +289,6 @@ export default function GestionPoisScreen({ navigation }) {
     setSuggestions([]);
     setShowSuggestions(false);
     setFormVisible(true);
-
-    // Animate camera to edited location with close zoom
-    if (poi.latitud != null && poi.longitud != null) {
-      setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.animateToRegion({
-            latitude: poi.latitud,
-            longitude: poi.longitud,
-            latitudeDelta: 0.003,
-            longitudeDelta: 0.003,
-          }, 500);
-        }
-      }, 300);
-    }
   }
 
   function closeForm() {
@@ -378,27 +315,10 @@ export default function GestionPoisScreen({ navigation }) {
     }
   }
 
-  // Handle map press
-  function handleMapPress(e) {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setFormLatitud(latitude.toFixed(6));
-    setFormLongitud(longitude.toFixed(6));
-  }
-
-  // Centrar mapa cuando se terminan de escribir las coordenadas
-  function handleCoordInputEnd() {
-    if (!mapRef.current) return;
-    const lat = parseFloat(formLatitud);
-    const lng = parseFloat(formLongitud);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      mapRef.current.animateToRegion({
-        latitude: lat,
-        longitude: lng,
-        latitudeDelta: currentDeltas.latitudeDelta,
-        longitudeDelta: currentDeltas.longitudeDelta,
-      }, 500);
-    }
-  }
+  const handleLocationSelect = ({ latitude, longitude }) => {
+    setFormLatitud(String(latitude));
+    setFormLongitud(String(longitude));
+  };
 
   async function handleSubmitForm() {
     // Validation
@@ -620,11 +540,11 @@ export default function GestionPoisScreen({ navigation }) {
                         </Text>
                       </View>
                     </View>
-                    
+
                     {poi.descripcion ? (
                       <Text style={styles.poiCardDesc}>{poi.descripcion}</Text>
                     ) : null}
-                    
+
                     <View style={styles.poiCardFooter}>
                       <View style={styles.poiCardCoords}>
                         <MaterialCommunityIcons name="compass-outline" size={12} color="#64748b" />
@@ -674,7 +594,7 @@ export default function GestionPoisScreen({ navigation }) {
               contentContainerStyle={styles.modalScrollContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              scrollEnabled={parentScrollEnabled}
+              scrollEnabled={true}
             >
               <View style={styles.modalView}>
                 {/* Header */}
@@ -792,67 +712,25 @@ export default function GestionPoisScreen({ navigation }) {
                 {/* Mapa Interactivo */}
                 <Text style={[styles.fieldLabel, { marginTop: 8 }]}>UBICACIÓN EN MAPA</Text>
                 <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8, marginTop: -4 }}>
-                  Tocá el mapa para ubicar el POI rápidamente.
+                  Buscá una dirección o mové el mapa para ajustar la ubicación exacta.
                 </Text>
-                <View 
-                  style={styles.mapContainer}
-                  onTouchStart={() => setParentScrollEnabled(false)}
-                  onTouchEnd={() => setParentScrollEnabled(true)}
-                  onTouchCancel={() => setParentScrollEnabled(true)}
-                >
-                  <GestionPoisMap
-                    ref={mapRef}
-                    initialRegion={{
-                      latitude: editingPoi?.latitud || -26.8118,
-                      longitude: editingPoi?.longitud || -65.2975,
-                      latitudeDelta: 0.004,
-                      longitudeDelta: 0.004,
-                    }}
-                    onRegionChangeComplete={(region) => {
-                      setCurrentDeltas({
-                        latitudeDelta: region.latitudeDelta,
-                        longitudeDelta: region.longitudeDelta,
-                      });
-                    }}
-                    onPress={handleMapPress}
-                    formLatitud={formLatitud}
-                    formLongitud={formLongitud}
-                    formCategoria={formCategoria}
-                    getCategoriaInfo={getCategoriaInfo}
-                    tacticalMapStyle={tacticalMapStyle}
-                    customMarkerContainerStyle={styles.customMarkerContainer}
-                    customMarkerBubbleStyle={styles.customMarkerBubble}
-                    customMarkerArrowStyle={styles.customMarkerArrow}
-                  />
-                </View>
-
-                {/* Coordenadas */}
-                <View style={styles.coordRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.fieldLabel}>LATITUD</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      placeholder="-26.81180"
-                      placeholderTextColor="#64748b"
-                      value={formLatitud}
-                      onChangeText={setFormLatitud}
-                      onEndEditing={handleCoordInputEnd}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.fieldLabel}>LONGITUD</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      placeholder="-65.29750"
-                      placeholderTextColor="#64748b"
-                      value={formLongitud}
-                      onChangeText={setFormLongitud}
-                      onEndEditing={handleCoordInputEnd}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
+                <LocationPicker
+                  initialLocation={
+                    formLatitud && formLongitud
+                      ? {
+                          latitude: parseFloat(formLatitud),
+                          longitude: parseFloat(formLongitud),
+                        }
+                      : editingPoi
+                      ? {
+                          latitude: editingPoi.latitud,
+                          longitude: editingPoi.longitud,
+                        }
+                      : undefined
+                  }
+                  onLocationSelect={handleLocationSelect}
+                  mapHeight={220}
+                />
 
                 {/* Actions */}
                 <View style={styles.modalActions}>
@@ -1345,34 +1223,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  coordRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   modalActions: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 8,
-  },
-  
-  // Map Container
-  mapContainer: {
-    height: 180,
-    width: '100%',
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  map: {
-    flex: 1,
-  },
-  markerIcon: {
-    padding: 6,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#1e293b',
   },
 
   modalBtn: {
@@ -1430,35 +1284,5 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: 'center',
     marginBottom: 20,
-  },
-  customMarkerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 4,
-  },
-  customMarkerBubble: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3 },
-      android: { elevation: 4 },
-    }),
-  },
-  customMarkerArrow: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 5,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -1,
   },
 });

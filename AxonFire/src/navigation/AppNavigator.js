@@ -126,7 +126,7 @@ function MainTabNavigator() {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Mapa" component={MapScreen} options={{ title: 'Mapa' }} />
-      <Tab.Screen name="Alertas" component={AlertsScreen} options={{ title: 'Centro de Alertas' }} />
+      <Tab.Screen name="Alertas" component={AlertsScreen} options={{ title: 'Alertas' }} />
       <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'Alerta' }} />
       <Tab.Screen name="Emergencia" component={EmergencyScreen} options={{ title: 'Emergencia' }} />
       <Tab.Screen name="Perfil" component={ProfileScreen} options={{ title: 'Perfil' }} />
@@ -140,7 +140,7 @@ function AdminTabBar({ state, descriptors, navigation }) {
 
   // Icon pairs: [inactive (outline), active (filled)]
   const ICON_MAP = {
-    Panel: ['monitor-dashboard-outline', 'monitor-dashboard'],
+    Panel: ['monitor-dashboard', 'monitor-dashboard'],
     Mapa: ['map-outline', 'map'],
     Alertas: ['bell-outline', 'bell'],
     Asistencia: ['clipboard-list-outline', 'clipboard-list'],
@@ -224,7 +224,7 @@ function AdminTabNavigator() {
       <Tab.Screen name="Panel" component={PanelControlScreen} options={{ title: 'Panel' }} />
       <Tab.Screen name="Mapa" component={MapScreen} options={{ title: 'Mapa' }} />
       <Tab.Screen name="SOS" component={NewAlertScreen} options={{ title: 'Alerta' }} />
-      <Tab.Screen name="Alertas" component={AlertsScreen} options={{ title: 'Centro de Alertas' }} />
+      <Tab.Screen name="Alertas" component={AlertsScreen} options={{ title: 'Alertas' }} />
       <Tab.Screen name="Asistencia" component={AdminAttendanceBoardScreen} options={{ title: 'Asistencia' }} />
     </Tab.Navigator>
   );
@@ -249,6 +249,7 @@ export default function AppNavigator() {
           <Stack.Screen name="MainApp" component={MainTabNavigator} />
 
           {/* Pantallas comunes/modales */}
+          <Stack.Screen name="PerfilGlobal" component={ProfileScreen} />
           <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="NewAlert" component={NewAlertScreen} />
 

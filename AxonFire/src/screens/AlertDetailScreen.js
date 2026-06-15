@@ -717,10 +717,10 @@ export default function AlertDetailScreen({ route, navigation }) {
             <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Alerts')}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate(rol === 'ADMIN' ? 'AdminApp' : 'MainApp', { screen: 'Alertas' })}>
             <MaterialCommunityIcons name="bell" size={22} color="#94a3b8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Perfil')}>
+          <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('PerfilGlobal')}>
             <MaterialCommunityIcons name="account" size={20} color="#e2e8f0" />
           </TouchableOpacity>
         </View>

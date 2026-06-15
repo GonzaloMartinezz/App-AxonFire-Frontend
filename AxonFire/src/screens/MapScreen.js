@@ -1,3 +1,15 @@
+// src/screens/MapScreen.js
+// Mapa táctico principal — react-native-maps (nativo)
+//
+// F1: Mapa base nativo + ubicación del usuario en tiempo real
+// F2: Marcador de incidente activo + ruta cuartel→incidente (Polyline)
+// F3: POI markers por categoría con toggle de capas
+//
+// ENDPOINTS:
+//   GET /api/maps/config    → { latitud, longitud }
+//   GET /api/maps/pois      → [{ id, categoria, nombre, descripcion, latitud, longitud }]
+//   GET /alerta/rango       → alertas activas (contador del banner)
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -9,8 +21,13 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Modal,
+  ScrollView,
+  Linking,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
+import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
+import * as Location from 'expo-location';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '../theme';
@@ -20,9 +37,9 @@ import { API_BASE_URL } from '../config/api';
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const FALLBACK_LAT = -26.8083;
 const FALLBACK_LNG = -65.2176;
-const DEFAULT_ZOOM = 15;
+const DEFAULT_DELTA = 0.015;
 
-// F3 — Configuración de cada capa de POI (enum del contrato gestion-pois-api.yaml)
+// F3 — Configuración de cada capa de POI
 const CAPAS_CONFIG = [
   { value: 'HIDRANTE', label: 'Hidrantes', icono: 'water', color: '#1565c0' },
   { value: 'SALUD', label: 'Salud', icono: 'hospital-box', color: '#2e7d32' },
@@ -30,358 +47,75 @@ const CAPAS_CONFIG = [
   { value: 'CUARTEL_APOYO', label: 'Cuarteles', icono: 'shield', color: '#37474f' },
 ];
 
-// ─── HTML + CSS de Leaflet ────────────────────────────────────────────────────
-function generarMapaHTML(lat, lng, zoom) {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        html, body {
-          width: 100%;
-          height: 100%;
-          background: #5a7055;
-        }
-        #map {
-          width: 100%;
-          height: 100vh;
-        }
-        /* Filtro táctico — convierte los tiles en verde sage militar */
-        .leaflet-tile-pane {
-          filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
-        }
-        /* Ocultamos el zoom nativo — usamos los botones del panel de RN */
-        .leaflet-control-zoom {
-          display: none !important;
-        }
-        .leaflet-control-attribution {
-          font-size: 8px !important;
-          background: rgba(26, 28, 35, 0.6) !important;
-          color: #475569 !important;
-        }
-        .leaflet-control-attribution a {
-          color: #64748b !important;
-        }
-        .leaflet-popup-content-wrapper {
-          background: #1a1c23;
-          border: 1px solid #334155;
-          border-radius: 10px;
-          color: #e2e8f0;
-          font-family: sans-serif;
-          font-size: 12px;
-        }
-        .leaflet-popup-tip {
-          background: #1a1c23;
-        }
-        .leaflet-popup-content b { color: #fff; font-size: 13px; }
+const POI_ICONS = {
+  HIDRANTE: 'water',
+  SALUD: 'hospital-box',
+  MATERIAL_PELIGROSO: 'alert-octagon',
+  CUARTEL_APOYO: 'shield',
+};
 
-        /* ── F2: Incident marker pulse animation ── */
-        @keyframes incident-pulse {
-          0%   { transform: scale(1);   opacity: 1;   }
-          50%  { transform: scale(1.8); opacity: 0.3; }
-          100% { transform: scale(2.2); opacity: 0;   }
-        }
-        .incident-marker {
-          position: relative;
-          width: 40px;
-          height: 40px;
-        }
-        .incident-marker .pulse-ring {
-          position: absolute;
-          top: 50%; left: 50%;
-          width: 40px; height: 40px;
-          margin: -20px 0 0 -20px;
-          border-radius: 50%;
-          background: rgba(220,38,38,0.4);
-          animation: incident-pulse 2s ease-out infinite;
-        }
-        .incident-marker .pin {
-          position: absolute;
-          top: 50%; left: 50%;
-          width: 32px; height: 32px;
-          margin: -16px 0 0 -16px;
-          background: #dc2626;
-          border: 3px solid #7f1d1d;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          box-shadow: 0 0 16px rgba(220,38,38,0.7);
-          z-index: 2;
-        }
-        .popup-incident { min-width: 200px; }
-        .popup-incident .popup-title {
-          font-size: 13px; font-weight: 800; color: #fff;
-          margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
-          border-bottom: 1px solid rgba(255,255,255,0.1);
-          padding-bottom: 6px;
-        }
-        .popup-incident .popup-row {
-          display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
-        }
-        .popup-incident .popup-label {
-          font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.5);
-          text-transform: uppercase; letter-spacing: 0.8px; min-width: 65px;
-        }
-        .popup-incident .popup-value {
-          font-size: 12px; font-weight: 600; color: #e2e8f0;
-        }
-        .popup-incident .prioridad-badge {
-          display: inline-block; padding: 2px 8px; border-radius: 6px;
-          font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
-        }
-        .popup-incident .prioridad-ALTA  { background: #dc2626; color: #fff; }
-        .popup-incident .prioridad-MEDIA { background: #f59e0b; color: #1a1c23; }
-        .popup-incident .prioridad-BAJA  { background: #22c55e; color: #1a1c23; }
-      </style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        var map = L.map('map', {
-          center: [${lat}, ${lng}],
-          zoom: ${zoom},
-          zoomControl: false,
-          attributionControl: true,
-        });
+const POI_COLORS = {
+  HIDRANTE: '#1565c0',
+  SALUD: '#2e7d32',
+  MATERIAL_PELIGROSO: '#c2410c',
+  CUARTEL_APOYO: '#37474f',
+};
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; OSM &copy; CartoDB',
-          maxZoom: 19,
-          minZoom: 8,
-          subdomains: 'abcd',
-        }).addTo(map);
-
-        // Marcador del cuartel del usuario logueado
-        var iconCuartel = L.divIcon({
-          className: '',
-          html: '<div style="width:14px;height:14px;background:#263238;border:2.5px solid #dc2626;border-radius:50%;box-shadow:0 0 8px rgba(220,38,38,0.65)"></div>',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-        });
-
-        L.marker([${lat}, ${lng}], { icon: iconCuartel })
-          .addTo(map)
-          .bindPopup('<b>Tu cuartel</b>');
-
-        // Funciones llamadas desde React Native vía injectJavaScript
-        window.zoomIn = function() {
-          map.zoomIn();
-        };
-        window.zoomOut = function() {
-          map.zoomOut();
-        };
-        window.centrarEnCuartel = function() {
-          map.flyTo([${lat}, ${lng}], ${zoom}, { animate: true, duration: 1.0 });
-        };
-
-        // ── F2: Marcador de incidente + ruta cuartel→incidente ────────────
-        var incidentMarker = null;
-        var routeLine = null;
-
-        window.mostrarIncidente = function(data) {
-          if (incidentMarker) { map.removeLayer(incidentMarker); }
-          if (routeLine) { map.removeLayer(routeLine); }
-
-          var iconHtml = '<div class="incident-marker">' +
-            '<div class="pulse-ring"></div>' +
-            '<div class="pin">🔥</div>' +
-            '</div>';
-
-          var incidentIcon = L.divIcon({
-            className: '',
-            html: iconHtml,
-            iconSize: [40, 40],
-            iconAnchor: [20, 20],
-            popupAnchor: [0, -22]
-          });
-
-          var prioClass = 'prioridad-' + (data.nivel_prioridad || 'ALTA');
-          var popupHtml = '<div class="popup-incident">' +
-            '<div class="popup-title">🔥 Incidente Activo</div>' +
-            '<div class="popup-row"><span class="popup-label">Tipo</span><span class="popup-value">' + (data.tipo_emergencia || '—') + '</span></div>' +
-            '<div class="popup-row"><span class="popup-label">Dirección</span><span class="popup-value">' + (data.direccion_exacta || '—') + '</span></div>' +
-            '<div class="popup-row"><span class="popup-label">Prioridad</span><span class="prioridad-badge ' + prioClass + '">' + (data.nivel_prioridad || '—') + '</span></div>' +
-            '</div>';
-
-          incidentMarker = L.marker([data.latitud, data.longitud], { icon: incidentIcon })
-            .addTo(map)
-            .bindPopup(popupHtml, { maxWidth: 260, closeButton: true });
-
-          // Ruta real por calles cuartel → incidente (OSRM, gratuito)
-          var cuartelLat = ${lat}, cuartelLng = ${lng};
-          var incLat = data.latitud, incLng = data.longitud;
-
-          var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/' +
-            cuartelLng + ',' + cuartelLat + ';' +
-            incLng + ',' + incLat +
-            '?overview=full&geometries=geojson';
-
-          fetch(osrmUrl)
-            .then(function(res) { return res.json(); })
-            .then(function(json) {
-              if (json.code === 'Ok' && json.routes && json.routes.length > 0) {
-                var coords = json.routes[0].geometry.coordinates.map(function(c) {
-                  return [c[1], c[0]]; // GeoJSON is [lng,lat], Leaflet needs [lat,lng]
-                });
-                routeLine = L.polyline(coords, {
-                  color: '#dc2626', weight: 4, opacity: 0.85,
-                  dashArray: null, lineJoin: 'round', lineCap: 'round'
-                }).addTo(map);
-
-                // Encuadrar la ruta completa
-                map.fitBounds(routeLine.getBounds(), { padding: [50, 50], animate: true, duration: 1.5 });
-              } else {
-                throw new Error('No route');
-              }
-            })
-            .catch(function() {
-              // Fallback: línea recta si OSRM falla
-              routeLine = L.polyline(
-                [[cuartelLat, cuartelLng], [incLat, incLng]],
-                { color: '#dc2626', weight: 3, dashArray: '10,8', opacity: 0.8 }
-              ).addTo(map);
-              var bounds = L.latLngBounds([cuartelLat, cuartelLng], [incLat, incLng]);
-              map.fitBounds(bounds, { padding: [50, 50], animate: true, duration: 1.5 });
-            });
-        };
-
-        // ── F3: LayerGroups — uno por categoría de POI ────────────────────────────
-        // Permite activar/desactivar cada capa sin recargar datos del backend
-        var capas = {
-          'HIDRANTE':           L.layerGroup().addTo(map),
-          'SALUD':              L.layerGroup().addTo(map),
-          'MATERIAL_PELIGROSO': L.layerGroup().addTo(map),
-          'CUARTEL_APOYO':      L.layerGroup().addTo(map),
-        };
-
-        // ── F3: Íconos SVG por categoría ──────────────────────────────────────────
-        // Gota de agua / Cruz médica / Triángulo de peligro / Escudo de cuartel
-        var ICONOS = {
-          'HIDRANTE': [
-            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-              '<circle cx="14" cy="14" r="13" fill="#1565c0" stroke="white" stroke-width="2"/>',
-              '<path d="M14 6 Q9 12 9 16 Q9 22 14 23 Q19 22 19 16 Q19 12 14 6Z" fill="white"/>',
-            '</svg>',
-          ].join(''),
-          'SALUD': [
-            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-              '<rect x="1" y="1" width="26" height="26" rx="6" fill="#2e7d32" stroke="white" stroke-width="2"/>',
-              '<rect x="12" y="5" width="4" height="18" fill="white"/>',
-              '<rect x="5" y="12" width="18" height="4" fill="white"/>',
-            '</svg>',
-          ].join(''),
-          'MATERIAL_PELIGROSO': [
-            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-              '<polygon points="14,1 27,26 1,26" fill="#c2410c" stroke="white" stroke-width="2"/>',
-              '<rect x="13" y="10" width="2" height="9" fill="white"/>',
-              '<circle cx="14" cy="22" r="1.5" fill="white"/>',
-            '</svg>',
-          ].join(''),
-          'CUARTEL_APOYO': [
-            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-              '<path d="M14 2 L24 6 L24 16 Q24 23 14 26 Q4 23 4 16 L4 6 Z" fill="#37474f" stroke="white" stroke-width="2"/>',
-              '<text x="14" y="18" text-anchor="middle" fill="white" font-size="10" font-weight="bold" font-family="sans-serif">C</text>',
-            '</svg>',
-          ].join(''),
-        };
-
-        // ── F3: Agregar un POI a su LayerGroup ────────────────────────────────────
-        function agregarPOIInterno(lat, lng, categoria, nombre, descripcion) {
-          var grupo = capas[categoria];
-          if (!grupo) return;
-
-          var svgHtml = ICONOS[categoria] || ICONOS['CUARTEL_APOYO'];
-          var icon = L.divIcon({
-            className: '',
-            html: svgHtml,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14],
-            popupAnchor: [0, -16],
-          });
-
-          L.marker([lat, lng], { icon: icon })
-            .addTo(grupo)
-            .bindPopup(
-              '<b>' + (nombre || categoria) + '</b>' +
-              (descripcion ? '<br><span style="color:#9ca3af">' + descripcion + '</span>' : '')
-            );
-        }
-
-        // ── F3: Carga en lote con requestAnimationFrame ────────────────────────────
-        window.cargarPOIsEnLote = function(poisArray) {
-          if (!Array.isArray(poisArray) || poisArray.length === 0) return;
-          var i = 0;
-          var LOTE = 15;
-
-          function procesarChunk() {
-            var fin = Math.min(i + LOTE, poisArray.length);
-            for (; i < fin; i++) {
-              var p = poisArray[i];
-              agregarPOIInterno(
-                p.latitud,
-                p.longitud,
-                p.categoria,
-                p.nombre || '',
-                p.descripcion || ''
-              );
-            }
-            if (i < poisArray.length) {
-              window.requestAnimationFrame(procesarChunk);
-            }
-          }
-          window.requestAnimationFrame(procesarChunk);
-        };
-
-        // ── F3: Toggle de visibilidad por capa ────────────────────────────────────
-        window.toggleCapa = function(categoria, visible) {
-          var grupo = capas[categoria];
-          if (!grupo) return;
-          if (visible && !map.hasLayer(grupo)) map.addLayer(grupo);
-          if (!visible && map.hasLayer(grupo)) map.removeLayer(grupo);
-        };
-
-        // Avisa a React Native que Leaflet terminó de cargar
-        setTimeout(function() {
-          try {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ tipo: 'MAPA_LISTO' }));
-          } catch(e) {}
-        }, 400);
-      </script>
-    </body>
-    </html>
-  `;
-}
+// Estilo táctico oscuro para Google Maps (Android)
+// En iOS se usa Apple Maps estándar (no soporta customMapStyle)
+const tacticalMapStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
+  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b9a76' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#746855' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1f2835' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f3d19c' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
+  { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
+  { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#17263c' }] },
+];
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 export default function MapScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
 
-  const webViewRef = useRef(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const mapRef = useRef(null);
 
+  // Animaciones
+  const bannerPulseAnim = useRef(new Animated.Value(1)).current;
+  const incidentPulseOpacity = useRef(new Animated.Value(1)).current;
+  const incidentPulseScale = useRef(new Animated.Value(1)).current;
+
+  // ── F1 — Estado base ────────────────────────────────────────────────────────
   const [coords, setCoords] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mapaListo, setMapaListo] = useState(false);
+  const [currentRegion, setCurrentRegion] = useState(null);
   const [alertasActivas, setAlertasActivas] = useState(0);
 
-  // F2: Estado del incidente
+  // Ubicación del usuario
+  const [locationGranted, setLocationGranted] = useState(false);
+
+  // F2: Incidente
   const [incidente, setIncidente] = useState(null);
   const [alertasData, setAlertasData] = useState([]);
+  const [routeCoords, setRouteCoords] = useState([]);
+  const [responders, setResponders] = useState([]);
+  const [modalBomberosVisible, setModalBomberosVisible] = useState(false);
 
-  // F3 — Estado del panel de capas
+  // F3: POIs y capas
+  const [pois, setPois] = useState([]);
   const [panelCapasVisible, setPanelCapasVisible] = useState(false);
   const [capasActivas, setCapasActivas] = useState({
     HIDRANTE: true,
@@ -390,6 +124,8 @@ export default function MapScreen({ navigation, route }) {
     CUARTEL_APOYO: true,
   });
 
+  const [routeOrigin, setRouteOrigin] = useState('STATION'); // 'STATION' or 'USER'
+
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
   const headers = {
@@ -397,14 +133,10 @@ export default function MapScreen({ navigation, route }) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  // ─── Handlers auth (igual que antes) ─────────────────────────────────────
+  // ─── Handlers de autenticación ──────────────────────────────────────────────
   const handleAdminPress = () => {
     if (user?.rol === 'ADMIN') {
-      if (isCurrentlyAdmin) {
-        navigation.navigate('MainApp');
-      } else {
-        navigation.navigate('AdminApp');
-      }
+      navigation.navigate(isCurrentlyAdmin ? 'MainApp' : 'AdminApp');
     } else {
       if (Platform.OS === 'web') alert('Esta sección es exclusiva para administradores.');
       else Alert.alert('Acceso Denegado', 'Esta sección es exclusiva para administradores.');
@@ -413,9 +145,7 @@ export default function MapScreen({ navigation, route }) {
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
-      if (window.confirm('¿Deseas cerrar sesión?')) {
-        logout();
-      }
+      if (window.confirm('¿Deseas cerrar sesión?')) logout();
     } else {
       Alert.alert('Cerrar Sesión', '¿Deseas cerrar sesión?', [
         { text: 'Cancelar', style: 'cancel' },
@@ -424,33 +154,137 @@ export default function MapScreen({ navigation, route }) {
     }
   };
 
-  // ─── Animación del punto pulsante ─────────────────────────────────────────
+  const abrirNavegacionGPS = () => {
+    if (!incidente) {
+      Alert.alert('Sin incidente', 'No hay ningún incidente activo seleccionado.');
+      return;
+    }
+    const { latitud, longitud, direccion_exacta } = incidente;
+    const address = direccion_exacta || '';
+    const hasNumber = /\b\d+\b/.test(address);
+    const destination = hasNumber ? encodeURIComponent(address) : `${latitud},${longitud}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          const fallback = hasNumber
+            ? `http://maps.google.com/maps?daddr=${encodeURIComponent(address)}`
+            : `http://maps.google.com/maps?daddr=${latitud},${longitud}`;
+          Linking.openURL(fallback);
+        }
+      })
+      .catch(() => {
+        Alert.alert('Error', 'No se pudo abrir la aplicación de mapas.');
+      });
+  };
+
+  // ─── Controles de mapa ──────────────────────────────────────────────────────
+  function centerOnStation() {
+    if (!coords || !mapRef.current) return;
+    mapRef.current.animateToRegion({
+      latitude: coords.latitud,
+      longitude: coords.longitud,
+      latitudeDelta: DEFAULT_DELTA,
+      longitudeDelta: DEFAULT_DELTA,
+    }, 500);
+  }
+
+  async function centerOnUser() {
+    try {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      mapRef.current?.animateToRegion({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 500);
+    } catch (e) {
+      Alert.alert('Ubicación', 'No se pudo obtener tu ubicación actual.');
+    }
+  }
+
+  function zoomIn() {
+    if (!currentRegion || !mapRef.current) return;
+    mapRef.current.animateToRegion({
+      ...currentRegion,
+      latitudeDelta: currentRegion.latitudeDelta / 2,
+      longitudeDelta: currentRegion.longitudeDelta / 2,
+    }, 300);
+  }
+
+  function zoomOut() {
+    if (!currentRegion || !mapRef.current) return;
+    mapRef.current.animateToRegion({
+      ...currentRegion,
+      latitudeDelta: Math.min(currentRegion.latitudeDelta * 2, 5),
+      longitudeDelta: Math.min(currentRegion.longitudeDelta * 2, 5),
+    }, 300);
+  }
+
+  function handleToggleCapa(categoria) {
+    setCapasActivas(prev => ({ ...prev, [categoria]: !prev[categoria] }));
+  }
+
+  // ─── Animaciones ────────────────────────────────────────────────────────────
+  // Pulso del banner de alertas
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.2, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(bannerPulseAnim, { toValue: 0.2, duration: 800, useNativeDriver: true }),
+        Animated.timing(bannerPulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
 
-  // ─── GET /api/maps/config — centrar en el cuartel del usuario ─────────────
+  // Pulso del marcador de incidente
+  useEffect(() => {
+    if (!incidente) return;
+    const loop = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(incidentPulseScale, { toValue: 2.2, duration: 1500, useNativeDriver: true }),
+          Animated.timing(incidentPulseScale, { toValue: 1, duration: 0, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(incidentPulseOpacity, { toValue: 0, duration: 1500, useNativeDriver: true }),
+          Animated.timing(incidentPulseOpacity, { toValue: 1, duration: 0, useNativeDriver: true }),
+        ]),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [incidente]);
+
+  // ─── F1: Ubicación del usuario ──────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          setLocationGranted(true);
+        }
+      } catch (e) {
+        console.warn('Error requesting location permission:', e);
+      }
+    })();
+  }, []);
+
+  // ─── F1: GET /api/maps/config ───────────────────────────────────────────────
   async function cargarConfig() {
     setCargando(true);
     setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/maps/config`, { headers });
       if (res.status === 401) throw new Error('No autorizado. Volvé a iniciar sesión.');
-      if (res.status === 404) {
-        setCoords({ latitud: FALLBACK_LAT, longitud: FALLBACK_LNG });
-        return;
-      }
       if (!res.ok) throw new Error(`Error ${res.status} al obtener la configuración del mapa.`);
       const data = await res.json();
       if (typeof data.latitud !== 'number' || typeof data.longitud !== 'number') {
-        throw new Error('El servidor no devolvió coordenadas válidas.');
+        throw new Error('Coordenadas inválidas en la respuesta del servidor.');
       }
       setCoords({ latitud: data.latitud, longitud: data.longitud });
     } catch (err) {
@@ -461,150 +295,301 @@ export default function MapScreen({ navigation, route }) {
     }
   }
 
-  // ─── Contador de alertas activas (últimas 24hs) ───────────────────────────
+  // ─── F1: Contador de alertas activas ────────────────────────────────────────
   async function cargarAlertasActivas() {
     try {
       const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 86400000).toISOString();
-      const res = await fetch(`${API_BASE_URL}/alerta/rango`, {
-        method: 'GET',
-        headers,
-        body: JSON.stringify({ fecha_desde: desde, fecha_hasta: hasta }),
-      });
+      const url = `${API_BASE_URL}/alerta/rango?fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}`;
+      const res = await fetch(url, { method: 'GET', headers });
       if (!res.ok) return;
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setAlertasActivas(data.length);
-        setAlertasData(data);
-      }
+      const rawList = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+
+      // Filtrar alertas finalizadas / resueltas / cerradas
+      const list = rawList.filter(a => {
+        const estadoObj = a.estadoAlerta || a.estado || {};
+        const nombreEstado = typeof estadoObj === 'string'
+          ? estadoObj
+          : (estadoObj.nombre_estado || estadoObj.nombre || '');
+        const e = nombreEstado.toUpperCase();
+        if (e === 'FINALIZADO' || e.includes('RESUEL') || e.includes('CERRAD')) return false;
+        return true;
+      });
+
+      list.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora));
+      setAlertasActivas(list.length);
+      setAlertasData(list);
     } catch (_) { }
   }
 
-  // ─── F2: GET /api/maps/incidents/{id} — datos del incidente activo ────────
+  // ─── F2: Incidente activo ───────────────────────────────────────────────────
   async function cargarIncidente(idIncidente) {
     if (!idIncidente) return;
     try {
       const res = await fetch(`${API_BASE_URL}/api/maps/incidents/${idIncidente}`, { headers });
       if (!res.ok) return;
       const data = await res.json();
-      if (typeof data.latitud === 'number' && typeof data.longitud === 'number') {
-        setIncidente(data);
+      const lat = parseFloat(data.latitud);
+      const lng = parseFloat(data.longitud);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setIncidente({ ...data, latitud: lat, longitud: lng });
       }
+      cargarResponders(idIncidente);
     } catch (_) { }
   }
 
-  // ─── F3: GET /api/maps/pois → inyección en lote ──────────────────────────
+  async function cargarResponders(idIncidente) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/respuestas_alertas/${idIncidente}`, { headers });
+      if (!res.ok) return;
+      const responsesData = await res.json();
+      const aceptados = (Array.isArray(responsesData) ? responsesData : [])
+        .filter(r => r.estado_respuesta === 'ACEPTADO')
+        .map((r, i) => {
+          const b = r.usuarioId?.bombero || r.bombero || {};
+          return {
+            id: r.id || String(i),
+            name: `${b.nombre || 'B.'} ${b.apellido || ''}`.trim().toUpperCase(),
+            role: b.rangoBombero?.nombre_rol || b.rango || 'BOMBERO',
+            hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—',
+          };
+        });
+      setResponders(aceptados);
+    } catch (_) { }
+  }
+
+  // ─── F2: Ruta cuartel → incidente (OSRM) ───────────────────────────────────
+  async function fetchRoute(cuartelLat, cuartelLng, incLat, incLng) {
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${cuartelLng},${cuartelLat};${incLng},${incLat}?overview=full&geometries=geojson`;
+      const res = await fetch(osrmUrl);
+      const json = await res.json();
+
+      if (json.code === 'Ok' && json.routes?.length > 0) {
+        const routePoints = json.routes[0].geometry.coordinates.map(c => ({
+          latitude: c[1],
+          longitude: c[0],
+        }));
+        setRouteCoords(routePoints);
+
+        // Ajustar cámara para ver toda la ruta
+        if (mapRef.current && routePoints.length > 1) {
+          mapRef.current.fitToCoordinates(routePoints, {
+            edgePadding: { top: 120, right: 60, bottom: 120, left: 60 },
+            animated: true,
+          });
+        }
+      } else {
+        throw new Error('No route');
+      }
+    } catch (_) {
+      // Fallback: línea recta
+      setRouteCoords([
+        { latitude: cuartelLat, longitude: cuartelLng },
+        { latitude: incLat, longitude: incLng },
+      ]);
+    }
+  }
+
+  // ─── F3: Cargar POIs ────────────────────────────────────────────────────────
   async function cargarPOIs() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/maps/pois`, { headers });
       if (!res.ok) return;
-      const poisData = await res.json();
-      if (!Array.isArray(poisData) || poisData.length === 0) return;
-
-      const poisSanitizados = poisData.map(p => ({
-        latitud: p.latitud,
-        longitud: p.longitud,
-        categoria: p.categoria,
-        nombre: (p.nombre || '').replace(/'/g, "\\'"),
-        descripcion: (p.descripcion || '').replace(/'/g, "\\'"),
-      }));
-
-      const json = JSON.stringify(poisSanitizados);
-      webViewRef.current?.injectJavaScript(`cargarPOIsEnLote(${json}); true;`);
+      const data = await res.json();
+      if (Array.isArray(data)) setPois(data);
     } catch (err) {
       console.warn('[MapScreen/F3] POIs:', err.message);
     }
   }
 
-  // ─── Carga inicial de datos ───────────────────────────────────────────────
+  // ─── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
     cargarConfig();
-    cargarAlertasActivas();
+    cargarPOIs();
 
-    // Si viene un incidenteId/alertaId por route params, cargarlo directamente
     const paramId = route?.params?.incidenteId || route?.params?.alertaId;
-    if (paramId) {
-      cargarIncidente(paramId);
-    }
+    if (paramId) cargarIncidente(paramId);
   }, []);
 
-  // ─── Cargar incidente si cambian los parámetros de la ruta ────────────────
+  // Recargar alertas cada vez que la pantalla obtiene el foco
+  useFocusEffect(
+    React.useCallback(() => {
+      cargarAlertasActivas();
+    }, [token])
+  );
+
+  // Cargar incidente si cambian los parámetros de ruta
   useEffect(() => {
     const paramId = route?.params?.incidenteId || route?.params?.alertaId;
-    if (paramId) {
-      cargarIncidente(paramId);
-    }
+    if (paramId) cargarIncidente(paramId);
   }, [route?.params?.incidenteId, route?.params?.alertaId]);
 
-  // ─── Auto-carga de incidente desde alertas activas (sin ID explícito) ─────
+  // Auto-carga de incidente desde alertas activas
   useEffect(() => {
     const paramId = route?.params?.incidenteId || route?.params?.alertaId;
-    if (!paramId && alertasData.length > 0 && !incidente) {
+    if (!paramId && alertasData.length > 0) {
       const primeraAlerta = alertasData[0];
       const id = primeraAlerta.id || primeraAlerta.id_alerta;
-      if (id) {
-        cargarIncidente(id);
-      }
+      const idIncidenteActual = incidente?.id || incidente?.id_alerta;
+      if (id && idIncidenteActual !== id) cargarIncidente(id);
+    } else if (!paramId && alertasData.length === 0 && incidente) {
+      setIncidente(null);
+      setRouteCoords([]);
     }
   }, [alertasData]);
 
-  // ─── F2: Inyectar incidente en Leaflet cuando mapa + datos estén listos ───
+  // Dibujar ruta cuando hay incidente + coordenadas
   useEffect(() => {
-    if (mapaListo && incidente) {
-      const js = `mostrarIncidente(${JSON.stringify(incidente)}); true;`;
-      webViewRef.current?.injectJavaScript(js);
+    async function updateRoute() {
+      if (!incidente) {
+        setRouteCoords([]);
+        return;
+      }
+
+      let originLat, originLng;
+
+      if (routeOrigin === 'USER' && locationGranted) {
+        try {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          originLat = loc.coords.latitude;
+          originLng = loc.coords.longitude;
+        } catch (e) {
+          Alert.alert('Error', 'No se pudo obtener tu ubicación actual.');
+          setRouteOrigin('STATION');
+          return;
+        }
+      } else if (coords) {
+        originLat = coords.latitud;
+        originLng = coords.longitud;
+      } else {
+        return;
+      }
+
+      fetchRoute(originLat, originLng, incidente.latitud, incidente.longitud);
     }
-  }, [mapaListo, incidente]);
 
-  // Cuando Leaflet confirma que cargó → inyectar los POIs
-  useEffect(() => {
-    if (!mapaListo) return;
-    cargarPOIs();
-  }, [mapaListo]);
+    updateRoute();
+  }, [incidente, coords, routeOrigin, locationGranted]);
 
-  // ─── F3: Toggle de visibilidad de una capa ───────────────────────────────
-  function handleToggleCapa(categoria) {
-    const nuevoEstado = !capasActivas[categoria];
-    setCapasActivas(prev => ({ ...prev, [categoria]: nuevoEstado }));
-    webViewRef.current?.injectJavaScript(
-      `toggleCapa('${categoria}', ${nuevoEstado}); true;`
-    );
-  }
-
-  // ─── Mensajes desde Leaflet → React Native ────────────────────────────────
-  function onMensajeWebView({ nativeEvent: { data } }) {
-    try {
-      const msg = JSON.parse(data);
-      if (msg.tipo === 'MAPA_LISTO') setMapaListo(true);
-    } catch (_) { }
-  }
-
+  // ─── Valores derivados ──────────────────────────────────────────────────────
   const lat = coords?.latitud ?? FALLBACK_LAT;
   const lng = coords?.longitud ?? FALLBACK_LNG;
-  const mapHTML = coords ? generarMapaHTML(lat, lng, DEFAULT_ZOOM) : null;
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const initialRegion = {
+    latitude: lat,
+    longitude: lng,
+    latitudeDelta: DEFAULT_DELTA,
+    longitudeDelta: DEFAULT_DELTA,
+  };
+
+  const poisVisibles = pois.filter(p => capasActivas[p.categoria]);
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ── Mapa Leaflet real — reemplaza el LinearGradient anterior ── */}
-      {mapHTML && (
-        <WebView
-          ref={webViewRef}
+      {/* ── F1: Mapa nativo ──────────────────────────────────────────────── */}
+      {coords && (
+        <MapView
+          ref={mapRef}
           style={StyleSheet.absoluteFill}
-          source={{ html: mapHTML }}
-          originWhitelist={['*']}
-          javaScriptEnabled
-          domStorageEnabled
-          scrollEnabled={false}
-          onMessage={onMensajeWebView}
-          mixedContentMode="always"
-          {...(Platform.OS === 'android' && { androidLayerType: 'hardware' })}
-        />
+          initialRegion={initialRegion}
+          customMapStyle={Platform.OS === 'android' ? tacticalMapStyle : undefined}
+          showsUserLocation={locationGranted}
+          showsMyLocationButton={false}
+          showsCompass={false}
+          showsScale={false}
+          rotateEnabled={false}
+          onMapReady={() => setMapaListo(true)}
+          onRegionChangeComplete={region => setCurrentRegion(region)}
+        >
+          {/* Marcador del cuartel */}
+          <Marker
+            coordinate={{ latitude: lat, longitude: lng }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.stationMarker} />
+            <Callout>
+              <View style={styles.calloutBox}>
+                <Text style={styles.calloutTitle}>Tu cuartel</Text>
+              </View>
+            </Callout>
+          </Marker>
+
+          {/* F3: POI markers (filtrados por capas activas) */}
+          {poisVisibles.map((poi, idx) => {
+            const color = POI_COLORS[poi.categoria] || '#37474f';
+            const icon = POI_ICONS[poi.categoria] || 'map-marker';
+
+            return (
+              <Marker
+                key={poi.id || `poi-${idx}`}
+                coordinate={{
+                  latitude: parseFloat(poi.latitud),
+                  longitude: parseFloat(poi.longitud),
+                }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+              >
+                <View style={[styles.poiMarker, { backgroundColor: color }]}>
+                  <MaterialCommunityIcons name={icon} size={14} color="#fff" />
+                </View>
+                <Callout>
+                  <View style={styles.calloutBox}>
+                    <Text style={styles.calloutTitle}>{poi.nombre || poi.categoria}</Text>
+                    {poi.descripcion ? (
+                      <Text style={styles.calloutDesc}>{poi.descripcion}</Text>
+                    ) : null}
+                  </View>
+                </Callout>
+              </Marker>
+            );
+          })}
+
+          {/* F2: Marcador de incidente con pulso */}
+          {incidente && (
+            <Marker
+              coordinate={{ latitude: incidente.latitud, longitude: incidente.longitud }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={true}
+              onPress={() => setModalBomberosVisible(true)}
+            >
+              <View style={styles.incidentMarkerContainer}>
+                <Animated.View
+                  style={[
+                    styles.incidentPulseRing,
+                    {
+                      opacity: incidentPulseOpacity,
+                      transform: [{ scale: incidentPulseScale }],
+                    },
+                  ]}
+                />
+                <View style={styles.incidentPin}>
+                  <Text style={{ fontSize: 16 }}>🔥</Text>
+                </View>
+              </View>
+            </Marker>
+          )}
+
+          {/* F2: Ruta cuartel → incidente */}
+          {routeCoords.length > 1 && (
+            <Polyline
+              coordinates={routeCoords}
+              strokeColor="#dc2626"
+              strokeWidth={4}
+              lineDashPattern={null}
+              lineJoin="round"
+              lineCap="round"
+            />
+          )}
+        </MapView>
       )}
 
-      {/* ── Top Overlay (igual que antes) ── */}
+      {/* ── Header + Mission card ────────────────────────────────────────── */}
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerBar}>
           <View style={styles.headerLeft}>
@@ -629,68 +614,96 @@ export default function MapScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Mission Status Card (igual que antes) */}
-        <View style={styles.missionCard}>
-          <View style={styles.missionLeft}>
-            <Text style={styles.missionLabel}>ESTADO DE MISIÓN</Text>
-            <View style={styles.missionStatusRow}>
-              <View style={styles.statusDotRed} />
-              <Text style={styles.missionStatus}>INCIDENTE EN{'\n'}PROGRESO</Text>
+        {incidente && (
+          <View style={styles.missionCard}>
+            <View style={styles.missionLeft}>
+              <Text style={styles.missionLabel}>ESTADO DE MISIÓN</Text>
+              <View style={styles.missionStatusRow}>
+                <View style={styles.statusDotRed} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.missionStatus} numberOfLines={1}>{incidente.tipo_emergencia || 'INCIDENTE EN PROGRESO'}</Text>
+                  <Text style={styles.missionLocation} numberOfLines={1}>{incidente.direccion_exacta || 'Ubicación no especificada'}</Text>
+                </View>
+              </View>
             </View>
+            <View style={styles.missionDivider} />
+            <TouchableOpacity
+              style={styles.missionRightContainer}
+              activeOpacity={0.7}
+              onPress={() => setModalBomberosVisible(true)}
+            >
+              <View style={styles.missionRight}>
+                <Text style={styles.missionLabel}>RESPONDIENDO</Text>
+                <Text style={styles.respondersCount}>{responders.length} UNIDADES</Text>
+                <Text style={styles.respondersStatus}>ACTIVAS</Text>
+              </View>
+              <View style={styles.avatarStack}>
+                {responders.slice(0, 2).map((r, i) => (
+                  <View key={r.id} style={[styles.miniAvatar, { marginLeft: i > 0 ? -8 : 0, backgroundColor: i === 0 ? Colors.warningOrange : Colors.secondary }]}>
+                    <MaterialCommunityIcons name="account" size={12} color="#fff" />
+                  </View>
+                ))}
+                {responders.length > 2 && (
+                  <View style={[styles.miniAvatar, { marginLeft: -8, backgroundColor: Colors.primary }]}>
+                    <Text style={styles.avatarCount}>+{responders.length - 2}</Text>
+                  </View>
+                )}
+                {responders.length === 0 && (
+                  <View style={[styles.miniAvatar, { backgroundColor: '#475569' }]}>
+                    <MaterialCommunityIcons name="account-off" size={12} color="#fff" />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
-          <View style={styles.missionDivider} />
-          <View style={styles.missionRight}>
-            <Text style={styles.missionLabel}>RESPONDIENDO</Text>
-            <Text style={styles.respondersCount}>12 UNIDADES</Text>
-            <Text style={styles.respondersStatus}>ACTIVAS</Text>
-          </View>
-          <View style={styles.avatarStack}>
-            <View style={[styles.miniAvatar, { backgroundColor: Colors.warningOrange }]}>
-              <MaterialCommunityIcons name="account" size={12} color="#fff" />
-            </View>
-            <View style={[styles.miniAvatar, { marginLeft: -8, backgroundColor: Colors.secondary }]}>
-              <MaterialCommunityIcons name="account" size={12} color="#fff" />
-            </View>
-            <View style={[styles.miniAvatar, { marginLeft: -8, backgroundColor: Colors.primary }]}>
-              <Text style={styles.avatarCount}>+10</Text>
-            </View>
-          </View>
-        </View>
+        )}
       </View>
 
-      {/* ── Map Controls — botones conectados a Leaflet ── */}
+      {/* ── Controles del mapa ───────────────────────────────────────────── */}
       <View style={[styles.mapControls, { bottom: 120 }]}>
-        <TouchableOpacity
-          style={[styles.controlBtn, panelCapasVisible && styles.controlBtnActivo]}
-          onPress={() => setPanelCapasVisible(v => !v)}
-        >
-          <MaterialCommunityIcons
-            name="layers-outline"
-            size={20}
-            color={panelCapasVisible ? '#fff' : Colors.onSurface}
-          />
+        {/* Capas */}
+        <TouchableOpacity style={styles.controlBtn} onPress={() => setPanelCapasVisible(!panelCapasVisible)}>
+          <MaterialCommunityIcons name="layers-outline" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => webViewRef.current?.injectJavaScript('centrarEnCuartel(); true;')}
-        >
+
+        {/* Origen de Ruta */}
+        {incidente && locationGranted && (
+          <TouchableOpacity 
+            style={[styles.controlBtn, routeOrigin === 'USER' && { backgroundColor: '#fef2f2' }]} 
+            onPress={() => setRouteOrigin(routeOrigin === 'STATION' ? 'USER' : 'STATION')}
+          >
+            <MaterialCommunityIcons 
+              name={routeOrigin === 'STATION' ? 'fire-truck' : 'account-map'} 
+              size={20} 
+              color={routeOrigin === 'USER' ? Colors.primary : Colors.onSurface} 
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Centrar en mi ubicación */}
+        {locationGranted && (
+          <TouchableOpacity style={styles.controlBtn} onPress={centerOnUser}>
+            <MaterialCommunityIcons name="crosshairs-gps" size={20} color={Colors.onSurface} />
+          </TouchableOpacity>
+        )}
+
+        {/* Centrar en cuartel */}
+        <TouchableOpacity style={styles.controlBtn} onPress={centerOnStation}>
           <MaterialIcons name="my-location" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => webViewRef.current?.injectJavaScript('zoomIn(); true;')}
-        >
+
+        {/* Zoom in */}
+        <TouchableOpacity style={styles.controlBtn} onPress={zoomIn}>
           <MaterialCommunityIcons name="plus" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => webViewRef.current?.injectJavaScript('zoomOut(); true;')}
-        >
+
+        {/* Zoom out */}
+        <TouchableOpacity style={styles.controlBtn} onPress={zoomOut}>
           <MaterialCommunityIcons name="minus" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
       </View>
 
-      {/* F3 — Panel de capas (aparece cuando se toca el botón layers) */}
+      {/* ── F3: Panel de capas ───────────────────────────────────────────── */}
       {panelCapasVisible && mapaListo && (
         <View style={[styles.panelCapas, { bottom: 180 }]}>
           <Text style={styles.panelCapasTitulo}>CAPAS</Text>
@@ -718,7 +731,7 @@ export default function MapScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* ── Admin FAB (igual que antes) ── */}
+      {/* ── Admin FAB ────────────────────────────────────────────────────── */}
       {user?.rol === 'ADMIN' && (
         <TouchableOpacity
           style={styles.floatingMapFab}
@@ -729,28 +742,42 @@ export default function MapScreen({ navigation, route }) {
         </TouchableOpacity>
       )}
 
-      {/* ── Banner alertas activas ── */}
+      {/* ── Botón de navegación GPS ──────────────────────────────────────── */}
+      {incidente && (
+        <TouchableOpacity
+          style={[
+            styles.floatingMapFab,
+            { left: (user?.rol === 'ADMIN') ? Spacing.lg + 64 : Spacing.lg },
+          ]}
+          onPress={abrirNavegacionGPS}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="google-maps" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* ── F1: Banner alertas activas ────────────────────────────────────── */}
       {mapaListo && alertasActivas > 0 && (
         <View style={[styles.bannerAlertas, { top: insets.top + 14 }]}>
-          <Animated.View style={[styles.puntoPulso, { opacity: pulseAnim }]} />
+          <Animated.View style={[styles.puntoPulso, { opacity: bannerPulseAnim }]} />
           <Text style={styles.bannerTexto}>
             {alertasActivas} {alertasActivas === 1 ? 'alerta activa' : 'alertas activas'}
           </Text>
         </View>
       )}
 
-      {/* ── Loading overlay ── */}
+      {/* ── F1: Loading overlay ──────────────────────────────────────────── */}
       {(cargando || (!mapaListo && !error)) && (
         <View style={styles.overlayLoading}>
           <ActivityIndicator size="large" color="#dc2626" />
           <Text style={styles.overlayTitulo}>Cargando mapa...</Text>
           <Text style={styles.overlaySubtitulo}>
-            {cargando ? 'Obteniendo ubicación del cuartel' : 'Inicializando mapa'}
+            {cargando ? 'Obteniendo ubicación del cuartel' : 'Inicializando mapa nativo'}
           </Text>
         </View>
       )}
 
-      {/* ── Error no bloqueante ── */}
+      {/* ── F1: Error no bloqueante ──────────────────────────────────────── */}
       {error && mapaListo && (
         <View style={[styles.bannerError, { top: insets.top + 14 }]}>
           <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#fca5a5" />
@@ -765,16 +792,157 @@ export default function MapScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* ── Modal: Detalles de Misión + Bomberos respondiendo ────────────── */}
+      <Modal visible={modalBomberosVisible} animationType="slide" transparent={true} onRequestClose={() => setModalBomberosVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Detalles de Misión</Text>
+              <TouchableOpacity onPress={() => setModalBomberosVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+
+              {/* Mission Details Section */}
+              <View style={styles.missionDetailsSection}>
+                <View style={styles.missionDetailRow}>
+                  <MaterialCommunityIcons name="alert-decagram" size={20} color="#e11d48" />
+                  <View style={styles.missionDetailTextContainer}>
+                    <Text style={styles.missionDetailLabel}>TIPO DE EMERGENCIA</Text>
+                    <Text style={styles.missionDetailValue}>{incidente?.tipo_emergencia || 'No especificado'}</Text>
+                  </View>
+                </View>
+                <View style={styles.missionDetailRow}>
+                  <MaterialCommunityIcons name="map-marker" size={20} color="#38bdf8" />
+                  <View style={styles.missionDetailTextContainer}>
+                    <Text style={styles.missionDetailLabel}>UBICACIÓN</Text>
+                    <Text style={styles.missionDetailValue}>{incidente?.direccion_exacta || 'Ubicación no especificada'}</Text>
+                  </View>
+                </View>
+                {incidente?.observaciones ? (
+                  <View style={styles.missionDetailRow}>
+                    <MaterialCommunityIcons name="text-box-outline" size={20} color="#94a3b8" />
+                    <View style={styles.missionDetailTextContainer}>
+                      <Text style={styles.missionDetailLabel}>DESCRIPCIÓN</Text>
+                      <Text style={styles.missionDetailValue}>{incidente.observaciones}</Text>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.modalDivider} />
+
+              <Text style={styles.sectionSubtitle}>ASISTENCIA DE BOMBEROS</Text>
+              {responders.length === 0 ? (
+                <Text style={styles.modalEmpty}>Aún no hay bomberos respondiendo a esta alerta.</Text>
+              ) : (
+                responders.map((r) => (
+                  <View key={r.id} style={styles.responderItem}>
+                    <View style={styles.responderAvatar}>
+                      <MaterialCommunityIcons name="account" size={20} color="#fff" />
+                    </View>
+                    <View style={styles.responderInfo}>
+                      <Text style={styles.responderName}>{r.name}</Text>
+                      <Text style={styles.responderRole}>{r.role}</Text>
+                    </View>
+                    <View style={styles.responderStatusBadge}>
+                      <Text style={styles.responderStatusText}>EN CAMINO</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity style={styles.returnButton} onPress={() => setModalBomberosVisible(false)}>
+              <Text style={styles.returnButtonText}>VOLVER AL MAPA</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-// ─── ESTILOS CORRESPONDIENTES , SIGO LA ESTRUCTURA DE LAS DEMAS SCREENS  ───────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#5a7055',
+    backgroundColor: '#242f3e',
   },
+
+  // ── Markers nativos ─────────────────────────────────────────────────────────
+  stationMarker: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#263238',
+    borderWidth: 2.5,
+    borderColor: '#dc2626',
+    ...Platform.select({
+      ios: { shadowColor: '#dc2626', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.65, shadowRadius: 4 },
+      android: { elevation: 6 },
+    }),
+  },
+  poiMarker: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3 },
+      android: { elevation: 4 },
+    }),
+  },
+  incidentMarkerContainer: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  incidentPulseRing: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(220,38,38,0.4)',
+  },
+  incidentPin: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#dc2626',
+    borderWidth: 3,
+    borderColor: '#7f1d1d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#dc2626', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 8 },
+      android: { elevation: 8 },
+    }),
+  },
+
+  // ── Callout ─────────────────────────────────────────────────────────────────
+  calloutBox: {
+    minWidth: 120,
+    maxWidth: 250,
+    padding: 4,
+  },
+  calloutTitle: {
+    fontWeight: '800',
+    fontSize: 13,
+    color: '#1a1c23',
+  },
+  calloutDesc: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+
+  // ── Header ──────────────────────────────────────────────────────────────────
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -808,7 +976,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     color: '#fff',
     textTransform: 'uppercase',
-    textShadow: '0px 1px 4px rgba(0,0,0,0.3)',
+    ...Platform.select({
+      ios: {},
+      android: {},
+      web: { textShadow: '0px 1px 4px rgba(0,0,0,0.3)' },
+    }),
   },
   emergencyIcon: {
     width: 36,
@@ -818,6 +990,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  // ── Mission card ────────────────────────────────────────────────────────────
   missionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -826,9 +1000,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
   },
-  missionLeft: {
-    flex: 1,
-  },
+  missionLeft: { flex: 1 },
   missionLabel: {
     fontSize: 8,
     fontWeight: '800',
@@ -855,15 +1027,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     lineHeight: 14,
   },
+  missionLocation: {
+    fontSize: 9,
+    color: '#94a3b8',
+    marginTop: 1,
+  },
   missionDivider: {
     width: 1,
     height: 32,
     backgroundColor: 'rgba(255,255,255,0.15)',
     marginHorizontal: Spacing.sm,
   },
-  missionRight: {
-    alignItems: 'flex-start',
+  missionRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
+  missionRight: { alignItems: 'flex-start' },
   respondersCount: {
     fontSize: 12,
     fontWeight: '900',
@@ -894,6 +1074,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+
+  // ── Controles del mapa ──────────────────────────────────────────────────────
   mapControls: {
     position: 'absolute',
     right: Spacing.lg,
@@ -907,9 +1089,6 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  controlBtnActivo: {
-    backgroundColor: '#1d4ed8',
   },
   floatingMapFab: {
     position: 'absolute',
@@ -935,10 +1114,10 @@ const styles = StyleSheet.create({
     }),
   },
 
-  // ── F3: Panel de capas ────────────────────────────────────────────────────────
+  // ── F3: Panel de capas ──────────────────────────────────────────────────────
   panelCapas: {
     position: 'absolute',
-    right: Spacing.lg + 48,  // a la izquierda del panel de controles
+    right: Spacing.lg + 48,
     backgroundColor: '#1a1c23',
     borderRadius: 12,
     borderWidth: 1,
@@ -993,7 +1172,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f2937',
   },
 
-  // ── Nuevos estilos F1 ─────────────────────────────────────────────────────
+  // ── F1: Banner alertas ──────────────────────────────────────────────────────
   bannerAlertas: {
     position: 'absolute',
     left: 16,
@@ -1027,6 +1206,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+
+  // ── F1: Loading overlay ─────────────────────────────────────────────────────
   overlayLoading: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0a0f12',
@@ -1047,6 +1228,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
+
+  // ── F1: Error banner ────────────────────────────────────────────────────────
   bannerError: {
     position: 'absolute',
     left: 16,
@@ -1067,5 +1250,136 @@ const styles = StyleSheet.create({
     color: '#fca5a5',
     fontSize: 10,
     fontWeight: '600',
+  },
+
+  // ── Modal Bomberos ──────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '70%',
+    backgroundColor: '#1a1c23',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  modalScroll: {
+    marginTop: 10,
+  },
+  modalEmpty: {
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 14,
+  },
+  responderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  responderAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  responderInfo: {
+    flex: 1,
+  },
+  responderName: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  responderRole: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  responderStatusBadge: {
+    backgroundColor: 'rgba(16,185,129,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  responderStatusText: {
+    color: '#10b981',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  missionDetailsSection: {
+    backgroundColor: '#0f172a',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  missionDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  missionDetailTextContainer: {
+    flex: 1,
+  },
+  missionDetailLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 1,
+  },
+  missionDetailValue: {
+    fontSize: 14,
+    color: '#f8fafc',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#334155',
+    marginBottom: 16,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  returnButton: {
+    backgroundColor: '#e11d48',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  returnButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });
