@@ -1,11 +1,3 @@
-// src/screens/NewAlertScreen.js
-// Cambios respecto al original:
-//   ✅ Agrega latitud y longitud al body del POST (requeridos por el contrato)
-//   ✅ Mini-mapa Leaflet embebido: tocás el mapa → se auto-llenan las coordenadas
-//   ✅ Inputs manuales de lat/lng si el usuario prefiere tipearlos
-//   ✅ Elimina handleGeoLocate (tenía referencias a Location y setIsLocating no definidas)
-//   ✅ Validación: no permite enviar si no hay coordenadas
-
 import React, { useState, useRef } from 'react';
 import {
   ScrollView,
@@ -630,7 +622,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   mapaContenedor: {
-    height: 200,
+    height: 350,
     borderRadius: 4,
     overflow: 'hidden',
     backgroundColor: '#26282f',
@@ -689,18 +681,20 @@ const styles = StyleSheet.create({
   // ── Botones y acciones ────────────────────────────────────────────────────
   primaryButton: {
     borderRadius: 4,
-    height: 54,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
     marginTop: 12,
+    paddingHorizontal: 10,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1,
+    textAlign: 'center',
   },
   bottomActions: {
     flexDirection: 'row',

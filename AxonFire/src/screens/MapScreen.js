@@ -18,6 +18,8 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -200,8 +202,7 @@ function generarMapaHTML(lat, lng, zoom) {
             className: '',
             html: iconHtml,
             iconSize: [40, 40],
-            iconAnchor: [20, 20],
-            popupAnchor: [0, -22]
+            iconAnchor: [20, 20]
           });
 
           var prioClass = 'prioridad-' + (data.nivel_prioridad || 'ALTA');
@@ -210,11 +211,15 @@ function generarMapaHTML(lat, lng, zoom) {
             '<div class="popup-row"><span class="popup-label">Tipo</span><span class="popup-value">' + (data.tipo_emergencia || '—') + '</span></div>' +
             '<div class="popup-row"><span class="popup-label">Dirección</span><span class="popup-value">' + (data.direccion_exacta || '—') + '</span></div>' +
             '<div class="popup-row"><span class="popup-label">Prioridad</span><span class="prioridad-badge ' + prioClass + '">' + (data.nivel_prioridad || '—') + '</span></div>' +
+            '<div style="margin-top:8px;text-align:center;"><button onclick="window.ReactNativeWebView.postMessage(JSON.stringify({ tipo: \\\'ABRIR_MODAL_INCIDENTE\\\' }))" style="background:#dc2626;color:white;border:none;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:bold;">VER DETALLES COMPLETOS</button></div>' +
             '</div>';
 
           incidentMarker = L.marker([data.latitud, data.longitud], { icon: incidentIcon })
             .addTo(map)
-            .bindPopup(popupHtml, { maxWidth: 260, closeButton: true });
+            .bindPopup(popupHtml, { maxWidth: 260, closeButton: true })
+            .on('click', function() {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ tipo: 'ABRIR_MODAL_INCIDENTE' }));
+            });
 
           var cuartelLat = ${lat}, cuartelLng = ${lng};
           var incLat = data.latitud, incLng = data.longitud;
@@ -384,6 +389,9 @@ export default function MapScreen({ navigation, route }) {
     CUARTEL_APOYO: true,
   });
 
+  const [responders, setResponders] = useState([]);
+  const [modalBomberosVisible, setModalBomberosVisible] = useState(false);
+
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
   const headers = {
@@ -474,6 +482,27 @@ export default function MapScreen({ navigation, route }) {
       if (typeof data.latitud === 'number' && typeof data.longitud === 'number') {
         setIncidente(data);
       }
+      cargarResponders(idIncidente);
+    } catch (_) { }
+  }
+
+  async function cargarResponders(idIncidente) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/respuestas_alertas/${idIncidente}`, { headers });
+      if (!res.ok) return;
+      const responsesData = await res.json();
+      const aceptados = (Array.isArray(responsesData) ? responsesData : [])
+        .filter(r => r.estado_respuesta === 'ACEPTADO')
+        .map((r, i) => {
+          const b = r.usuarioId?.bombero || r.bombero || {};
+          return {
+            id: r.id || String(i),
+            name: `${b.nombre || 'B.'} ${b.apellido || ''}`.trim().toUpperCase(),
+            role: b.rangoBombero?.nombre_rol || b.rango || 'BOMBERO',
+            hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
+          };
+        });
+      setResponders(aceptados);
     } catch (_) { }
   }
 
@@ -559,6 +588,7 @@ export default function MapScreen({ navigation, route }) {
     try {
       const msg = JSON.parse(data);
       if (msg.tipo === 'MAPA_LISTO') setMapaListo(true);
+      if (msg.tipo === 'ABRIR_MODAL_INCIDENTE') setModalBomberosVisible(true);
     } catch (_) { }
   }
 
@@ -612,37 +642,54 @@ export default function MapScreen({ navigation, route }) {
           </View>
         </View>
 
-        <View style={styles.missionCard}>
-          <View style={styles.missionLeft}>
-            <Text style={styles.missionLabel}>ESTADO DE MISIÓN</Text>
-            <View style={styles.missionStatusRow}>
-              <View style={styles.statusDotRed} />
-              <Text style={styles.missionStatus}>INCIDENTE EN{'\n'}PROGRESO</Text>
+        {incidente && (
+          <View style={styles.missionCard}>
+            <View style={styles.missionLeft}>
+              <Text style={styles.missionLabel}>ESTADO DE MISIÓN</Text>
+              <View style={styles.missionStatusRow}>
+                <View style={styles.statusDotRed} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.missionStatus} numberOfLines={1}>{incidente.tipo_emergencia || 'INCIDENTE EN PROGRESO'}</Text>
+                  <Text style={styles.missionLocation} numberOfLines={1}>{incidente.direccion_exacta || 'Ubicación no especificada'}</Text>
+                </View>
+              </View>
             </View>
+            <View style={styles.missionDivider} />
+            <TouchableOpacity 
+              style={styles.missionRightContainer} 
+              activeOpacity={0.7} 
+              onPress={() => setModalBomberosVisible(true)}
+            >
+              <View style={styles.missionRight}>
+                <Text style={styles.missionLabel}>RESPONDIENDO</Text>
+                <Text style={styles.respondersCount}>{responders.length} UNIDADES</Text>
+                <Text style={styles.respondersStatus}>ACTIVAS</Text>
+              </View>
+              <View style={styles.avatarStack}>
+                {responders.slice(0, 2).map((r, i) => (
+                  <View key={r.id} style={[styles.miniAvatar, { marginLeft: i > 0 ? -8 : 0, backgroundColor: i === 0 ? Colors.warningOrange : Colors.secondary }]}>
+                    <MaterialCommunityIcons name="account" size={12} color="#fff" />
+                  </View>
+                ))}
+                {responders.length > 2 && (
+                  <View style={[styles.miniAvatar, { marginLeft: -8, backgroundColor: Colors.primary }]}>
+                    <Text style={styles.avatarCount}>+{responders.length - 2}</Text>
+                  </View>
+                )}
+                {responders.length === 0 && (
+                  <View style={[styles.miniAvatar, { backgroundColor: '#475569' }]}>
+                    <MaterialCommunityIcons name="account-off" size={12} color="#fff" />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
-          <View style={styles.missionDivider} />
-          <View style={styles.missionRight}>
-            <Text style={styles.missionLabel}>RESPONDIENDO</Text>
-            <Text style={styles.respondersCount}>12 UNIDADES</Text>
-            <Text style={styles.respondersStatus}>ACTIVAS</Text>
-          </View>
-          <View style={styles.avatarStack}>
-            <View style={[styles.miniAvatar, { backgroundColor: Colors.warningOrange }]}>
-              <MaterialCommunityIcons name="account" size={12} color="#fff" />
-            </View>
-            <View style={[styles.miniAvatar, { marginLeft: -8, backgroundColor: Colors.secondary }]}>
-              <MaterialCommunityIcons name="account" size={12} color="#fff" />
-            </View>
-            <View style={[styles.miniAvatar, { marginLeft: -8, backgroundColor: Colors.primary }]}>
-              <Text style={styles.avatarCount}>+10</Text>
-            </View>
-          </View>
-        </View>
+        )}
       </View>
 
       {/* ── Map Controls — botones ahora conectados a Leaflet ── */}
       <View style={[styles.mapControls, { bottom: 120 }]}>
-        <TouchableOpacity style={styles.controlBtn} onPress={() => {/* F3: toggle capas */ }}>
+        <TouchableOpacity style={styles.controlBtn} onPress={() => setPanelCapasVisible(!panelCapasVisible)}>
           <MaterialCommunityIcons name="layers-outline" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
 
@@ -746,6 +793,73 @@ export default function MapScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
       )}
+      {/* Modal Lista de Bomberos Respondiendo */}
+      <Modal visible={modalBomberosVisible} animationType="slide" transparent={true} onRequestClose={() => setModalBomberosVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Detalles de Misión</Text>
+              <TouchableOpacity onPress={() => setModalBomberosVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              
+              {/* Mission Details Section */}
+              <View style={styles.missionDetailsSection}>
+                <View style={styles.missionDetailRow}>
+                  <MaterialCommunityIcons name="alert-decagram" size={20} color="#e11d48" />
+                  <View style={styles.missionDetailTextContainer}>
+                    <Text style={styles.missionDetailLabel}>TIPO DE EMERGENCIA</Text>
+                    <Text style={styles.missionDetailValue}>{incidente?.tipo_emergencia || 'No especificado'}</Text>
+                  </View>
+                </View>
+                <View style={styles.missionDetailRow}>
+                  <MaterialCommunityIcons name="map-marker" size={20} color="#38bdf8" />
+                  <View style={styles.missionDetailTextContainer}>
+                    <Text style={styles.missionDetailLabel}>UBICACIÓN</Text>
+                    <Text style={styles.missionDetailValue}>{incidente?.direccion_exacta || 'Ubicación no especificada'}</Text>
+                  </View>
+                </View>
+                {incidente?.observaciones ? (
+                  <View style={styles.missionDetailRow}>
+                    <MaterialCommunityIcons name="text-box-outline" size={20} color="#94a3b8" />
+                    <View style={styles.missionDetailTextContainer}>
+                      <Text style={styles.missionDetailLabel}>DESCRIPCIÓN</Text>
+                      <Text style={styles.missionDetailValue}>{incidente.observaciones}</Text>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.modalDivider} />
+
+              <Text style={styles.sectionSubtitle}>ASISTENCIA DE BOMBEROS</Text>
+              {responders.length === 0 ? (
+                <Text style={styles.modalEmpty}>Aún no hay bomberos respondiendo a esta alerta.</Text>
+              ) : (
+                responders.map((r) => (
+                  <View key={r.id} style={styles.responderItem}>
+                    <View style={styles.responderAvatar}>
+                      <MaterialCommunityIcons name="account" size={20} color="#fff" />
+                    </View>
+                    <View style={styles.responderInfo}>
+                      <Text style={styles.responderName}>{r.name}</Text>
+                      <Text style={styles.responderRole}>{r.role}</Text>
+                    </View>
+                    <View style={styles.responderStatusBadge}>
+                      <Text style={styles.responderStatusText}>EN CAMINO</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity style={styles.returnButton} onPress={() => setModalBomberosVisible(false)}>
+              <Text style={styles.returnButtonText}>VOLVER AL MAPA</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -838,11 +952,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     lineHeight: 14,
   },
+  missionLocation: {
+    fontSize: 9,
+    color: '#94a3b8',
+    marginTop: 1,
+  },
   missionDivider: {
     width: 1,
     height: 32,
     backgroundColor: 'rgba(255,255,255,0.15)',
     marginHorizontal: Spacing.sm,
+  },
+  missionRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   missionRight: { alignItems: 'flex-start' },
   respondersCount: {
@@ -1051,5 +1175,136 @@ const styles = StyleSheet.create({
     color: '#fca5a5',
     fontSize: 10,
     fontWeight: '600',
+  },
+
+  // ── Modal Bomberos ──────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '70%',
+    backgroundColor: '#1a1c23',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  modalScroll: {
+    marginTop: 10,
+  },
+  modalEmpty: {
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 14,
+  },
+  responderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  responderAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  responderInfo: {
+    flex: 1,
+  },
+  responderName: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  responderRole: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  responderStatusBadge: {
+    backgroundColor: 'rgba(16,185,129,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  responderStatusText: {
+    color: '#10b981',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  missionDetailsSection: {
+    backgroundColor: '#0f172a',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  missionDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  missionDetailTextContainer: {
+    flex: 1,
+  },
+  missionDetailLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 1,
+  },
+  missionDetailValue: {
+    fontSize: 14,
+    color: '#f8fafc',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#334155',
+    marginBottom: 16,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  returnButton: {
+    backgroundColor: '#e11d48',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  returnButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });
