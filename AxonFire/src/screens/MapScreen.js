@@ -124,6 +124,8 @@ export default function MapScreen({ navigation, route }) {
     CUARTEL_APOYO: true,
   });
 
+  const [routeOrigin, setRouteOrigin] = useState('STATION'); // 'STATION' or 'USER'
+
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
   const headers = {
@@ -438,14 +440,38 @@ export default function MapScreen({ navigation, route }) {
     }
   }, [alertasData]);
 
-  // Dibujar ruta cuando hay incidente + coordenadas del cuartel
+  // Dibujar ruta cuando hay incidente + coordenadas
   useEffect(() => {
-    if (incidente && coords) {
-      fetchRoute(coords.latitud, coords.longitud, incidente.latitud, incidente.longitud);
-    } else {
-      setRouteCoords([]);
+    async function updateRoute() {
+      if (!incidente) {
+        setRouteCoords([]);
+        return;
+      }
+
+      let originLat, originLng;
+
+      if (routeOrigin === 'USER' && locationGranted) {
+        try {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          originLat = loc.coords.latitude;
+          originLng = loc.coords.longitude;
+        } catch (e) {
+          Alert.alert('Error', 'No se pudo obtener tu ubicación actual.');
+          setRouteOrigin('STATION');
+          return;
+        }
+      } else if (coords) {
+        originLat = coords.latitud;
+        originLng = coords.longitud;
+      } else {
+        return;
+      }
+
+      fetchRoute(originLat, originLng, incidente.latitud, incidente.longitud);
     }
-  }, [incidente, coords]);
+
+    updateRoute();
+  }, [incidente, coords, routeOrigin, locationGranted]);
 
   // ─── Valores derivados ──────────────────────────────────────────────────────
   const lat = coords?.latitud ?? FALLBACK_LAT;
@@ -639,6 +665,20 @@ export default function MapScreen({ navigation, route }) {
         <TouchableOpacity style={styles.controlBtn} onPress={() => setPanelCapasVisible(!panelCapasVisible)}>
           <MaterialCommunityIcons name="layers-outline" size={20} color={Colors.onSurface} />
         </TouchableOpacity>
+
+        {/* Origen de Ruta */}
+        {incidente && locationGranted && (
+          <TouchableOpacity 
+            style={[styles.controlBtn, routeOrigin === 'USER' && { backgroundColor: '#fef2f2' }]} 
+            onPress={() => setRouteOrigin(routeOrigin === 'STATION' ? 'USER' : 'STATION')}
+          >
+            <MaterialCommunityIcons 
+              name={routeOrigin === 'STATION' ? 'fire-truck' : 'account-map'} 
+              size={20} 
+              color={routeOrigin === 'USER' ? Colors.primary : Colors.onSurface} 
+            />
+          </TouchableOpacity>
+        )}
 
         {/* Centrar en mi ubicación */}
         {locationGranted && (
