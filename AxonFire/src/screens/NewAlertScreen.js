@@ -140,6 +140,13 @@ function generarMapaAlertaHTML(lat, lng) {
     }
   };
 
+  // Llamado desde RN para centrar el mapa sin colocar marcador
+  window.centrarMapa = function(lat, lng) {
+    if(!isNaN(lat) && !isNaN(lng)) {
+      map.setView([lat, lng], map.getZoom(), { animate:true });
+    }
+  };
+
   setTimeout(function(){
     try{ window.ReactNativeWebView.postMessage(JSON.stringify({ tipo:'MAPA_ALERTA_LISTO' })); } catch(e){}
   }, 350);
@@ -152,7 +159,7 @@ function generarMapaAlertaHTML(lat, lng) {
 const DEFAULT_LAT = -26.8083;
 const DEFAULT_LNG = -65.2176;
 
-const TIPOS_INCIDENTE = [
+const TIPOS_INCIDENTE_DEFAULT = [
   { label: 'Incendio Estructural', id: '1' },
   { label: 'Incendio Forestal', id: '1' },
   { label: 'Rescate Vehicular', id: '2' },
@@ -194,6 +201,8 @@ export default function NewAlertScreen({ navigation }) {
   const searchTimeoutRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [tiposIncidente, setTiposIncidente] = useState(TIPOS_INCIDENTE_DEFAULT);
 
   const parentState = navigation.getParent()?.getState();
   const isCurrentlyAdmin = parentState?.routeNames?.includes('Panel')
@@ -211,18 +220,76 @@ export default function NewAlertScreen({ navigation }) {
     };
   }, []);
 
+  // Cargar subcategorías reales desde el backend
+  React.useEffect(() => {
+    if (!token) return;
+
+    const cargarSubcategorias = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/alerta/subcategorias`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        const resData = await response.json();
+        const list = resData.data || resData || [];
+        
+        const mapped = list.map(item => ({
+          label: item.nombre_sub_categoria || item.nombre || 'Incidente',
+          id: item.id,
+          prioridad: item.prioridad || ''
+        }));
+        
+        if (mapped.length > 0) {
+          setTiposIncidente(mapped);
+          setFormData(prev => ({
+            ...prev,
+            type: mapped[0].label
+          }));
+        }
+      } catch (error) {
+        console.warn('Error al cargar subcategorías de la API:', error);
+        setTiposIncidente(TIPOS_INCIDENTE_DEFAULT);
+      }
+    };
+
+    cargarSubcategorias();
+  }, [token]);
+
+  // Solicitar permisos de ubicación y centrar el mapa en la ubicación actual del usuario
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          const lat = loc.coords.latitude;
+          const lng = loc.coords.longitude;
+          if (mapaAlertaListo) {
+            webViewRef.current?.injectJavaScript(`centrarMapa(${lat.toFixed(6)}, ${lng.toFixed(6)}); true;`);
+          }
+        }
+      } catch (err) {
+        console.warn('Error al obtener la ubicación actual:', err);
+      }
+    })();
+  }, [mapaAlertaListo]);
+
   // ─── Helpers ───────────────────────────────────────────────────────────────
   const updateForm = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
 
   // ── NUEVO: Búsqueda de direcciones y selección ────────────────────────────
   const buscarDirecciones = async (text) => {
-    // Coordenadas base para priorizar búsqueda en Tucumán/Yerba Buena
-    const viewbox = "-65.35,-26.88,-65.15,-26.75";
+    // Bounding box que cubre toda la provincia de Tucumán:
+    // Oeste: -66.30, Sur: -28.00, Este: -64.40, Norte: -26.00
+    // Orden correcto: left,top,right,bottom -> -66.30,-26.00,-64.40,-28.00
+    const viewbox = "-66.30,-26.00,-64.40,-28.00";
     
-    // Si la búsqueda no incluye Tucumán, se la agregamos para forzar búsqueda local específica
+    // Si la búsqueda no incluye Tucumán, le agregamos la provincia y el país para acotar y dar precisión local
     let queryText = text;
     if (!text.toLowerCase().includes("tucuman") && !text.toLowerCase().includes("tucumán")) {
-      queryText = `${text}, Yerba Buena, Tucumán, Argentina`;
+      queryText = `${text}, Tucumán, Argentina`;
     }
 
     try {
@@ -230,7 +297,7 @@ export default function NewAlertScreen({ navigation }) {
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryText)}&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`,
         {
           headers: {
-            'User-Agent': 'AxonFire-App',
+            'User-Agent': 'AxonFire-App (contact: gonzalomartinez.dev@gmail.com)',
           }
         }
       );
@@ -262,7 +329,7 @@ export default function NewAlertScreen({ navigation }) {
     }, 600);
   }
 
-  const seleccionarSugerencia = async (item) => {
+  const seleccionarSugerencia = (item) => {
     // 1. Extraer número de altura del input original (ej: "av aconquija 2300" -> "2300")
     const matchNumero = formData.location.match(/\b\d+\b/);
     const numero = matchNumero ? matchNumero[0] : null;
@@ -292,30 +359,42 @@ export default function NewAlertScreen({ navigation }) {
     
     updateForm('location', nombreLimpio);
     
-    // 2. Geocodificar usando el geocodificador nativo (Apple Maps en iOS, Google en Android)
-    // para obtener las coordenadas exactas de la altura
-    let lat = parseFloat(item.lat);
-    let lng = parseFloat(item.lon);
-
-    try {
-      const geocoded = await Location.geocodeAsync(nombreLimpio);
-      if (geocoded && geocoded.length > 0) {
-        lat = geocoded[0].latitude;
-        lng = geocoded[0].longitude;
-      }
-    } catch (err) {
-      console.warn('Geocodificación nativa falló, usando Nominatim:', err);
-    }
+    // Obtener coordenadas iniciales desde Nominatim
+    const initialLat = parseFloat(item.lat);
+    const initialLng = parseFloat(item.lon);
     
-    updateForm('latitud', String(lat.toFixed(6)));
-    updateForm('longitud', String(lng.toFixed(6)));
+    // Actualizar coordenadas y mapa de forma inmediata (feedback visual instantáneo)
+    updateForm('latitud', String(initialLat.toFixed(6)));
+    updateForm('longitud', String(initialLng.toFixed(6)));
     setCoordsSeleccionadas(true);
+    setSuggestions([]); // Ocultar dropdown de inmediato
     
     if (mapaAlertaListo) {
-      webViewRef.current?.injectJavaScript(`moverMarcador(${lat.toFixed(6)}, ${lng.toFixed(6)}); true;`);
+      webViewRef.current?.injectJavaScript(`moverMarcador(${initialLat.toFixed(6)}, ${initialLng.toFixed(6)}); true;`);
     }
-    
-    setSuggestions([]);
+
+    // Geocodificar de forma asíncrona de fondo para refinar la altura exacta (sin bloquear el hilo de render)
+    if (numero) {
+      (async () => {
+        try {
+          const geocoded = await Promise.race([
+            Location.geocodeAsync(`${nombreLimpio}, Argentina`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout geocode')), 2500))
+          ]);
+          if (geocoded && geocoded.length > 0) {
+            const refinedLat = geocoded[0].latitude;
+            const refinedLng = geocoded[0].longitude;
+            updateForm('latitud', String(refinedLat.toFixed(6)));
+            updateForm('longitud', String(refinedLng.toFixed(6)));
+            if (mapaAlertaListo) {
+              webViewRef.current?.injectJavaScript(`moverMarcador(${refinedLat.toFixed(6)}, ${refinedLng.toFixed(6)}); true;`);
+            }
+          }
+        } catch (err) {
+          console.warn('Geocodificación nativa de fondo falló o expiró:', err);
+        }
+      })();
+    }
   };
 
   // ─── Mensajes del mini-mapa → React Native ────────────────────────────────
@@ -386,7 +465,7 @@ export default function NewAlertScreen({ navigation }) {
 
     setIsLoading(true);
     try {
-      const selectedType = TIPOS_INCIDENTE.find(t => t.label === formData.type);
+      const selectedType = tiposIncidente.find(t => t.label === formData.type);
       const subCategoriaId = selectedType ? selectedType.id : '1';
 
       const body = {
@@ -457,6 +536,7 @@ export default function NewAlertScreen({ navigation }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            scrollEnabled={scrollEnabled}
           >
             <View style={styles.headerTitleBox}>
               <View style={[styles.redBorder, { backgroundColor: colorPrimario }]} />
@@ -472,9 +552,9 @@ export default function NewAlertScreen({ navigation }) {
               />
               {showTypePicker && (
                 <View style={styles.pickerContainer}>
-                  {TIPOS_INCIDENTE.map(tipo => (
+                  {tiposIncidente.map(tipo => (
                     <TouchableOpacity
-                      key={tipo.label}
+                      key={tipo.id || tipo.label}
                       style={styles.pickerOption}
                       onPress={() => { updateForm('type', tipo.label); setShowTypePicker(false); }}
                     >
@@ -571,7 +651,12 @@ export default function NewAlertScreen({ navigation }) {
                 </View>
 
                 {/* Mapa interactivo */}
-                <View style={styles.mapaContenedor}>
+                <View 
+                  style={styles.mapaContenedor}
+                  onTouchStart={() => setScrollEnabled(false)}
+                  onTouchEnd={() => setScrollEnabled(true)}
+                  onTouchCancel={() => setScrollEnabled(true)}
+                >
                   {!mapaAlertaListo && (
                     <View style={styles.mapaLoader}>
                       <ActivityIndicator size="small" color={colorPrimario} />
@@ -585,7 +670,7 @@ export default function NewAlertScreen({ navigation }) {
                     originWhitelist={['*']}
                     javaScriptEnabled
                     domStorageEnabled
-                    scrollEnabled={false}
+                    scrollEnabled={true}
                     onMessage={onMensajeMapaAlerta}
                     mixedContentMode="always"
                     {...(Platform.OS === 'android' && { androidLayerType: 'hardware' })}
