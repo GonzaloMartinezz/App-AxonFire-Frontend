@@ -216,14 +216,23 @@ export default function PanelControlScreen({ navigation }) {
           <TouchableOpacity 
             style={styles.iconBtn} 
             onPress={() => {
-              Alert.alert(
-                "Vista Bombero",
-                "¿Deseas visualizar la aplicación con el rol de Bombero?",
-                [
-                  { text: "Cancelar", style: "cancel" },
-                  { text: "Cambiar Vista", onPress: () => navigation.navigate('MainApp') }
-                ]
-              );
+              const changeView = () => {
+                navigation.navigate('MainApp');
+              };
+              if (Platform.OS === 'web') {
+                if (window.confirm("¿Deseas visualizar la aplicación con el rol de Bombero?")) {
+                  changeView();
+                }
+              } else {
+                Alert.alert(
+                  "Vista Bombero",
+                  "¿Deseas visualizar la aplicación con el rol de Bombero?",
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    { text: "Cambiar Vista", onPress: changeView }
+                  ]
+                );
+              }
             }}
             activeOpacity={0.7}
           >

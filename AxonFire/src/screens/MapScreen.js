@@ -27,7 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-// const BASE_URL = 'http://localhost:3000'; // Eliminado en favor de API_BASE_URL
+const BASE_URL = 'http://localhost:3000';
 const FALLBACK_LAT = -26.8083;
 const FALLBACK_LNG = -65.2176;
 const DEFAULT_ZOOM = 15;
@@ -42,192 +42,325 @@ const CAPAS_CONFIG = [
 
 // ─── HTML de Leaflet (F1 + F3) ────────────────────────────────────────────────
 function generarMapaHTML(lat, lng, zoom) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #5a7055; }
-    #map { width: 100%; height: 100vh; }
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        html, body {
+          width: 100%;
+          height: 100%;
+          background: #5a7055;
+        }
+        #map {
+          width: 100%;
+          height: 100vh;
+        }
+        /* Filtro táctico — convierte los tiles en verde sage militar */
+        .leaflet-tile-pane {
+          filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
+        }
+        /* Ocultamos el zoom nativo — usamos los botones del panel de RN */
+        .leaflet-control-zoom {
+          display: none !important;
+        }
+        .leaflet-control-attribution {
+          font-size: 8px !important;
+          background: rgba(26, 28, 35, 0.6) !important;
+          color: #475569 !important;
+        }
+        .leaflet-control-attribution a {
+          color: #64748b !important;
+        }
+        .leaflet-popup-content-wrapper {
+          background: #1a1c23;
+          border: 1px solid #334155;
+          border-radius: 10px;
+          color: #e2e8f0;
+          font-family: sans-serif;
+          font-size: 12px;
+        }
+        .leaflet-popup-tip {
+          background: #1a1c23;
+        }
+        .leaflet-popup-content b { color: #fff; font-size: 13px; }
 
-    /* F1 — Filtro táctico verde sage */
-    .leaflet-tile-pane {
-      filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
-    }
+        /* ── F2: Incident marker pulse animation ── */
+        @keyframes incident-pulse {
+          0%   { transform: scale(1);   opacity: 1;   }
+          50%  { transform: scale(1.8); opacity: 0.3; }
+          100% { transform: scale(2.2); opacity: 0;   }
+        }
+        .incident-marker {
+          position: relative;
+          width: 40px;
+          height: 40px;
+        }
+        .incident-marker .pulse-ring {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 40px; height: 40px;
+          margin: -20px 0 0 -20px;
+          border-radius: 50%;
+          background: rgba(220,38,38,0.4);
+          animation: incident-pulse 2s ease-out infinite;
+        }
+        .incident-marker .pin {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 32px; height: 32px;
+          margin: -16px 0 0 -16px;
+          background: #dc2626;
+          border: 3px solid #7f1d1d;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          box-shadow: 0 0 16px rgba(220,38,38,0.7);
+          z-index: 2;
+        }
+        .popup-incident { min-width: 200px; }
+        .popup-incident .popup-title {
+          font-size: 13px; font-weight: 800; color: #fff;
+          margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+          padding-bottom: 6px;
+        }
+        .popup-incident .popup-row {
+          display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
+        }
+        .popup-incident .popup-label {
+          font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.5);
+          text-transform: uppercase; letter-spacing: 0.8px; min-width: 65px;
+        }
+        .popup-incident .popup-value {
+          font-size: 12px; font-weight: 600; color: #e2e8f0;
+        }
+        .popup-incident .prioridad-badge {
+          display: inline-block; padding: 2px 8px; border-radius: 6px;
+          font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
+        }
+        .popup-incident .prioridad-ALTA  { background: #dc2626; color: #fff; }
+        .popup-incident .prioridad-MEDIA { background: #f59e0b; color: #1a1c23; }
+        .popup-incident .prioridad-BAJA  { background: #22c55e; color: #1a1c23; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map('map', {
+          center: [${lat}, ${lng}],
+          zoom: ${zoom},
+          zoomControl: false,
+          attributionControl: true,
+        });
 
-    /* F1 — Zoom nativo oculto: usamos los botones del panel de RN */
-    .leaflet-control-zoom { display: none !important; }
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; OSM &copy; CartoDB',
+          maxZoom: 19,
+          minZoom: 8,
+          subdomains: 'abcd',
+        }).addTo(map);
 
-    .leaflet-control-attribution {
-      font-size: 8px !important;
-      background: rgba(26, 28, 35, 0.6) !important;
-      color: #475569 !important;
-    }
-    .leaflet-control-attribution a { color: #64748b !important; }
+        // F1 — Marcador del cuartel del usuario logueado
+        var iconCuartel = L.divIcon({
+          className: '',
+          html: '<div style="width:14px;height:14px;background:#263238;border:2.5px solid #dc2626;border-radius:50%;box-shadow:0 0 8px rgba(220,38,38,0.65)"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
+        L.marker([${lat}, ${lng}], { icon: iconCuartel })
+          .addTo(map)
+          .bindPopup('<b>Tu cuartel</b>');
 
-    .leaflet-popup-content-wrapper {
-      background: #1a1c23;
-      border: 1px solid #334155;
-      border-radius: 10px;
-      color: #e2e8f0;
-      font-family: sans-serif;
-      font-size: 12px;
-    }
-    .leaflet-popup-tip { background: #1a1c23; }
-    .leaflet-popup-content b { color: #fff; font-size: 13px; }
-  </style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-  // ── F1: Inicializar el mapa ────────────────────────────────────────────────
-  var map = L.map('map', {
-    center: [${lat}, ${lng}],
-    zoom: ${zoom},
-    zoomControl: false,
-    attributionControl: true,
-  });
+        // ── F2: Marcador de incidente + ruta cuartel→incidente ────────────
+        var incidentMarker = null;
+        var routeLine = null;
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OSM &copy; CartoDB',
-    maxZoom: 19,
-    minZoom: 8,
-    subdomains: 'abcd',
-  }).addTo(map);
+        window.mostrarIncidente = function(data) {
+          if (incidentMarker) { map.removeLayer(incidentMarker); }
+          if (routeLine) { map.removeLayer(routeLine); }
 
-  // F1 — Marcador del cuartel del usuario logueado
-  var iconCuartel = L.divIcon({
-    className: '',
-    html: '<div style="width:14px;height:14px;background:#263238;border:2.5px solid #dc2626;border-radius:50%;box-shadow:0 0 8px rgba(220,38,38,0.65)"></div>',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-  });
-  L.marker([${lat}, ${lng}], { icon: iconCuartel })
-    .addTo(map)
-    .bindPopup('<b>Tu cuartel</b>');
+          var iconHtml = '<div class="incident-marker">' +
+            '<div class="pulse-ring"></div>' +
+            '<div class="pin">🔥</div>' +
+            '</div>';
 
-  // ── F3: LayerGroups — uno por categoría de POI ────────────────────────────
-  // Permite activar/desactivar cada capa sin recargar datos del backend
-  var capas = {
-    'HIDRANTE':           L.layerGroup().addTo(map),
-    'SALUD':              L.layerGroup().addTo(map),
-    'MATERIAL_PELIGROSO': L.layerGroup().addTo(map),
-    'CUARTEL_APOYO':      L.layerGroup().addTo(map),
-  };
+          var incidentIcon = L.divIcon({
+            className: '',
+            html: iconHtml,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            popupAnchor: [0, -22]
+          });
 
-  // ── F3: Íconos SVG por categoría ──────────────────────────────────────────
-  // Gota de agua / Cruz médica / Triángulo de peligro / Escudo de cuartel
-  var ICONOS = {
-    'HIDRANTE': [
-      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-        '<circle cx="14" cy="14" r="13" fill="#1565c0" stroke="white" stroke-width="2"/>',
-        '<path d="M14 6 Q9 12 9 16 Q9 22 14 23 Q19 22 19 16 Q19 12 14 6Z" fill="white"/>',
-      '</svg>',
-    ].join(''),
-    'SALUD': [
-      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-        '<rect x="1" y="1" width="26" height="26" rx="6" fill="#2e7d32" stroke="white" stroke-width="2"/>',
-        '<rect x="12" y="5" width="4" height="18" fill="white"/>',
-        '<rect x="5" y="12" width="18" height="4" fill="white"/>',
-      '</svg>',
-    ].join(''),
-    'MATERIAL_PELIGROSO': [
-      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-        '<polygon points="14,1 27,26 1,26" fill="#c2410c" stroke="white" stroke-width="2"/>',
-        '<rect x="13" y="10" width="2" height="9" fill="white"/>',
-        '<circle cx="14" cy="22" r="1.5" fill="white"/>',
-      '</svg>',
-    ].join(''),
-    'CUARTEL_APOYO': [
-      '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
-        '<path d="M14 2 L24 6 L24 16 Q24 23 14 26 Q4 23 4 16 L4 6 Z" fill="#37474f" stroke="white" stroke-width="2"/>',
-        '<text x="14" y="18" text-anchor="middle" fill="white" font-size="10" font-weight="bold" font-family="sans-serif">C</text>',
-      '</svg>',
-    ].join(''),
-  };
+          var prioClass = 'prioridad-' + (data.nivel_prioridad || 'ALTA');
+          var popupHtml = '<div class="popup-incident">' +
+            '<div class="popup-title">🔥 Incidente Activo</div>' +
+            '<div class="popup-row"><span class="popup-label">Tipo</span><span class="popup-value">' + (data.tipo_emergencia || '—') + '</span></div>' +
+            '<div class="popup-row"><span class="popup-label">Dirección</span><span class="popup-value">' + (data.direccion_exacta || '—') + '</span></div>' +
+            '<div class="popup-row"><span class="popup-label">Prioridad</span><span class="prioridad-badge ' + prioClass + '">' + (data.nivel_prioridad || '—') + '</span></div>' +
+            '</div>';
 
-  // ── F3: Agregar un POI a su LayerGroup ────────────────────────────────────
-  function agregarPOIInterno(lat, lng, categoria, nombre, descripcion) {
-    var grupo = capas[categoria];
-    if (!grupo) return;
+          incidentMarker = L.marker([data.latitud, data.longitud], { icon: incidentIcon })
+            .addTo(map)
+            .bindPopup(popupHtml, { maxWidth: 260, closeButton: true });
 
-    var svgHtml = ICONOS[categoria] || ICONOS['CUARTEL_APOYO'];
-    var icon = L.divIcon({
-      className: '',
-      html: svgHtml,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-      popupAnchor: [0, -16],
-    });
+          var cuartelLat = ${lat}, cuartelLng = ${lng};
+          var incLat = data.latitud, incLng = data.longitud;
 
-    L.marker([lat, lng], { icon: icon })
-      .addTo(grupo)
-      .bindPopup(
-        '<b>' + (nombre || categoria) + '</b>' +
-        (descripcion ? '<br><span style="color:#9ca3af">' + descripcion + '</span>' : '')
-      );
-  }
+          var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/' +
+            cuartelLng + ',' + cuartelLat + ';' +
+            incLng + ',' + incLat +
+            '?overview=full&geometries=geojson';
 
-  // ── F3: Carga en lote con requestAnimationFrame ────────────────────────────
-  // Procesa 15 POIs por frame → la UI nunca se congela con muchos marcadores
-  window.cargarPOIsEnLote = function(poisArray) {
-    if (!Array.isArray(poisArray) || poisArray.length === 0) return;
-    var i = 0;
-    var LOTE = 15;
+          fetch(osrmUrl)
+            .then(function(res) { return res.json(); })
+            .then(function(json) {
+              if (json.code === 'Ok' && json.routes && json.routes.length > 0) {
+                var coords = json.routes[0].geometry.coordinates.map(function(c) {
+                  return [c[1], c[0]];
+                });
+                routeLine = L.polyline(coords, {
+                  color: '#dc2626', weight: 4, opacity: 0.85,
+                  dashArray: null, lineJoin: 'round', lineCap: 'round'
+                }).addTo(map);
 
-    function procesarChunk() {
-      var fin = Math.min(i + LOTE, poisArray.length);
-      for (; i < fin; i++) {
-        var p = poisArray[i];
-        agregarPOIInterno(
-          p.latitud,
-          p.longitud,
-          p.categoria,
-          p.nombre || '',
-          p.descripcion || ''
-        );
-      }
-      if (i < poisArray.length) {
-        window.requestAnimationFrame(procesarChunk);
-      }
-    }
-    window.requestAnimationFrame(procesarChunk);
-  };
+                map.fitBounds(routeLine.getBounds(), { padding: [50, 50], animate: true, duration: 1.5 });
+              } else {
+                throw new Error('No route');
+              }
+            })
+            .catch(function() {
+              routeLine = L.polyline(
+                [[cuartelLat, cuartelLng], [incLat, incLng]],
+                { color: '#dc2626', weight: 3, dashArray: '10,8', opacity: 0.8 }
+              ).addTo(map);
+              var bounds = L.latLngBounds([cuartelLat, cuartelLng], [incLat, incLng]);
+              map.fitBounds(bounds, { padding: [50, 50], animate: true, duration: 1.5 });
+            });
+        };
 
-  // ── F3: Toggle de visibilidad por capa ────────────────────────────────────
-  window.toggleCapa = function(categoria, visible) {
-    var grupo = capas[categoria];
-    if (!grupo) return;
-    if (visible && !map.hasLayer(grupo)) map.addLayer(grupo);
-    if (!visible && map.hasLayer(grupo)) map.removeLayer(grupo);
-  };
+        // ── F3: LayerGroups — uno por categoría de POI ────────────────────────────
+        var capas = {
+          'HIDRANTE':           L.layerGroup().addTo(map),
+          'SALUD':              L.layerGroup().addTo(map),
+          'MATERIAL_PELIGROSO': L.layerGroup().addTo(map),
+          'CUARTEL_APOYO':      L.layerGroup().addTo(map),
+        };
 
-  // ── F1: Funciones del panel de controles ──────────────────────────────────
-  window.zoomIn           = function() { map.zoomIn(); };
-  window.zoomOut          = function() { map.zoomOut(); };
-  window.centrarEnCuartel = function() {
-    map.flyTo([${lat}, ${lng}], ${zoom}, { animate: true, duration: 1.0 });
-  };
+        var ICONOS = {
+          'HIDRANTE': [
+            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+              '<circle cx="14" cy="14" r="13" fill="#1565c0" stroke="white" stroke-width="2"/>',
+              '<path d="M14 6 Q9 12 9 16 Q9 22 14 23 Q19 22 19 16 Q19 12 14 6Z" fill="white"/>',
+            '</svg>',
+          ].join(''),
+          'SALUD': [
+            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+              '<rect x="1" y="1" width="26" height="26" rx="6" fill="#2e7d32" stroke="white" stroke-width="2"/>',
+              '<rect x="12" y="5" width="4" height="18" fill="white"/>',
+              '<rect x="5" y="12" width="18" height="4" fill="white"/>',
+            '</svg>',
+          ].join(''),
+          'MATERIAL_PELIGROSO': [
+            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+              '<polygon points="14,1 27,26 1,26" fill="#c2410c" stroke="white" stroke-width="2"/>',
+              '<rect x="13" y="10" width="2" height="9" fill="white"/>',
+              '<circle cx="14" cy="22" r="1.5" fill="white"/>',
+            '</svg>',
+          ].join(''),
+          'CUARTEL_APOYO': [
+            '<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">',
+              '<path d="M14 2 L24 6 L24 16 Q24 23 14 26 Q4 23 4 16 L4 6 Z" fill="#37474f" stroke="white" stroke-width="2"/>',
+              '<text x="14" y="18" text-anchor="middle" fill="white" font-size="10" font-weight="bold" font-family="sans-serif">C</text>',
+            '</svg>',
+          ].join(''),
+        };
 
-  // F1 — Avisa a React Native que el mapa cargó
-  setTimeout(function() {
-    try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ tipo: 'MAPA_LISTO' }));
-    } catch(e) {}
-  }, 400);
-</script>
+        function agregarPOIInterno(lat, lng, categoria, nombre, descripcion) {
+          var grupo = capas[categoria];
+          if (!grupo) return;
+
+          var svgHtml = ICONOS[categoria] || ICONOS['CUARTEL_APOYO'];
+          var icon = L.divIcon({
+            className: '',
+            html: svgHtml,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+            popupAnchor: [0, -16],
+          });
+
+          L.marker([lat, lng], { icon: icon })
+            .addTo(grupo)
+            .bindPopup(
+              '<b>' + (nombre || categoria) + '</b>' +
+              (descripcion ? '<br><span style="color:#9ca3af">' + descripcion + '</span>' : '')
+            );
+        }
+
+        window.cargarPOIsEnLote = function(poisArray) {
+          if (!Array.isArray(poisArray) || poisArray.length === 0) return;
+          var i = 0;
+          var LOTE = 15;
+
+          function procesarChunk() {
+            var fin = Math.min(i + LOTE, poisArray.length);
+            for (; i < fin; i++) {
+              var p = poisArray[i];
+              agregarPOIInterno(
+                p.latitud,
+                p.longitud,
+                p.categoria,
+                p.nombre || '',
+                p.descripcion || ''
+              );
+            }
+            if (i < poisArray.length) {
+              window.requestAnimationFrame(procesarChunk);
+            }
+          }
+          window.requestAnimationFrame(procesarChunk);
+        };
+
+        window.toggleCapa = function(categoria, visible) {
+          var grupo = capas[categoria];
+          if (!grupo) return;
+          if (visible && !map.hasLayer(grupo)) map.addLayer(grupo);
+          if (!visible && map.hasLayer(grupo)) map.removeLayer(grupo);
+        };
+
+        window.zoomIn = function() { map.zoomIn(); };
+        window.zoomOut = function() { map.zoomOut(); };
+        window.centrarEnCuartel = function() {
+          map.flyTo([${lat}, ${lng}], ${zoom}, { animate: true, duration: 1.0 });
+        };
+
+        setTimeout(function() {
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ tipo: 'MAPA_LISTO' }));
+          } catch(e) {}
+        }, 400);
+      </script>
 </body>
 </html>`;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
-export default function MapScreen({ navigation }) {
+export default function MapScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
+
   const webViewRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -237,6 +370,10 @@ export default function MapScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [mapaListo, setMapaListo] = useState(false);
   const [alertasActivas, setAlertasActivas] = useState(0);
+
+  // F2: Estado del incidente
+  const [incidente, setIncidente] = useState(null);
+  const [alertasData, setAlertasData] = useState([]);
 
   // F3 — Estado del panel de capas
   const [panelCapasVisible, setPanelCapasVisible] = useState(false);
@@ -294,11 +431,6 @@ export default function MapScreen({ navigation }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/maps/config`, { headers });
       if (res.status === 401) throw new Error('No autorizado. Volvé a iniciar sesión.');
-      if (res.status === 404) {
-        // Endpoint no existe en el backend, usamos fallback silenciosamente
-        setCoords({ latitud: FALLBACK_LAT, longitud: FALLBACK_LNG });
-        return;
-      }
       if (!res.ok) throw new Error(`Error ${res.status} al obtener la configuración del mapa.`);
       const data = await res.json();
       if (typeof data.latitud !== 'number' || typeof data.longitud !== 'number') {
@@ -325,21 +457,35 @@ export default function MapScreen({ navigation }) {
       });
       if (!res.ok) return;
       const data = await res.json();
-      if (Array.isArray(data)) setAlertasActivas(data.length);
+      if (Array.isArray(data)) {
+        setAlertasActivas(data.length);
+        setAlertasData(data);
+      }
+    } catch (_) { }
+  }
+
+  // ─── F2: GET /api/maps/incidents/{id} — datos del incidente activo ────────
+  async function cargarIncidente(idIncidente) {
+    if (!idIncidente) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/maps/incidents/${idIncidente}`, { headers });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.latitud === 'number' && typeof data.longitud === 'number') {
+        setIncidente(data);
+      }
     } catch (_) { }
   }
 
   // ─── F3: GET /api/maps/pois → inyección en lote ──────────────────────────
-  // Una sola llamada a injectJavaScript con TODOS los POIs.
-  // Leaflet los procesa en chunks de 15 con requestAnimationFrame → sin freeze.
   async function cargarPOIs() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/maps/pois`, { headers });
       if (!res.ok) return;
-      const pois = await res.json();
-      if (!Array.isArray(pois) || pois.length === 0) return;
+      const poisData = await res.json();
+      if (!Array.isArray(poisData) || poisData.length === 0) return;
 
-      const poisSanitizados = pois.map(p => ({
+      const poisSanitizados = poisData.map(p => ({
         latitud: p.latitud,
         longitud: p.longitud,
         categoria: p.categoria,
@@ -354,6 +500,45 @@ export default function MapScreen({ navigation }) {
     }
   }
 
+  useEffect(() => {
+    cargarConfig();
+    cargarAlertasActivas();
+
+    // Si viene un incidenteId/alertaId por route params, cargarlo directamente
+    const paramId = route?.params?.incidenteId || route?.params?.alertaId;
+    if (paramId) {
+      cargarIncidente(paramId);
+    }
+  }, []);
+
+  // ─── Cargar incidente si cambian los parámetros de la ruta ────────────────
+  useEffect(() => {
+    const paramId = route?.params?.incidenteId || route?.params?.alertaId;
+    if (paramId) {
+      cargarIncidente(paramId);
+    }
+  }, [route?.params?.incidenteId, route?.params?.alertaId]);
+
+  // ─── Auto-carga de incidente desde alertas activas (sin ID explícito) ─────
+  useEffect(() => {
+    const paramId = route?.params?.incidenteId || route?.params?.alertaId;
+    if (!paramId && alertasData.length > 0 && !incidente) {
+      const primeraAlerta = alertasData[0];
+      const id = primeraAlerta.id || primeraAlerta.id_alerta;
+      if (id) {
+        cargarIncidente(id);
+      }
+    }
+  }, [alertasData]);
+
+  // ─── F2: Inyectar incidente en Leaflet cuando mapa + datos estén listos ───
+  useEffect(() => {
+    if (mapaListo && incidente) {
+      const js = `mostrarIncidente(${JSON.stringify(incidente)}); true;`;
+      webViewRef.current?.injectJavaScript(js);
+    }
+  }, [mapaListo, incidente]);
+
   // ─── F3: Toggle de visibilidad de una capa ───────────────────────────────
   function handleToggleCapa(categoria) {
     const nuevoEstado = !capasActivas[categoria];
@@ -362,12 +547,6 @@ export default function MapScreen({ navigation }) {
       `toggleCapa('${categoria}', ${nuevoEstado}); true;`
     );
   }
-
-  // ─── Effects ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    cargarConfig();
-    cargarAlertasActivas();
-  }, []);
 
   // Cuando Leaflet confirma que cargó → inyectar los POIs
   useEffect(() => {
@@ -461,6 +640,37 @@ export default function MapScreen({ navigation }) {
         </View>
       </View>
 
+      {/* ── Map Controls — botones ahora conectados a Leaflet ── */}
+      <View style={[styles.mapControls, { bottom: 120 }]}>
+        <TouchableOpacity style={styles.controlBtn} onPress={() => {/* F3: toggle capas */ }}>
+          <MaterialCommunityIcons name="layers-outline" size={20} color={Colors.onSurface} />
+        </TouchableOpacity>
+
+        {/* F1: Centrar en cuartel */}
+        <TouchableOpacity
+          style={styles.controlBtn}
+          onPress={() => webViewRef.current?.injectJavaScript('centrarEnCuartel(); true;')}
+        >
+          <MaterialIcons name="my-location" size={20} color={Colors.onSurface} />
+        </TouchableOpacity>
+
+        {/* F1: Zoom in */}
+        <TouchableOpacity
+          style={styles.controlBtn}
+          onPress={() => webViewRef.current?.injectJavaScript('zoomIn(); true;')}
+        >
+          <MaterialCommunityIcons name="plus" size={20} color={Colors.onSurface} />
+        </TouchableOpacity>
+
+        {/* F1: Zoom out */}
+        <TouchableOpacity
+          style={styles.controlBtn}
+          onPress={() => webViewRef.current?.injectJavaScript('zoomOut(); true;')}
+        >
+          <MaterialCommunityIcons name="minus" size={20} color={Colors.onSurface} />
+        </TouchableOpacity>
+      </View>
+
       {/* F3 — Panel de capas (aparece cuando se toca el botón layers) */}
       {panelCapasVisible && mapaListo && (
         <View style={[styles.panelCapas, { bottom: 180 }]}>
@@ -488,46 +698,6 @@ export default function MapScreen({ navigation }) {
           })}
         </View>
       )}
-
-      {/* F1 + F3 — Panel de controles */}
-      <View style={[styles.mapControls, { bottom: 120 }]}>
-
-        {/* F3: Botón capas — ahora abre/cierra el panel */}
-        <TouchableOpacity
-          style={[styles.controlBtn, panelCapasVisible && styles.controlBtnActivo]}
-          onPress={() => setPanelCapasVisible(v => !v)}
-        >
-          <MaterialCommunityIcons
-            name="layers-outline"
-            size={20}
-            color={panelCapasVisible ? '#fff' : Colors.onSurface}
-          />
-        </TouchableOpacity>
-
-        {/* F1: Centrar en cuartel */}
-        <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => webViewRef.current?.injectJavaScript('centrarEnCuartel(); true;')}
-        >
-          <MaterialIcons name="my-location" size={20} color={Colors.onSurface} />
-        </TouchableOpacity>
-
-        {/* F1: Zoom in */}
-        <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => webViewRef.current?.injectJavaScript('zoomIn(); true;')}
-        >
-          <MaterialCommunityIcons name="plus" size={20} color={Colors.onSurface} />
-        </TouchableOpacity>
-
-        {/* F1: Zoom out */}
-        <TouchableOpacity
-          style={styles.controlBtn}
-          onPress={() => webViewRef.current?.injectJavaScript('zoomOut(); true;')}
-        >
-          <MaterialCommunityIcons name="minus" size={20} color={Colors.onSurface} />
-        </TouchableOpacity>
-      </View>
 
       {/* Admin FAB (igual que antes) */}
       {user?.rol === 'ADMIN' && (
@@ -721,8 +891,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  controlBtnActivo: {
-    backgroundColor: '#1d4ed8',
+  floatingMapFab: {
+    position: 'absolute',
+    bottom: 120,
+    left: Spacing.lg,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#dc2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#7f1d1d',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#dc2626',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.5,
+        shadowRadius: 8,
+      },
+      android: { elevation: 8 },
+      web: { boxShadow: '0px 4px 12px rgba(220, 38, 38, 0.5)' },
+    }),
   },
 
   // ── F3: Panel de capas ────────────────────────────────────────────────────────
@@ -781,31 +971,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#1f2937',
-  },
-
-  // ── Admin FAB ────────────────────────────────────────────────────────────────
-  floatingMapFab: {
-    position: 'absolute',
-    bottom: 120,
-    left: Spacing.lg,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#dc2626',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#7f1d1d',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#dc2626',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 8,
-      },
-      android: { elevation: 8 },
-      web: { boxShadow: '0px 4px 12px rgba(220, 38, 38, 0.5)' },
-    }),
   },
 
   // ── F1: Banner alertas ───────────────────────────────────────────────────────
