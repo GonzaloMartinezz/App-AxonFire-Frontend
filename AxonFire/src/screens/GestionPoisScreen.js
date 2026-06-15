@@ -19,7 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
-import { GestionPoisMap } from '../components/GestionPoisMap';
+import GestionPoisMap from '../components/GestionPoisMap';
 
 // ── Category helpers ─────────────────────────────────────────────────────────
 const CATEGORIAS = ['HIDRANTE', 'SALUD', 'MATERIAL_PELIGROSO', 'CUARTEL_APOYO'];
