@@ -20,6 +20,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -420,6 +421,28 @@ export default function MapScreen({ navigation, route }) {
     }
   };
 
+  const abrirNavegacionGPS = () => {
+    if (!incidente) {
+      Alert.alert('Sin incidente', 'No hay ningún incidente activo seleccionado.');
+      return;
+    }
+    const { latitud, longitud } = incidente;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitud},${longitud}&travelmode=driving`;
+    
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          const fallback = `http://maps.google.com/maps?daddr=${latitud},${longitud}`;
+          Linking.openURL(fallback);
+        }
+      })
+      .catch(() => {
+        Alert.alert('Error', 'No se pudo abrir la aplicación de mapas.');
+      });
+  };
+
   // ─── Animación del punto pulsante ─────────────────────────────────────────
   useEffect(() => {
     const loop = Animated.loop(
@@ -754,6 +777,22 @@ export default function MapScreen({ navigation, route }) {
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="alarm-light" size={24} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* Botón de Navegación GPS (duplicado de alarma) */}
+      {incidente && (
+        <TouchableOpacity
+          style={[
+            styles.floatingMapFab,
+            {
+              left: (user?.rol === 'ADMIN') ? Spacing.lg + 64 : Spacing.lg,
+            }
+          ]}
+          onPress={abrirNavegacionGPS}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="google-maps" size={24} color="#fff" />
         </TouchableOpacity>
       )}
 

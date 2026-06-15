@@ -189,6 +189,11 @@ export default function NewAlertScreen({ navigation }) {
   const [mapaAlertaListo, setMapaAlertaListo] = useState(false);
   const [coordsSeleccionadas, setCoordsSeleccionadas] = useState(false);
 
+  // ── NUEVO: Estados y ref para autocompletado de direcciones ────────────────
+  const searchTimeoutRef = useRef(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+
   const parentState = navigation.getParent()?.getState();
   const isCurrentlyAdmin = parentState?.routeNames?.includes('Panel')
     || navigation.getState()?.routeNames?.includes('Panel')
@@ -196,8 +201,76 @@ export default function NewAlertScreen({ navigation }) {
 
   const colorPrimario = isCurrentlyAdmin ? '#dc2626' : '#0284c7';
 
+  // Cleanup de timeout al desmontar
+  React.useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // ─── Helpers ───────────────────────────────────────────────────────────────
   const updateForm = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
+
+  // ── NUEVO: Búsqueda de direcciones y selección ────────────────────────────
+  const buscarDirecciones = async (text) => {
+    // Coordenadas base para priorizar búsqueda en Tucumán/Yerba Buena
+    const viewbox = "-65.35,-26.88,-65.15,-26.75";
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&viewbox=${viewbox}&bounded=0&limit=5`,
+        {
+          headers: {
+            'User-Agent': 'AxonFire-App',
+          }
+        }
+      );
+      const data = await response.json();
+      setSuggestions(data || []);
+    } catch (error) {
+      console.warn('Error al buscar dirección:', error);
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  };
+
+  function onCambioUbicacion(text) {
+    updateForm('location', text);
+    
+    if (!text || text.trim().length < 4) {
+      setSuggestions([]);
+      setIsSearchingAddress(false);
+      return;
+    }
+    
+    setIsSearchingAddress(true);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      buscarDirecciones(text);
+    }, 600);
+  }
+
+  const seleccionarSugerencia = (item) => {
+    const partes = item.display_name.split(',');
+    const nombreLimpio = partes.slice(0, 3).map(p => p.trim()).join(', ');
+    
+    updateForm('location', nombreLimpio);
+    updateForm('latitud', item.lat);
+    updateForm('longitud', item.lon);
+    setCoordsSeleccionadas(true);
+    
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    if (!isNaN(lat) && !isNaN(lng) && mapaAlertaListo) {
+      webViewRef.current?.injectJavaScript(`moverMarcador(${lat}, ${lng}); true;`);
+    }
+    
+    setSuggestions([]);
+  };
 
   // ─── Mensajes del mini-mapa → React Native ────────────────────────────────
   function onMensajeMapaAlerta({ nativeEvent: { data } }) {
@@ -371,13 +444,41 @@ export default function NewAlertScreen({ navigation }) {
                 </View>
               )}
 
-              {/* Ubicación texto (igual que antes) */}
-              <InputField
-                label="UBICACIÓN EXACTA"
-                placeholder="DIRECCIÓN O DESCRIPCIÓN DEL LUGAR..."
-                value={formData.location}
-                onChangeText={text => updateForm('location', text)}
-              />
+              {/* Ubicación texto con autocompletado */}
+              <View style={styles.inputGroup}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.label}>UBICACIÓN EXACTA</Text>
+                  {isSearchingAddress && (
+                    <ActivityIndicator size="small" color={colorPrimario} style={{ marginBottom: 8 }} />
+                  )}
+                </View>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="DIRECCIÓN O DESCRIPCIÓN DEL LUGAR..."
+                    placeholderTextColor="#52525b"
+                    value={formData.location}
+                    onChangeText={onCambioUbicacion}
+                  />
+                </View>
+                
+                {suggestions.length > 0 && (
+                  <View style={styles.suggestionsContainer}>
+                    {suggestions.map((item, index) => (
+                      <TouchableOpacity
+                        key={item.place_id || String(index)}
+                        style={styles.suggestionItem}
+                        onPress={() => seleccionarSugerencia(item)}
+                      >
+                        <MaterialCommunityIcons name="map-marker-outline" size={16} color={colorPrimario} />
+                        <Text style={styles.suggestionText} numberOfLines={2}>
+                          {item.display_name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
 
               {/* ── NUEVO: Mini-mapa para seleccionar coordenadas ── */}
               <View style={styles.inputGroup}>
@@ -713,5 +814,29 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+  // ── Nuevo: autocompletado de direcciones ───────────────────────────────────
+  suggestionsContainer: {
+    backgroundColor: '#26282f',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    marginTop: 4,
+    maxHeight: 220,
+    overflow: 'hidden',
+    zIndex: 1000,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1b1d24',
+    gap: 10,
+  },
+  suggestionText: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    flex: 1,
   },
 });
