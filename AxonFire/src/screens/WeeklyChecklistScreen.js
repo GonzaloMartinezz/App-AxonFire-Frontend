@@ -679,7 +679,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
       // API Post attempt
       try {
-        await fetch(`${API_BASE_URL}/checklist_cuartel/`, {
+        const res = await fetch(`${API_BASE_URL}/checklist_cuartel/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -690,6 +690,9 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             detalles,
           }),
         });
+        if (!res.ok) {
+          console.warn('Backend returned error for checklist_cuartel POST:', res.status);
+        }
       } catch (err) {
         console.log('Error posting to backend, using local persistence:', err);
       }
@@ -704,9 +707,30 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       });
       await AsyncStorage.setItem('weekly_checklist_history', JSON.stringify(history));
 
-      // Refresh base inventory history immediately
-      await fetchHistorialCuartel();
+      // ── OPTIMISTIC UPDATE: actualizar "último control" inmediatamente ──
+      const nuevoCheckCuartel = {
+        id: `temp-${Date.now()}`,
+        fecha_control: new Date().toISOString(),
+        usuario: {
+          id: userId,
+          nombre_usuario: user?.nombre_usuario || 'Bombero',
+          bombero: user?.bombero || null,
+        },
+        detalles,
+      };
+      setUltimoCheckCuartel(nuevoCheckCuartel);
+      setHistorialCuartel(prev => [nuevoCheckCuartel, ...prev]);
+
+      // Reset inventory form
+      const resetInv = {};
+      herramientas.forEach(tool => {
+        resetInv[tool.id] = { status: null, justification: '' };
+      });
+      setInventoryItems(resetInv);
       setForceShowBaseInventoryList(false);
+
+      // Refrescar desde backend en segundo plano
+      fetchHistorialCuartel().catch(err => console.log('Error refreshing cuartel history:', err));
 
       if (Platform.OS === 'web') {
         alert('Inventario de base guardado correctamente.');
