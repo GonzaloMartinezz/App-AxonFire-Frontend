@@ -413,10 +413,11 @@ export default function MapScreen({ navigation, route }) {
     if (paramId) cargarIncidente(paramId);
   }, []);
 
-  // Recargar alertas cada vez que la pantalla obtiene el foco
+  // Recargar alertas y POIs cada vez que la pantalla obtiene el foco
   useFocusEffect(
     React.useCallback(() => {
       cargarAlertasActivas();
+      cargarPOIs();
     }, [token])
   );
 
