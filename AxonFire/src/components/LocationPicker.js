@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import MapView from 'react-native-maps';
+import MapView from './NativeMap';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const DEFAULT_LAT = -26.8083;

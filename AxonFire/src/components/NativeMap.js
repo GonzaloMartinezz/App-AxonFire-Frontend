@@ -4,10 +4,14 @@ import { View, Text } from 'react-native';
 export const PROVIDER_GOOGLE = 'google';
 
 export const Marker = ({ children }) => <View>{children}</View>;
+export const Polyline = () => null;
+export const Callout = ({ children }) => <View>{children}</View>;
 
 const NativeMap = React.forwardRef((props, ref) => {
   React.useImperativeHandle(ref, () => ({
     animateToRegion: () => {},
+    animateCamera: () => {},
+    fitToCoordinates: () => {},
   }));
 
   return (

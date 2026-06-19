@@ -25,7 +25,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
-import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
+import MapView, { Marker, Polyline, Callout } from '../components/NativeMap';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
