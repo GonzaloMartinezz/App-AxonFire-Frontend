@@ -25,7 +25,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
-import MapView, { Marker, Polyline, Callout } from '../components/NativeMap';
+import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -413,11 +413,9 @@ export default function MapScreen({ navigation, route }) {
     if (paramId) cargarIncidente(paramId);
   }, []);
 
-  // Recargar alertas y POIs cada vez que la pantalla obtiene el foco
   useFocusEffect(
     React.useCallback(() => {
       cargarAlertasActivas();
-      cargarPOIs();
     }, [token])
   );
 
@@ -669,14 +667,14 @@ export default function MapScreen({ navigation, route }) {
 
         {/* Origen de Ruta */}
         {incidente && locationGranted && (
-          <TouchableOpacity 
-            style={[styles.controlBtn, routeOrigin === 'USER' && { backgroundColor: '#fef2f2' }]} 
+          <TouchableOpacity
+            style={[styles.controlBtn, routeOrigin === 'USER' && { backgroundColor: '#fef2f2' }]}
             onPress={() => setRouteOrigin(routeOrigin === 'STATION' ? 'USER' : 'STATION')}
           >
-            <MaterialCommunityIcons 
-              name={routeOrigin === 'STATION' ? 'fire-truck' : 'account-map'} 
-              size={20} 
-              color={routeOrigin === 'USER' ? Colors.primary : Colors.onSurface} 
+            <MaterialCommunityIcons
+              name={routeOrigin === 'STATION' ? 'fire-truck' : 'account-map'}
+              size={20}
+              color={routeOrigin === 'USER' ? Colors.primary : Colors.onSurface}
             />
           </TouchableOpacity>
         )}
@@ -767,14 +765,46 @@ export default function MapScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* ── F1: Loading overlay ──────────────────────────────────────────── */}
-      {(cargando || (!mapaListo && !error)) && (
+      {/* ── F1: Pantalla de Carga y Error (Bloqueante) ─────────────────────────── */}
+      {(cargando || !mapaListo || error) && (
         <View style={styles.overlayLoading}>
-          <ActivityIndicator size="large" color="#dc2626" />
-          <Text style={styles.overlayTitulo}>Cargando mapa...</Text>
-          <Text style={styles.overlaySubtitulo}>
-            {cargando ? 'Obteniendo ubicación del cuartel' : 'Inicializando mapa nativo'}
-          </Text>
+          {error && !cargando ? (
+            <View style={{ alignItems: 'center', paddingHorizontal: 32 }}>
+              <MaterialCommunityIcons name="cloud-off-outline" size={48} color="#fca5a5" />
+              <Text style={[styles.overlayTitulo, { color: '#fca5a5', marginTop: 12 }]}>
+                Error de Conexión
+              </Text>
+              <Text style={[styles.overlaySubtitulo, { marginTop: 8 }]}>
+                {error}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.errorBotonReintentar}
+                onPress={cargarConfig}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
+                <Text style={styles.errorBotonTexto}>REINTENTAR</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ marginTop: 24, padding: 8 }}
+                onPress={() => setError(null)}
+              >
+                <Text style={[styles.overlaySubtitulo, { textDecorationLine: 'underline' }]}>
+                  Forzar inicio en modo offline
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#dc2626" />
+              <Text style={styles.overlayTitulo}>Cargando mapa...</Text>
+              <Text style={styles.overlaySubtitulo}>
+                {cargando ? 'Obteniendo ubicación del cuartel' : 'Inicializando mapa nativo'}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -1380,6 +1410,24 @@ const styles = StyleSheet.create({
   returnButtonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  // ── Estilos para el estado de Error ─────────────────────────────────────────
+  errorBotonReintentar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 24,
+    height: 48,
+    borderRadius: 8,
+    marginTop: 24,
+    gap: 8,
+  },
+  errorBotonTexto: {
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '800',
     letterSpacing: 1,
   },
