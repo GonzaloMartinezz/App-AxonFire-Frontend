@@ -21,6 +21,7 @@ import { Vibration } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import ModalRevisionBolsos, { useRevisionBolsos } from '../components/ModalRevisionBolsos';
+import { styles } from '../styles/EmergencyScreenStyles';
 
 // ── Local Mock / Storage Helpers ─────────────────────────────────────────────
 async function loadMockResponses(alertaId, currentUserId, token) {
@@ -163,7 +164,7 @@ function parseDateLocal(dateInput) {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
   if (typeof dateInput !== 'string') return new Date(dateInput);
-  
+
   // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
   const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
   return new Date(cleaned);
@@ -201,27 +202,27 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
       onChange('');
     }
   }
-  const estaVacio   = texto.length === 0;
-  const esValido    = esHoraValida(texto);
+  const estaVacio = texto.length === 0;
+  const esValido = esHoraValida(texto);
 
   return (
     <View style={inputStyles.wrapper}>
       <Text style={inputStyles.label}>{label}</Text>
       <View style={[
         inputStyles.container,
-        readOnly  && inputStyles.containerReadOnly,
-        enfocado  && inputStyles.containerFocused,
-        esValido  && !readOnly && inputStyles.containerValid,
+        readOnly && inputStyles.containerReadOnly,
+        enfocado && inputStyles.containerFocused,
+        esValido && !readOnly && inputStyles.containerValid,
       ]}>
         {/* Ícono izquierdo */}
         <MaterialCommunityIcons
           name={icono}
           size={18}
           color={
-            readOnly    ? '#475569'
-            : esValido  ? '#22c55e'
-            : enfocado  ? '#3b82f6'
-            : '#64748b'
+            readOnly ? '#475569'
+              : esValido ? '#22c55e'
+                : enfocado ? '#3b82f6'
+                  : '#64748b'
           }
           style={{ marginRight: 10 }}
         />
@@ -253,7 +254,7 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
           />
         )}
 
-{/* Indicador de estado */}
+        {/* Indicador de estado */}
         {!readOnly && esValido && (
           <MaterialCommunityIcons name="check-circle" size={16} color="#22c55e" />
         )}
@@ -276,19 +277,19 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
 }
 
 const inputStyles = StyleSheet.create({
-  wrapper:            { marginBottom: 16 },
-  label:              { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
-  container:          { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,24,39,0.8)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  wrapper: { marginBottom: 16 },
+  label: { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
+  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,24,39,0.8)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   containerReadOnly: { backgroundColor: 'rgba(15,20,28,0.9)', borderColor: 'rgba(71,85,105,0.3)', borderStyle: 'dashed' },
-  containerFocused:  { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.05)' },
-  containerValid:    { borderColor: 'rgba(34,197,94,0.4)' },
-  input:              { flex: 1, color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
-  readOnlyBox:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  readOnlyTexto:    { color: '#475569', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
-  badgeReadOnly:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(71,85,105,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  containerFocused: { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.05)' },
+  containerValid: { borderColor: 'rgba(34,197,94,0.4)' },
+  input: { flex: 1, color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
+  readOnlyBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  readOnlyTexto: { color: '#475569', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
+  badgeReadOnly: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(71,85,105,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   badgeReadOnlyTexto: { color: '#475569', fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
-  ayuda:            { color: '#475569', fontSize: 10, fontWeight: '500', marginTop: 4 },
-  ayudaReadOnly:    { color: '#334155', fontSize: 9, fontWeight: '500', marginTop: 3, fontStyle: 'italic' },
+  ayuda: { color: '#475569', fontSize: 10, fontWeight: '500', marginTop: 4 },
+  ayudaReadOnly: { color: '#334155', fontSize: 9, fontWeight: '500', marginTop: 3, fontStyle: 'italic' },
 });
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -314,14 +315,14 @@ export default function EmergencyScreen({ route, navigation }) {
 
   // ── AX-14: Tiempos críticos ──────────────────────────────────────────────
   // Hora de llamado: se captura automáticamente al confirmar (o desde alertaData)
-  const [horaLlamado, setHoraLlamado]   = useState('');
-  const [horaSalida, setHoraSalida]     = useState('');
-  const [horaRegreso, setHoraRegreso]   = useState('');
+  const [horaLlamado, setHoraLlamado] = useState('');
+  const [horaSalida, setHoraSalida] = useState('');
+  const [horaRegreso, setHoraRegreso] = useState('');
   const [guardandoTiempos, setGuardandoTiempos] = useState(false);
 
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const soundRef  = useRef(null);
+  const soundRef = useRef(null);
   const vibrationRef = useRef(null);
   const isAlertActiveRef = useRef(false);
   const soundLoadingRef = useRef(false);
@@ -354,16 +355,16 @@ export default function EmergencyScreen({ route, navigation }) {
   const promptedRef = useRef({});
 
 
-// ── Siren Sound & Vibration ────────────────────────────────────────────────
+  // ── Siren Sound & Vibration ────────────────────────────────────────────────
   async function startEmergencyAlert() {
     if (soundRef.current || vibrationRef.current || soundLoadingRef.current) return;
 
     isAlertActiveRef.current = true;
     soundLoadingRef.current = true;
     try {
-      await Audio.setAudioModeAsync({ 
-        playsInSilentModeIOS: true, 
-        staysActiveInBackground: true 
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true
       });
       const { sound } = await Audio.Sound.createAsync(
         require('../../assets/siren.wav'),
@@ -382,8 +383,8 @@ export default function EmergencyScreen({ route, navigation }) {
       if (!vibrationRef.current) {
         vibrationRef.current = setInterval(() => Vibration.vibrate(1000), 1500);
       }
-    } catch (e) { 
-      console.log('Error playing sound:', e); 
+    } catch (e) {
+      console.log('Error playing sound:', e);
     } finally {
       soundLoadingRef.current = false;
     }
@@ -403,14 +404,14 @@ export default function EmergencyScreen({ route, navigation }) {
       }
       soundRef.current = null;
     }
-    if (vibrationRef.current) { 
-      clearInterval(vibrationRef.current); 
-      vibrationRef.current = null; 
+    if (vibrationRef.current) {
+      clearInterval(vibrationRef.current);
+      vibrationRef.current = null;
     }
     Vibration.cancel();
   }
 
-// ── Control de Ciclo de Vida: Audio y Vibración ───────────────────────────
+  // ── Control de Ciclo de Vida: Audio y Vibración ───────────────────────────
   useEffect(() => {
     // Only cleanup audio on unmount
     return () => { stopEmergencyAlert(); };
@@ -440,10 +441,11 @@ export default function EmergencyScreen({ route, navigation }) {
       if (!activeAlertaId) {
         try {
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
-          params: {
+            params: {
               fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
               fecha_hasta: new Date().toISOString()
-            }, headers });
+            }, headers
+          });
           const data = resAlertas.data;
           const alertas = data.alertas || [];
           if (alertas.length > 0) {
@@ -464,7 +466,7 @@ export default function EmergencyScreen({ route, navigation }) {
         setLoadingAlerta(false);
         return;
       }
-      
+
       setResolvedAlertaId(activeAlertaId);
 
       // 3. Cargar datos específicos de la alerta
@@ -512,7 +514,7 @@ export default function EmergencyScreen({ route, navigation }) {
           estadoAlerta: { nombre_estado: 'ACTIVA' }
         };
       }
-      
+
       setAlertaData(alertDataObj);
 
       // AX-14: Extracción automática de la hora de llamado para la UI (Aporte dev)
@@ -542,10 +544,10 @@ export default function EmergencyScreen({ route, navigation }) {
           });
         }
       }
-      
+
       // Ver si YO ya respondí (primero verificar almacenamiento local persistente para máxima robustez)
       const localResponse = await AsyncStorage.getItem(`local_response_${activeAlertaId}`);
-      
+
       let miRespuestaVal = localResponse;
       if (!miRespuestaVal) {
         const miRespuestaObj = respuestas.find(r => (r.usuario_id || r.usuarioId?.id) === usuarioId);
@@ -555,7 +557,7 @@ export default function EmergencyScreen({ route, navigation }) {
           await AsyncStorage.setItem(`local_response_${activeAlertaId}`, miRespuestaVal);
         }
       }
-      
+
       if (isFinalizada) {
         setRespuesta('FINALIZADA');
         stopEmergencyAlert();
@@ -662,7 +664,7 @@ export default function EmergencyScreen({ route, navigation }) {
             }),
           }
         );
-        
+
         if (!res.ok) throw new Error(`HTTP Error Status: ${res.status}`);
       } catch (err) {
         console.log('Error responding to alert on backend, executing local sync override:', err);
@@ -694,7 +696,7 @@ export default function EmergencyScreen({ route, navigation }) {
       } else {
         mockList.push(updatedResponse);
       }
-      
+
       await AsyncStorage.setItem(`responses_${targetAlertaId}`, JSON.stringify(mockList));
       await AsyncStorage.setItem(`local_response_${targetAlertaId}`, estadoRespuesta);
       await stopEmergencyAlert();
@@ -806,8 +808,8 @@ export default function EmergencyScreen({ route, navigation }) {
               </Text>
             </Animated.View>
             {/* CTA de acceso rápido a revisión de bolsos */}
-            <TouchableOpacity 
-              style={[styles.changeButton, { marginTop: 12, backgroundColor: 'rgba(220, 38, 38, 0.1)', borderColor: 'rgba(220, 38, 38, 0.3)' }]} 
+            <TouchableOpacity
+              style={[styles.changeButton, { marginTop: 12, backgroundColor: 'rgba(220, 38, 38, 0.1)', borderColor: 'rgba(220, 38, 38, 0.3)' }]}
               onPress={() => navigation.navigate('ChecklistBolsos', { token })}
             >
               <MaterialCommunityIcons name="clipboard-check-outline" size={16} color="#dc2626" />
@@ -833,7 +835,7 @@ export default function EmergencyScreen({ route, navigation }) {
             contentContainerStyle={styles.confirmScroll}
             showsVerticalScrollIndicator={false}
           >
-{/* Card de confirmación */}
+            {/* Card de confirmación */}
             <Animated.View
               style={[
                 styles.confirmationCard,
@@ -860,7 +862,7 @@ export default function EmergencyScreen({ route, navigation }) {
               </View>
 
               {/* Botón premium de acceso al Tablero de Asistencia */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.boardAccessButton}
                 onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
                 activeOpacity={0.8}
@@ -886,7 +888,7 @@ export default function EmergencyScreen({ route, navigation }) {
                 <InputHora
                   label="Hora de Llamado"
                   value={horaLlamado}
-                  onChange={() => {}} 
+                  onChange={() => { }}
                   readOnly={true}
                   icono="phone-incoming"
                 />
@@ -931,18 +933,18 @@ export default function EmergencyScreen({ route, navigation }) {
             {/* ── Monitoreo de Personal y Dotación Activa (Aporte carona) ─── */}
             <View style={styles.respondersSummaryBox}>
               <View style={styles.summaryItem}>
-                 <Text style={[styles.summaryNum, { color: '#22c55e' }]}>{respuestaSummary.confirmaron}</Text>
-                 <Text style={styles.summaryLabel}>VAN</Text>
+                <Text style={[styles.summaryNum, { color: '#22c55e' }]}>{respuestaSummary.confirmaron}</Text>
+                <Text style={styles.summaryLabel}>VAN</Text>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
-                 <Text style={[styles.summaryNum, { color: '#94a3b8' }]}>{respuestaSummary.pendientes}</Text>
-                 <Text style={styles.summaryLabel}>PEND.</Text>
+                <Text style={[styles.summaryNum, { color: '#94a3b8' }]}>{respuestaSummary.pendientes}</Text>
+                <Text style={styles.summaryLabel}>PEND.</Text>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
-                 <Text style={[styles.summaryNum, { color: '#ef4444' }]}>{respuestaSummary.rechazaron}</Text>
-                 <Text style={styles.summaryLabel}>NO</Text>
+                <Text style={[styles.summaryNum, { color: '#ef4444' }]}>{respuestaSummary.rechazaron}</Text>
+                <Text style={styles.summaryLabel}>NO</Text>
               </View>
             </View>
 
@@ -953,10 +955,10 @@ export default function EmergencyScreen({ route, navigation }) {
                 <View style={styles.miniRespondersScroll}>
                   {responders.slice(0, 5).map((r, idx) => (
                     <View key={idx} style={styles.miniResponderItem}>
-                       <MaterialCommunityIcons name="account-check" size={12} color="#22c55e" />
-                       <Text style={styles.responderRowMini}>
-                         {r.nombre} {r.apellido} ({r.hora})
-                       </Text>
+                      <MaterialCommunityIcons name="account-check" size={12} color="#22c55e" />
+                      <Text style={styles.responderRowMini}>
+                        {r.nombre} {r.apellido} ({r.hora})
+                      </Text>
                     </View>
                   ))}
                   {responders.length > 5 && (
@@ -966,22 +968,22 @@ export default function EmergencyScreen({ route, navigation }) {
               </View>
             )}
 
-          {/* Botón cambiar respuesta */}
-          {respuesta !== 'FINALIZADA' && !alertaData?.estadoAlerta?.nombre_estado?.includes('FINALIZADO') && (
-            <TouchableOpacity style={styles.changeButton} onPress={cambiarRespuesta}>
-              <MaterialCommunityIcons name="refresh" size={16} color="#90a4ae" />
-              <Text style={styles.changeButtonText}>Cambiar mi respuesta</Text>
-            </TouchableOpacity>
-)}
+            {/* Botón cambiar respuesta */}
+            {respuesta !== 'FINALIZADA' && !alertaData?.estadoAlerta?.nombre_estado?.includes('FINALIZADO') && (
+              <TouchableOpacity style={styles.changeButton} onPress={cambiarRespuesta}>
+                <MaterialCommunityIcons name="refresh" size={16} color="#90a4ae" />
+                <Text style={styles.changeButtonText}>Cambiar mi respuesta</Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Botón de escape unificado para retornar al Panel Principal */}
-          <TouchableOpacity 
-            style={[styles.changeButton, { marginTop: 12 }]} 
-            onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
-            <Text style={styles.changeButtonText}>Volver al panel principal</Text>
-          </TouchableOpacity>
+            {/* Botón de escape unificado para retornar al Panel Principal */}
+            <TouchableOpacity
+              style={[styles.changeButton, { marginTop: 12 }]}
+              onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+              <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+            </TouchableOpacity>
 
             <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
           </ScrollView>
@@ -1017,17 +1019,17 @@ export default function EmergencyScreen({ route, navigation }) {
                   <MaterialCommunityIcons name="shield-lock-outline" size={64} color="#10b981" />
                 </View>
               </View>
-              
+
               <Text style={styles.emptyTitle}>SITUACIÓN BAJO CONTROL</Text>
               <Text style={styles.emptySubtitle}>
                 No se registran emergencias activas en este momento.
               </Text>
-              
+
               <View style={styles.statusBoxActive}>
                 <View style={styles.greenDot} />
                 <Text style={styles.statusBoxText}>SISTEMA EN MONITOREO ACTIVO</Text>
               </View>
-              
+
               <TouchableOpacity style={styles.emptyRefreshButton} onPress={fetchEmergencyData}>
                 <MaterialCommunityIcons name="refresh" size={18} color="#94a3b8" />
                 <Text style={styles.emptyRefreshButtonText}>VERIFICAR ALERTA</Text>
@@ -1120,7 +1122,7 @@ export default function EmergencyScreen({ route, navigation }) {
                 </TouchableOpacity>
 
                 {/* Acceso siempre disponible al Tablero de Asistencia */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.boardAccessButton}
                   onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
                   activeOpacity={0.8}
@@ -1132,307 +1134,11 @@ export default function EmergencyScreen({ route, navigation }) {
             </>
           )}
 
-        {/* FOOTER */}
-        <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
+          {/* FOOTER */}
+          <Text style={styles.footer}>AXON TACTICAL DRIVE</Text>
         </ScrollView>
       </SafeAreaView>
       <ModalRevisionBolsos estado={revisionBolsos} />
     </View>
   );
-}
-
-// ── Estilos Unificados ────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#0a0f12', padding: 20 },
-  confirmScroll:   { flexGrow: 1, paddingBottom: 40 },
-  centeredFlex:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  
-  header:          { alignItems: 'center', marginBottom: 20, width: '100%' },
-  headerTopRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', position: 'relative' },
-  refreshIcon:     { position: 'absolute', right: 0, padding: 10 },
-  
-  time:            { fontSize: 48, color: '#fff', fontWeight: 'bold' },
-  date:            { color: '#90a4ae', fontSize: 12, letterSpacing: 2 },
-  alertBox:        { flexDirection: 'row', gap: 10, backgroundColor: '#dc2626', padding: 16, borderRadius: 12, marginBottom: 20, alignItems: 'center' },
-  alertTitle:      { color: '#fff', fontWeight: 'bold' },
-  alertSubtitle:   { color: '#fecaca', fontSize: 12 },
-  card:            { backgroundColor: 'rgba(17,24,39,0.7)', padding: 20, borderRadius: 16, marginBottom: 20 },
-  label:           { color: '#90a4ae', fontSize: 10, marginBottom: 4 },
-  text:            { color: '#fff', marginBottom: 4 },
-  critical:        { color: '#ef4444', fontWeight: 'bold' },
-  row:             { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10 },
-  location:        { flexDirection: 'row', gap: 8, marginTop: 10 },
-  locationText:    { color: '#cfd8dc', flex: 1 },
-  errorBox:        { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: '#ef4444', borderRadius: 8, padding: 12, marginBottom: 12 },
-  errorText:       { color: '#ef4444', fontSize: 13, flex: 1 },
-  
-  actions:         { marginTop: 30, gap: 10, paddingBottom: 20 },
-  confirmButton:   { backgroundColor: '#dc2626', padding: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  rejectButton:    { backgroundColor: '#1f2937', padding: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  buttonDisabled:  { opacity: 0.6 },
-  buttonText:      { color: '#fff', fontWeight: 'bold' },
-  footer:          { textAlign: 'center', color: '#455a64', marginTop: 20, fontSize: 10 },
-
-  // ── Pantalla de Confirmación y Estados de Tarjeta ───────────────────────────
-  confirmationCard:          { width: '100%', borderRadius: 24, padding: 32, alignItems: 'center', gap: 10, borderWidth: 1, marginBottom: 20 },
-  confirmationCardAccepted:  { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)' },
-  confirmationCardRejected:  { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' },
-  confirmationCardFinalized: { backgroundColor: '#1e293b', borderColor: '#334155' },
-  confirmationTitle:         { color: '#fff', fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginTop: 6 },
-  confirmationSubtitle:      { color: '#90a4ae', fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  confirmationBadge:         { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginTop: 6 },
-  confirmationTime:          { color: '#90a4ae', fontSize: 12 },
-  changeButton:              { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(144,164,174,0.3)', alignSelf: 'center', marginTop: 8 },
-  changeButtonText:          { color: '#90a4ae', fontSize: 14 },
-
-  // ── AX-14: Card de Tiempos Críticos ────────────────────────────────────────
-  tiemposCard: {
-    backgroundColor: 'rgba(17,24,39,0.85)',
-    borderRadius: 16, padding: 20, marginBottom: 16,
-    borderWidth: 1, borderColor: 'rgba(220,38,38,0.2)',
-  },
-  tiemposHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6,
-  },
-  tiemposTitulo: {
-    color: '#dc2626', fontSize: 11, fontWeight: '900', letterSpacing: 1.2,
-  },
-  tiemposDesc: {
-    color: '#475569', fontSize: 11, fontWeight: '500',
-    marginBottom: 20, lineHeight: 16,
-  },
-  botonGuardarTiempos: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#dc2626',
-    borderRadius: 10, paddingVertical: 14, marginTop: 4,
-  },
-  botonGuardarTiemposTexto: {
-    color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 1,
-  },
-  // Responders List
-  respondersPreview: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  respondersHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  respondersTitle: {
-    color: '#3b82f6',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  respondersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  responderChip: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  responderChipText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  respondersSmallList: {
-    marginTop: 20,
-    width: '100%',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
-  respondersSmallTitle: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  responderRowMini: {
-    color: '#cfd8dc',
-    fontSize: 11,
-    flex: 1,
-  },
-  responderMoreText: {
-    color: '#3b82f6',
-    fontSize: 11,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  // Resumen de respuestas en confirmación
-  respondersSummaryBox: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    marginVertical: 16,
-  },
-  summaryItem: {
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  summaryNum: {
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  summaryLabel: {
-    fontSize: 9,
-    color: '#90a4ae',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  summaryDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  miniRespondersScroll: {
-    width: '100%',
-    marginTop: 8,
-    gap: 4,
-  },
-  miniResponderItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  boardAccessButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#0284c7',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    marginTop: 14,
-    width: '100%',
-    shadowColor: '#0284c7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(2, 132, 199, 0.5)'
-  },
-  boardAccessButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    marginTop: 40,
-  },
-  pulseContainer: {
-    position: 'relative',
-    width: 120,
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-  },
-  pulseRing: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  pulseIconContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  emptyTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 1,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: '#90a4ae',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  statusBoxActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 30,
-    marginBottom: 32,
-  },
-  greenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-    marginRight: 10,
-  },
-  statusBoxText: {
-    color: '#10b981',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  emptyRefreshButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#1f2937',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  emptyRefreshButtonText: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-});
+};

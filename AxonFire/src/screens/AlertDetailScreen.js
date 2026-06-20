@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import { styles } from '../styles/AlertDetailScreenStyles';
 
 const { width } = Dimensions.get('window');
 
@@ -75,7 +76,7 @@ function parseDateLocal(dateInput) {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
   if (typeof dateInput !== 'string') return new Date(dateInput);
-  
+
   // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
   const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
   return new Date(cleaned);
@@ -85,7 +86,7 @@ function parseDateLocal(dateInput) {
 function deduplicarLogistics(logs) {
   if (!Array.isArray(logs)) return [];
   const result = [];
-  
+
   const normalizeMsg = (msg) => {
     if (!msg) return '';
     return msg
@@ -101,13 +102,13 @@ function deduplicarLogistics(logs) {
   for (const log of sortedLogs) {
     const norm = normalizeMsg(log.mensaje);
     const time = new Date(log.fecha_hora).getTime();
-    
+
     let duplicateIdx = -1;
     for (let i = 0; i < result.length; i++) {
       const existing = result[i];
       const existingNorm = normalizeMsg(existing.mensaje);
       const existingTime = new Date(existing.fecha_hora).getTime();
-      
+
       // If messages match and time difference is <= 2 minutes (120000 ms)
       if (norm && norm === existingNorm && Math.abs(time - existingTime) <= 120000) {
         duplicateIdx = i;
@@ -119,7 +120,7 @@ function deduplicarLogistics(logs) {
       const existing = result[duplicateIdx];
       const logHasUser = !!log.usuarioId?.bombero;
       const existingHasUser = !!existing.usuarioId?.bombero;
-      
+
       if (logHasUser && !existingHasUser) {
         result[duplicateIdx] = log;
       }
@@ -175,26 +176,26 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
       onChange('');
     }
   }
-  const estaVacio   = texto.length === 0;
-  const esValido    = esHoraValida(texto);
+  const estaVacio = texto.length === 0;
+  const esValido = esHoraValida(texto);
 
   return (
     <View style={inputStyles.wrapper}>
       <Text style={inputStyles.label}>{label}</Text>
       <View style={[
         inputStyles.container,
-        readOnly  && inputStyles.containerReadOnly,
-        enfocado  && inputStyles.containerFocused,
-        esValido  && !readOnly && inputStyles.containerValid,
+        readOnly && inputStyles.containerReadOnly,
+        enfocado && inputStyles.containerFocused,
+        esValido && !readOnly && inputStyles.containerValid,
       ]}>
         <MaterialCommunityIcons
           name={icono}
           size={18}
           color={
-            readOnly    ? '#475569'
-            : esValido  ? '#22c55e'
-            : enfocado  ? '#3b82f6'
-            : '#64748b'
+            readOnly ? '#475569'
+              : esValido ? '#22c55e'
+                : enfocado ? '#3b82f6'
+                  : '#64748b'
           }
           style={{ marginRight: 10 }}
         />
@@ -245,19 +246,19 @@ function InputHora({ label, value, onChange, readOnly = false, icono = 'clock-ou
 }
 
 const inputStyles = StyleSheet.create({
-  wrapper:            { marginBottom: 16 },
-  label:              { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
-  container:          { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,24,39,0.8)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  wrapper: { marginBottom: 16 },
+  label: { color: '#64748b', fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
+  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,24,39,0.8)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   containerReadOnly: { backgroundColor: 'rgba(15,20,28,0.9)', borderColor: 'rgba(71,85,105,0.3)', borderStyle: 'dashed' },
-  containerFocused:  { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.05)' },
-  containerValid:    { borderColor: 'rgba(34,197,94,0.4)' },
-  input:              { flex: 1, color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
-  readOnlyBox:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  readOnlyTexto:    { color: '#475569', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
-  badgeReadOnly:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(71,85,105,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  containerFocused: { borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.05)' },
+  containerValid: { borderColor: 'rgba(34,197,94,0.4)' },
+  input: { flex: 1, color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
+  readOnlyBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  readOnlyTexto: { color: '#475569', fontSize: 22, fontWeight: '700', letterSpacing: 2 },
+  badgeReadOnly: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(71,85,105,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   badgeReadOnlyTexto: { color: '#475569', fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
-  ayuda:            { color: '#475569', fontSize: 10, fontWeight: '500', marginTop: 4 },
-  ayudaReadOnly:    { color: '#334155', fontSize: 9, fontWeight: '500', marginTop: 3, fontStyle: 'italic' },
+  ayuda: { color: '#475569', fontSize: 10, fontWeight: '500', marginTop: 4 },
+  ayudaReadOnly: { color: '#334155', fontSize: 9, fontWeight: '500', marginTop: 3, fontStyle: 'italic' },
 });
 
 export default function AlertDetailScreen({ route, navigation }) {
@@ -279,13 +280,13 @@ export default function AlertDetailScreen({ route, navigation }) {
   const [logistics, setLogistics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timerText, setTimerText] = useState('00:00:00');
-  
+
   // Tiempos Críticos
-  const [horaLlamado, setHoraLlamado]   = useState('');
-  const [horaSalida, setHoraSalida]     = useState('');
-  const [horaRegreso, setHoraRegreso]   = useState('');
+  const [horaLlamado, setHoraLlamado] = useState('');
+  const [horaSalida, setHoraSalida] = useState('');
+  const [horaRegreso, setHoraRegreso] = useState('');
   const [guardandoTiempos, setGuardandoTiempos] = useState(false);
-  
+
   // Modal Solicitar Recursos
   const [modalVisible, setModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
@@ -295,7 +296,7 @@ export default function AlertDetailScreen({ route, navigation }) {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     try {
       const headers = {
@@ -471,7 +472,7 @@ export default function AlertDetailScreen({ route, navigation }) {
         const llamadoMatch = msg.match(/Llamado:\s*([^\s|]+)/);
         const salidaMatch = msg.match(/Salida:\s*([^\s|]+)/);
         const regresoMatch = msg.match(/Regreso:\s*([^\s|]+)/);
-        
+
         if (llamadoMatch) setHoraLlamado(llamadoMatch[1]);
         if (salidaMatch) setHoraSalida(salidaMatch[1]);
         if (regresoMatch && regresoMatch[1] !== 'pendiente') setHoraRegreso(regresoMatch[1]);
@@ -494,8 +495,8 @@ export default function AlertDetailScreen({ route, navigation }) {
       `¿Solicitar ${resourceName} para esta emergencia?`,
       [
         { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Confirmar", 
+        {
+          text: "Confirmar",
           onPress: async () => {
             setRequesting(true);
             try {
@@ -663,15 +664,15 @@ export default function AlertDetailScreen({ route, navigation }) {
     let interval;
     if (alerta && alerta.fecha_hora && alerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
       const startTime = parseDateLocal(alerta.fecha_hora).getTime();
-      
+
       const updateTimer = () => {
         const now = new Date().getTime();
         const diff = Math.max(0, now - startTime);
-        
+
         const hours = Math.floor(diff / 3600000);
         const minutes = Math.floor((diff % 3600000) / 60000);
         const seconds = Math.floor((diff % 60000) / 1000);
-        
+
         setTimerText(
           `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
         );
@@ -707,14 +708,14 @@ export default function AlertDetailScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#121417" />
-      
-{/* Header */}
+
+      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
-           <TouchableOpacity onPress={() => navigation?.goBack()}>
-               <MaterialCommunityIcons name="arrow-left" size={24} color="#e11d48" />
-           </TouchableOpacity>
-            <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
+          <TouchableOpacity onPress={() => navigation?.goBack()}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#e11d48" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate(rol === 'ADMIN' ? 'AdminApp' : 'MainApp', { screen: 'Alertas' })}>
@@ -767,8 +768,8 @@ export default function AlertDetailScreen({ route, navigation }) {
 
         {/* Botón Finalizar Emergencia (solo para Administrador si no está finalizada) */}
         {rol === 'ADMIN' && alerta?.estadoAlerta?.nombre_estado !== 'FINALIZADO' && (
-          <TouchableOpacity 
-            style={styles.finalizeBtn} 
+          <TouchableOpacity
+            style={styles.finalizeBtn}
             onPress={finalizarEmergencia}
             activeOpacity={0.8}
           >
@@ -818,7 +819,7 @@ export default function AlertDetailScreen({ route, navigation }) {
           })}
 
           {logistics.length === 0 && (
-             <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>No hay suministros solicitados para esta emergencia.</Text>
+            <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>No hay suministros solicitados para esta emergencia.</Text>
           )}
 
           <TouchableOpacity style={styles.requestButton} onPress={() => setModalVisible(true)}>
@@ -855,7 +856,7 @@ export default function AlertDetailScreen({ route, navigation }) {
           <InputHora
             label="Hora de Llamado"
             value={horaLlamado}
-            onChange={() => {}} 
+            onChange={() => { }}
             readOnly={true}
             icono="phone-incoming"
           />
@@ -967,7 +968,7 @@ export default function AlertDetailScreen({ route, navigation }) {
             </View>
           ))}
           {responders.length === 0 && (
-             <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 10 }}>No hay personal en respuesta aún.</Text>
+            <Text style={{ color: '#94a3b8', fontSize: 13, marginTop: 10 }}>No hay personal en respuesta aún.</Text>
           )}
         </View>
 
@@ -984,7 +985,7 @@ export default function AlertDetailScreen({ route, navigation }) {
                 <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.modalSub}>Selecciona el recurso que necesitas en el lugar de la emergencia.</Text>
 
             <View style={styles.resourceGrid}>
@@ -1024,183 +1025,5 @@ export default function AlertDetailScreen({ route, navigation }) {
 
     </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-container:         { flex: 1, backgroundColor: '#16181d' },
-  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#26282f' },
-  headerLeft:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerTitle:      { fontSize: 16, fontWeight: '900', color: '#e11d48', letterSpacing: 0.5 },
-  headerRight:      { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  iconBtn:          { padding: 4 },
-  avatarBtn:        { width: 32, height: 32, borderRadius: 6, backgroundColor: '#2d333b', alignItems: 'center', justifyContent: 'center' },
-  scrollView:       { flex: 1 },
-  contentScroll:   { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
-
-  mainCard:         { backgroundColor: '#1b1d24', borderRadius: 8, flexDirection: 'row', overflow: 'hidden', marginBottom: 24 },
-  cardLeftBorder:  { width: 4, backgroundColor: '#e11d48' },
-  mainCardContent: { flex: 1, padding: 20 },
-  titleRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  mainTitle:       { color: '#f8fafc', fontSize: 22, fontWeight: '800', flex: 1 },
-  levelBadge:      { backgroundColor: '#b91c1c', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginLeft: 12 },
-  levelText:       { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  locationRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  locationText:    { color: '#cbd5e1', fontSize: 14, fontWeight: '500' },
-  timeStatsBox:    { backgroundColor: '#13141a', borderRadius: 6, padding: 16, flexDirection: 'row', justifyContent: 'space-between' },
-  timeStatItem:    { flex: 1 },
-  timeStatItemRight: { flex: 1, alignItems: 'flex-end' },
-  timeLabel:       { color: '#94a3b8', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
-  timeValueRed:    { color: '#fca5a5', fontSize: 16, fontWeight: '800' },
-  timeValueWhite:  { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
-
-  sectionContainer: { backgroundColor: '#1b1d24', borderRadius: 8, padding: 20, marginBottom: 24 },
-  sectionHeader:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
-  sectionTitle:    { color: '#f8fafc', fontSize: 14, fontWeight: '700', letterSpacing: 1 },
-  logisticsItem:   { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
-  logisticsIcon:   { width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  logisticsTitle:  { color: '#f8fafc', fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  logisticsSubtitle: { color: '#94a3b8', fontSize: 13 },
-
-  requestButton:   { borderWidth: 1, borderColor: '#334155', borderStyle: 'dashed', borderRadius: 6, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 10 },
-  requestButtonText: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
-
-  // ── AX-16: Botón de informe (De la rama dev) ───────────────────────────────────────────────
-  informeButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#1e1b2e',
-    borderWidth: 1, borderColor: '#3b1f6e',
-    borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16,
-    marginTop: 4,
-  },
-  informeButtonText: {
-    flex: 1, color: '#c4b5fd',
-    fontSize: 12, fontWeight: '900', letterSpacing: 0.8,
-  },
-  informeBadgeRol: {
-    backgroundColor: '#3b1f6e',
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4,
-  },
-  informeBadgeRolTexto: {
-    color: '#c4b5fd', fontSize: 8, fontWeight: '900', letterSpacing: 0.6,
-  },
-
-  mapContainer:    { height: 250, backgroundColor: '#1a1d24', borderRadius: 8, overflow: 'hidden', marginBottom: 24, position: 'relative', borderWidth: 1, borderColor: '#26282f' },
-  mapBackgroundOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#1a1d24', opacity: 0.8 },
-  liveBadge:       { position: 'absolute', top: 16, left: 16, backgroundColor: 'rgba(30,41,59,0.8)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  redDot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fca5a5' },
-  liveText:        { color: '#f8fafc', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  mapControls:     { position: 'absolute', bottom: 16, right: 16, gap: 8 },
-  mapFab:          { width: 40, height: 40, backgroundColor: '#2d333b', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
-  impactCard:      { position: 'absolute', bottom: 16, left: 16, backgroundColor: '#2d333b', padding: 12, borderRadius: 4 },
-  impactLabel:     { color: '#cbd5e1', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
-  impactValue:     { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
-
-  personnelCard:   { borderLeftWidth: 2, borderLeftColor: '#334155', paddingLeft: 16, marginBottom: 20 },
-  personTopRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  personName:      { color: '#f8fafc', fontSize: 14, fontWeight: '700' },
-  statusBadge:     { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
-  statusText:      { color: '#cbd5e1', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  personRoleRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  personRoleText:  { color: '#94a3b8', fontSize: 13 },
-
-  // ── Modales (Rescatados de la rama carona) ───────────────────────────────────────────────
-  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent:    { width: '100%', backgroundColor: '#1b1d24', borderRadius: 12, padding: 24, borderWidth: 1, borderColor: '#26282f' },
-  modalHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle:      { color: '#f8fafc', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
-  modalSub:        { color: '#94a3b8', fontSize: 13, marginBottom: 24, lineHeight: 18 },
-  resourceGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  resourceCard:    { width: '48%', backgroundColor: '#13141a', borderRadius: 8, padding: 16, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#26282f' },
-  resIcon:         { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  resName:         { color: '#f8fafc', fontSize: 10, fontWeight: '800', textAlign: 'center', letterSpacing: 0.5 },
-  logisticsStatus: { backgroundColor: '#064e3b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
-  statusMiniText:  { color: '#10b981', fontSize: 8, fontWeight: '900' },
-  finalizeBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: '#e11d48', 
-    paddingVertical: 14, 
-    borderRadius: 8, 
-    marginBottom: 24, 
-    gap: 8,
-    shadowColor: '#e11d48',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  finalizeBtnText: { 
-    color: '#fff', 
-    fontSize: 13, 
-    fontWeight: '800', 
-    letterSpacing: 1 
-  },
-  tiemposCard: {
-    backgroundColor: '#1b1d24',
-    borderRadius: 8, 
-    padding: 20, 
-    marginBottom: 24,
-    borderWidth: 1, 
-    borderColor: 'rgba(225,29,72,0.15)',
-  },
-  tiemposHeader: {
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 8, 
-    marginBottom: 6,
-  },
-  tiemposTitulo: {
-    color: '#e11d48', 
-    fontSize: 12, 
-    fontWeight: '900', 
-    letterSpacing: 1.2,
-  },
-  tiemposDesc: {
-    color: '#64748b', 
-    fontSize: 11, 
-    fontWeight: '500',
-    marginBottom: 20, 
-    lineHeight: 16,
-  },
-  botonGuardarTiempos: {
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    gap: 8, 
-    backgroundColor: '#e11d48',
-    borderRadius: 6, 
-    paddingVertical: 14, 
-    marginTop: 4,
-    shadowColor: '#e11d48',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  botonGuardarTiemposTexto: {
-    color: '#fff', 
-    fontSize: 12, 
-    fontWeight: '900', 
-    letterSpacing: 1,
-  },
-  verEnMapaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.25)',
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  verEnMapaBtnTexto: {
-    flex: 1,
-    color: '#38bdf8',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-});
