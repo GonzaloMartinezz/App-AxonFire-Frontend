@@ -20,6 +20,7 @@ import DamageReportField, { isDamageReportComplete } from '../components/DamageR
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import SelectorBomberos from '../components/SelectorBomberos';
+import { styles } from '../styles/WeeklyChecklistScreenStyles';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -79,16 +80,16 @@ function getToolIcon(name) {
 // Icon resolver for daily checklist sectors
 function getIconoDiario(nombre = '') {
   const n = nombre.toLowerCase();
-  if (n.includes('manguera'))                        return 'pipe';
-  if (n.includes('extintor'))                        return 'fire-extinguisher';
-  if (n.includes('motosierra'))                      return 'saw-blade';
-  if (n.includes('hacha'))                           return 'axe';
-  if (n.includes('hidrau'))                          return 'car-wrench';
-  if (n.includes('casco'))                           return 'hard-hat';
-  if (n.includes('era') || n.includes('autónomo'))   return 'diving-scuba-tank';
-  if (n.includes('piton'))                           return 'water';
-  if (n.includes('cuerda') || n.includes('soga'))    return 'rope';
-  if (n.includes('escalera'))                        return 'stairs';
+  if (n.includes('manguera')) return 'pipe';
+  if (n.includes('extintor')) return 'fire-extinguisher';
+  if (n.includes('motosierra')) return 'saw-blade';
+  if (n.includes('hacha')) return 'axe';
+  if (n.includes('hidrau')) return 'car-wrench';
+  if (n.includes('casco')) return 'hard-hat';
+  if (n.includes('era') || n.includes('autónomo')) return 'diving-scuba-tank';
+  if (n.includes('piton')) return 'water';
+  if (n.includes('cuerda') || n.includes('soga')) return 'rope';
+  if (n.includes('escalera')) return 'stairs';
   return 'toolbox-outline';
 }
 
@@ -128,7 +129,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   const userId = user?.id || '';
 
   // Parámetros de navegación para el tab diario (opcionales)
-  const camionId     = route?.params?.camionId     || null;
+  const camionId = route?.params?.camionId || null;
   const camionNombre = route?.params?.camionNombre || 'MÓVIL';
 
   const headers = {
@@ -182,14 +183,14 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   const isMaintBlocked = blocked && !maintBypassed;
 
   // ── State for Daily Checklist Tab ───────────────────────────────────────
-  const [sectores, setSectores]           = useState([]);
+  const [sectores, setSectores] = useState([]);
   const [faltantesAyer, setFaltantesAyer] = useState(new Set());
   const [estadoItemsDiario, setEstadoItemsDiario] = useState({});
   const [observacionesDiario, setObservacionesDiario] = useState({});
-  const [acompanantes, setAcompanantes]   = useState([]);
+  const [acompanantes, setAcompanantes] = useState([]);
   const [cargandoDiario, setCargandoDiario] = useState(false);
   const [guardandoDiario, setGuardandoDiario] = useState(false);
-  const [errorDiario, setErrorDiario]     = useState(null);
+  const [errorDiario, setErrorDiario] = useState(null);
 
   // Listado de camiones disponibles para seleccionar en el tab diario
   const [camionesDisponibles, setCamionesDisponibles] = useState([]);
@@ -251,7 +252,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       } else {
         const hasRadio = tools.some(t => t.nombre_herramienta?.toUpperCase().includes('RADIO DE REPUESTO'));
         const hasMotosierra = tools.some(t => t.nombre_herramienta?.toUpperCase().includes('MOTOSIERRA DE CUARTEL'));
-        
+
         if (!hasRadio) {
           tools.push({ id: 'fixed_radio', nombre_herramienta: 'RADIO DE REPUESTO', cantidad_disponible: 5 });
         }
@@ -320,7 +321,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       if (res.ok) {
         const data = await res.json();
         const camiones = Array.isArray(data) ? data : [];
-        
+
         // Cargar en paralelo el historial más reciente para cada camión
         const camionesConHistorial = await Promise.all(
           camiones.map(async (camion) => {
@@ -339,7 +340,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             return { ...camion, ultimoCheck: null };
           })
         );
-        
+
         setCamionesDisponibles(camionesConHistorial);
       }
     } catch (err) {
@@ -354,10 +355,10 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   async function seleccionarCamion(camion) {
     const tieneControlHoy = camion.ultimoCheck && esDeHoy(camion.ultimoCheck.fecha_control);
     if (tieneControlHoy) {
-      const bomberoNombre = camion.ultimoCheck.usuarioId?.bombero 
+      const bomberoNombre = camion.ultimoCheck.usuarioId?.bombero
         ? `${camion.ultimoCheck.usuarioId.bombero.nombre} ${camion.ultimoCheck.usuarioId.bombero.apellido}`
         : camion.ultimoCheck.usuarioId?.nombre_usuario || 'un bombero';
-      
+
       const horaText = new Date(camion.ultimoCheck.fecha_control).toLocaleTimeString('es-AR', {
         hour: '2-digit',
         minute: '2-digit'
@@ -380,7 +381,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         return;
       }
     }
-    
+
     setCamionSeleccionado(camion);
   }
 
@@ -413,7 +414,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
     );
     if (!res.ok) throw new Error(`Error ${res.status}`);
     const data = await res.json();
-    
+
     // Transform Record<string, InventarioItem[]> to Array of sectors
     let lista = [];
     if (Array.isArray(data)) {
@@ -428,7 +429,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         }))
       }));
     }
-    
+
     setSectores(lista);
 
     const estadoInicial = {};
@@ -592,14 +593,16 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         setAcompanantes([]);
       } else {
         Alert.alert('✅ Guardado', 'El checklist diario fue guardado correctamente.', [
-          { text: 'OK', onPress: () => {
-            // Reset para volver al grid con los datos actualizados
-            setCamionSeleccionado(null);
-            setSectores([]);
-            setEstadoItemsDiario({});
-            setObservacionesDiario({});
-            setAcompanantes([]);
-          }},
+          {
+            text: 'OK', onPress: () => {
+              // Reset para volver al grid con los datos actualizados
+              setCamionSeleccionado(null);
+              setSectores([]);
+              setEstadoItemsDiario({});
+              setObservacionesDiario({});
+              setAcompanantes([]);
+            }
+          },
         ]);
       }
     } catch (err) {
@@ -923,13 +926,13 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                         {daysSinceDate(ultimoCheckCuartel.fecha_control) === 0
                           ? 'HACE HORAS'
                           : daysSinceDate(ultimoCheckCuartel.fecha_control) === 1
-                          ? 'AYER'
-                          : `HACE ${daysSinceDate(ultimoCheckCuartel.fecha_control)} DÍAS`}
+                            ? 'AYER'
+                            : `HACE ${daysSinceDate(ultimoCheckCuartel.fecha_control)} DÍAS`}
                       </Text>
                     </View>
                   )}
                 </View>
-                
+
                 <View style={styles.lastCheckBaseBody}>
                   <View style={styles.lastCheckBaseInfoRow}>
                     <View style={{ flex: 1 }}>
@@ -1385,7 +1388,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                   {camionesDisponibles.map(camion => {
                     const ultimoCheck = camion.ultimoCheck;
                     const controladoHoy = ultimoCheck && esDeHoy(ultimoCheck.fecha_control);
-                    
+
                     let checkInfoText = 'Sin chequeos';
                     let autorText = '';
                     if (ultimoCheck) {
@@ -1394,13 +1397,13 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                       const mes = String(fecha.getMonth() + 1).padStart(2, '0');
                       const hora = String(fecha.getHours()).padStart(2, '0');
                       const mins = String(fecha.getMinutes()).padStart(2, '0');
-                      
-                      checkInfoText = controladoHoy 
-                        ? `Hoy - ${hora}:${mins} hs` 
+
+                      checkInfoText = controladoHoy
+                        ? `Hoy - ${hora}:${mins} hs`
                         : `${dia}/${mes} - ${hora}:${mins} hs`;
-                      
+
                       const userBombero = ultimoCheck.usuarioId?.bombero;
-                      autorText = userBombero 
+                      autorText = userBombero
                         ? `${userBombero.nombre} ${userBombero.apellido.substring(0, 1)}.`
                         : ultimoCheck.usuarioId?.nombre_usuario || '';
                     }
@@ -1416,7 +1419,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                         activeOpacity={0.75}
                       >
                         {ultimoCheck && (
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.eyeIconBadge}
                             onPress={() => {
                               setUltimoCheckSeleccionado({
@@ -1436,7 +1439,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                         <Text style={styles.nombreCamion} numberOfLines={2}>
                           {camion.nombre_camion?.toUpperCase()}
                         </Text>
-                        
+
                         <View style={styles.checkStatusInfo}>
                           {controladoHoy ? (
                             <View style={styles.badgeControladoHoy}>
@@ -1541,10 +1544,10 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                     </View>
 
                     {(sector.herramientas || []).map((item) => {
-                      const estado         = estadoItemsDiario[item.id] || null;
+                      const estado = estadoItemsDiario[item.id] || null;
                       const esFaltanteAyer = faltantesAyer.has(item.id);
-                      const esChequeado    = estado === 'CHEQUEADO';
-                      const esFaltante     = estado === 'FALTANTE';
+                      const esChequeado = estado === 'CHEQUEADO';
+                      const esFaltante = estado === 'FALTANTE';
 
                       return (
                         <View
@@ -1552,7 +1555,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                           style={[
                             styles.cardItem,
                             esChequeado && { borderLeftColor: '#22c55e' },
-                            esFaltante  && { borderLeftColor: '#dc2626', backgroundColor: '#1f1315' },
+                            esFaltante && { borderLeftColor: '#dc2626', backgroundColor: '#1f1315' },
                             esFaltanteAyer && !esChequeado && !esFaltante && { borderLeftColor: '#f59e0b', backgroundColor: '#1c1a12' },
                           ]}
                         >
@@ -1565,10 +1568,10 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                                   name={getIconoDiario(item.herramienta)}
                                   size={16}
                                   color={
-                                    esFaltante      ? '#fca5a5'
-                                    : esChequeado   ? '#86efac'
-                                    : esFaltanteAyer ? '#fcd34d'
-                                    : '#64748b'
+                                    esFaltante ? '#fca5a5'
+                                      : esChequeado ? '#86efac'
+                                        : esFaltanteAyer ? '#fcd34d'
+                                          : '#64748b'
                                   }
                                 />
                               </View>
@@ -1947,7 +1950,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                             : item.usuario?.nombre_usuario || 'Bombero de Guardia'}
                         </Text>
                       </View>
-                      
+
                       <View style={{ alignItems: 'flex-end', gap: 4 }}>
                         {failItems > 0 ? (
                           <View style={[styles.controlledTodayBadge, { backgroundColor: 'rgba(220, 38, 38, 0.15)', borderColor: 'rgba(220, 38, 38, 0.3)' }]}>
@@ -1978,893 +1981,4 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       </Modal>
     </View>
   );
-}
-
-// ── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#16181d',
-    ...Platform.select({
-      web: {
-        height: '100vh',
-        overflow: 'hidden',
-      },
-      default: {
-        height: '100%',
-        overflow: 'visible',
-      },
-    }),
-  },
-  scrollView: {
-    flex: 1,
-    ...Platform.select({
-      web: {
-        height: 'calc(100vh - 80px)',
-        overflowY: 'auto',
-      },
-      default: {
-        height: '100%',
-      },
-    }),
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#1a1c23',
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBarTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 120,
-  },
-  headerTitleBox: {
-    marginBottom: 24,
-  },
-  mainTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dateText: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  dateDot: {
-    color: '#94a3b8',
-    fontSize: 10,
-  },
-
-  // Tabs Row — 3 tabs
-  tabRow: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 4,
-    gap: 6,
-  },
-  tabActive: {
-    backgroundColor: '#dc2626',
-  },
-  tabText: {
-    color: '#94a3b8',
-    fontWeight: '700',
-    fontSize: 10,
-    letterSpacing: 0.5,
-  },
-  tabTextActive: {
-    color: '#fff',
-  },
-
-  // Blocked banner
-  blockedBanner: {
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#854d0e',
-  },
-  blockedIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-  },
-  blockedTitle: {
-    color: '#fbbf24',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  blockedText: {
-    color: '#94a3b8',
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  bypassButton: {
-    marginTop: 14,
-    backgroundColor: '#fbbf24',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  bypassButtonText: {
-    color: '#0f172a',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-
-  // Progress
-  progressContainer: {
-    marginBottom: 24,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  progressValue: {
-    color: '#dc2626',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  progressBarBg: {
-    height: 4,
-    backgroundColor: '#26282f',
-    borderRadius: 2,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#dc2626',
-    borderRadius: 2,
-  },
-
-  // Section
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 8,
-    gap: 8,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  sectionLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#26282f',
-    marginLeft: 8,
-  },
-  sectionCount: {
-    color: '#475569',
-    fontSize: 10,
-    fontWeight: '700',
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-
-  // Card items
-  cardItem: {
-    backgroundColor: '#1b1d24',
-    borderRadius: 4,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#334155',
-  },
-  cardItemLeft: {
-    flex: 1,
-  },
-  toolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  toolIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#2d1515',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemTitle: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  itemSubtitle: {
-    color: '#94a3b8',
-    fontSize: 10,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconButton: {
-    width: 48,
-    height: 36,
-    borderRadius: 4,
-    backgroundColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconButtonActive: {
-    backgroundColor: '#22c55e',
-  },
-  iconButtonFail: {
-    backgroundColor: '#dc2626',
-  },
-  btnText: {
-    color: '#e2e8f0',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  btnTextActive: {
-    color: '#fff',
-  },
-
-  // Save button
-  saveButton: {
-    backgroundColor: '#dc2626',
-    borderRadius: 6,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginTop: 32,
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#334155',
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-
-  // ── Daily Checklist Tab styles ─────────────────────────────────────────
-
-  // Intro (selector de camión)
-  introBox: {
-    alignItems: 'center',
-    paddingVertical: 28,
-    gap: 8,
-    marginBottom: 20,
-  },
-  introTitulo: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-  },
-  introSub: {
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-
-  // Grid de camiones
-  gridCamiones: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  cardCamion: {
-    width: '47%',
-    backgroundColor: '#1b1d24',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  iconoCamionBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#2d1515',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nombreCamion: {
-    color: '#e2e8f0',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    textAlign: 'center',
-  },
-  estadoCamionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  puntoVerde: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#22c55e',
-  },
-  estadoCamionText: {
-    color: '#22c55e',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-
-  // Camión banner (selected truck header)
-  camionBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    padding: 14,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    borderLeftWidth: 3,
-    borderLeftColor: '#dc2626',
-  },
-  camionBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  camionBannerTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  camionBannerSub: {
-    color: '#dc2626',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginTop: 2,
-  },
-  camionBannerBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Faltantes ayer
-  alertaAyer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#451a03',
-    borderRadius: 6,
-    padding: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
-    marginBottom: 16,
-  },
-  alertaAyerText: {
-    color: '#fcd34d',
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
-    lineHeight: 16,
-  },
-  badgeFaltanteAyer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#78350f',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  badgeFaltanteAyerText: {
-    color: '#fcd34d',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-
-  // Observación para faltantes
-  observacionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-    backgroundColor: '#2d1515',
-    borderRadius: 4,
-    padding: 8,
-  },
-  observacionInput: {
-    color: '#f87171',
-    fontSize: 10,
-    fontWeight: '600',
-    fontStyle: 'italic',
-    flex: 1,
-  },
-
-  // Estados genéricos
-  centrado: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    gap: 10,
-  },
-  textoEstado: {
-    color: '#475569',
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  botonReintentar: {
-    marginTop: 8,
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 4,
-  },
-  textoReintentar: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  eyeIconBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#26282f',
-    padding: 6,
-    borderRadius: 14,
-    zIndex: 10,
-  },
-  checkStatusInfo: {
-    alignItems: 'center',
-    width: '100%',
-    marginTop: 4,
-  },
-  badgeControladoHoy: {
-    backgroundColor: '#052e16',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 4,
-  },
-  badgeControladoHoyText: {
-    color: '#22c55e',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  ultimoCheckLabel: {
-    color: '#64748b',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  ultimoCheckVal: {
-    color: '#94a3b8',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  ultimoCheckAutor: {
-    color: '#64748b',
-    fontSize: 8,
-    fontStyle: 'italic',
-    marginTop: 2,
-    textAlign: 'center',
-    width: '100%',
-  },
-  // Modal layout styles
-  auditCenteredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    padding: 20,
-  },
-  auditModalView: {
-    width: '100%',
-    maxWidth: 500,
-    backgroundColor: '#16181d',
-    borderRadius: 8,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  auditHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
-    paddingBottom: 12,
-  },
-  auditTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  auditDesc: {
-    color: '#dc2626',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginTop: 4,
-  },
-  auditCloseIcon: {
-    padding: 6,
-    borderRadius: 14,
-    backgroundColor: '#26282f',
-  },
-  auditAuditorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#1b1d24',
-    padding: 10,
-    borderRadius: 4,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  auditAuditorText: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  auditScroll: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  auditSectorBlock: {
-    marginBottom: 16,
-  },
-  auditSectorHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
-    paddingBottom: 6,
-    marginBottom: 8,
-  },
-  auditSectorTitle: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  auditToolRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1b1d24',
-    padding: 12,
-    borderRadius: 4,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  auditToolName: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  auditToolObs: {
-    color: '#f87171',
-    fontSize: 9,
-    fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  auditToolStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  auditToolStatusText: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  auditBtnClose: {
-    backgroundColor: '#334155',
-    borderRadius: 6,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  auditBtnCloseText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  lastCheckBaseCard: {
-    backgroundColor: '#1b1d24',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    padding: 14,
-    marginBottom: 16,
-  },
-  lastCheckBaseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
-    paddingBottom: 10,
-    marginBottom: 10,
-  },
-  lastCheckBaseTitle: {
-    color: '#22c55e',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  controlledTodayBadge: {
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.3)',
-  },
-  controlledTodayText: {
-    color: '#22c55e',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  daysSinceBadge: {
-    backgroundColor: 'rgba(234, 179, 8, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(234, 179, 8, 0.3)',
-  },
-  daysSinceText: {
-    color: '#eab308',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  lastCheckBaseBody: {
-    gap: 12,
-  },
-  lastCheckBaseInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  lastCheckBaseLabel: {
-    color: '#64748b',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  lastCheckBaseVal: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  lastCheckBaseActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  lastCheckBaseBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#dc2626',
-    paddingVertical: 8,
-    borderRadius: 4,
-  },
-  lastCheckBaseBtnText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  auditSummaryContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  auditSummaryBlock: {
-    flex: 1,
-    backgroundColor: '#1b1d24',
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  auditSummaryNum: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  auditSummaryLabel: {
-    color: '#64748b',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginTop: 2,
-  },
-  historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1b1d24',
-    padding: 12,
-    borderRadius: 4,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    borderLeftWidth: 3,
-    borderLeftColor: '#22c55e',
-  },
-  historyRowDate: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  historyRowAuditor: {
-    color: '#94a3b8',
-    fontSize: 9,
-    fontWeight: '500',
-    fontStyle: 'italic',
-  },
-  modifyControlBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderColor: '#22c55e',
-    borderWidth: 1,
-    paddingVertical: 8,
-    borderRadius: 4,
-    marginTop: 8,
-  },
-  modifyControlBtnText: {
-    color: '#22c55e',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  editModeWarningCard: {
-    backgroundColor: '#1b1d24',
-    borderWidth: 1,
-    borderColor: '#fbbf24',
-    borderLeftWidth: 4,
-    borderLeftColor: '#fbbf24',
-    borderRadius: 6,
-    padding: 12,
-    marginTop: 12,
-    marginBottom: 16,
-    gap: 8,
-  },
-  editModeWarningHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  editModeWarningTitle: {
-    color: '#fbbf24',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  editModeWarningText: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '500',
-    lineHeight: 14,
-  },
-  cancelEditBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(220, 38, 38, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(220, 38, 38, 0.3)',
-    paddingVertical: 6,
-    borderRadius: 4,
-    marginTop: 4,
-  },
-  cancelEditBtnText: {
-    color: '#fca5a5',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-});
+};

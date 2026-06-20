@@ -21,6 +21,7 @@ import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
+import { styles } from '../styles/PanelControlScreenStyles';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ function clasificarEstado(nombreEstado = '') {
   if (e === 'PENDIENTE') return 'activa';
   if (e === 'EN CURSO') return 'progreso';
   if (e === 'FINALIZADO') return 'resuelta';
-  
+
   if (e.includes('ACTIV')) return 'activa';
   if (e.includes('DESPACH')) return 'despachada';
   if (e.includes('PROGRESO') || e.includes('CURSO')) return 'progreso';
@@ -110,18 +111,18 @@ export default function PanelControlScreen({ navigation }) {
       const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const res = await axios.get(`${API_BASE_URL}/alerta/rango`, {
-          params: { fecha_desde: desde, fecha_hasta: hasta },
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          timeout: 15000,
-        }
+        params: { fecha_desde: desde, fecha_hasta: hasta },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        timeout: 15000,
+      }
       );
 
       const data = res.data;
       const lista = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
-      
+
       // Resolve local finalized overrides
       const resolvedLista = await Promise.all(lista.map(async (a) => {
         const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${a.id}`);
@@ -154,8 +155,8 @@ export default function PanelControlScreen({ navigation }) {
       "¿Deseas eliminar todo el historial de pruebas para iniciar un test limpio? Esta acción borrará todas las alertas y registros de comunicación.",
       [
         { text: "Cancelar", style: "cancel" },
-        { 
-          text: "BORRAR TODO", 
+        {
+          text: "BORRAR TODO",
           style: "destructive",
           onPress: async () => {
             setCargando(true);
@@ -213,8 +214,8 @@ export default function PanelControlScreen({ navigation }) {
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
         <View style={styles.topBarRight}>
-          <TouchableOpacity 
-            style={styles.iconBtn} 
+          <TouchableOpacity
+            style={styles.iconBtn}
             onPress={() => {
               const changeView = () => {
                 navigation.navigate('MainApp');
@@ -307,8 +308,8 @@ export default function PanelControlScreen({ navigation }) {
             </View>
 
             <View style={styles.grilla}>
-              <TouchableOpacity 
-                activeOpacity={0.7} 
+              <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Activas' })}
                 style={[styles.cardStat, { borderLeftColor: '#ef4444' }]}
               >
@@ -319,8 +320,8 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.statLabel}>Activas</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                activeOpacity={0.7} 
+              <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Despachadas' })}
                 style={[styles.cardStat, { borderLeftColor: '#3b82f6' }]}
               >
@@ -331,8 +332,8 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.statLabel}>Despachadas</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                activeOpacity={0.7} 
+              <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Resueltas' })}
                 style={[styles.cardStat, { borderLeftColor: '#10b981' }]}
               >
@@ -343,8 +344,8 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.statLabel}>Resueltas</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                activeOpacity={0.7} 
+              <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Todas' })}
                 style={[styles.cardStat, { borderLeftColor: '#94a3b8' }]}
               >
@@ -357,7 +358,7 @@ export default function PanelControlScreen({ navigation }) {
             </View>
 
             {/* ── Acceso a Centro Logístico ───────────────────────────────── */}
-            <TouchableOpacity 
+            <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => navigation.navigate('Logistica')}
               style={styles.logisticCard}
@@ -399,7 +400,7 @@ export default function PanelControlScreen({ navigation }) {
             </View>
 
             <View style={styles.gridContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('NewAlert')}
                 style={styles.gridItem}
@@ -414,7 +415,7 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemSub}>Iniciar reporte táctico</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('AddFirefighter')}
                 style={styles.gridItem}
@@ -429,7 +430,7 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemSub}>Registrar nuevo personal</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('AdminEquipment')}
                 style={styles.gridItem}
@@ -444,7 +445,7 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemSub}>Móviles y herramientas</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('PedidosSuministro')}
                 style={styles.gridItem}
@@ -459,7 +460,7 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemSub}>Solicitud de insumos</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('WeeklyChecklist')}
                 style={styles.gridItem}
@@ -474,7 +475,7 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemSub}>Controles de móviles</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Reports')}
                 style={styles.gridItem}
@@ -489,7 +490,7 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemSub}>Historial de actas</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Estadisticas')}
                 style={styles.gridItem}
@@ -504,7 +505,7 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemSub}>Estadísticas RUBA</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('GestionPois')}
                 style={styles.gridItem}
@@ -541,9 +542,9 @@ export default function PanelControlScreen({ navigation }) {
                 const priorityColor = getPriorityColor(a.prioridad);
                 const statusStyle = getStatusBadgeStyles(a.estado);
                 return (
-                  <TouchableOpacity 
-                    key={a.id || idx} 
-                    onPress={() => navigation.navigate('AlertDetail', { alerta_id: a.id })} 
+                  <TouchableOpacity
+                    key={a.id || idx}
+                    onPress={() => navigation.navigate('AlertDetail', { alerta_id: a.id })}
                     activeOpacity={0.8}
                     style={[styles.alertCard, { borderLeftColor: priorityColor }]}
                   >
@@ -581,322 +582,5 @@ export default function PanelControlScreen({ navigation }) {
       </ScrollView>
     </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#16181d' },
-
-  // Top Bar
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: '#1a1c23',
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  topBarTitle: {
-    color: '#e11d48',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    gap: 16,
-    alignItems: 'center',
-  },
-  iconBtn: {
-    padding: 4,
-  },
-
-  contenido: { padding: 24 },
-
-  // Header Row
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 28,
-  },
-  titleLeftGroup: {
-    flexDirection: 'row',
-    flex: 1,
-  },
-  redAccent: {
-    width: 3,
-    backgroundColor: '#dc2626',
-    marginRight: 12,
-    marginTop: 4,
-  },
-  headerLabel: {
-    fontSize: 10,
-    color: '#fca5a5',
-    letterSpacing: 2,
-    fontWeight: '700',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  mainTitle: {
-    fontSize: 30,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: -1,
-    lineHeight: 33,
-  },
-
-  centrado: { alignItems: 'center', paddingVertical: 60, gap: 12 },
-  textoCarga: { fontSize: 12, color: '#64748b', marginTop: 12 },
-  botonReintentar: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    backgroundColor: '#26282f',
-    borderRadius: 4,
-  },
-  textoReintentar: { color: '#e2e8f0', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-
-  // Total Card
-  totalCard: {
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    padding: 18,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    borderLeftWidth: 3,
-    borderLeftColor: '#dc2626',
-  },
-  totalLeft: { marginBottom: 16 },
-  totalLabel: { fontSize: 9, color: '#94a3b8', letterSpacing: 1, fontWeight: '700', marginBottom: 6 },
-  totalValue: { fontSize: 32, fontWeight: '900', color: '#fff' },
-  progressBarLabel: { fontSize: 8, color: '#94a3b8', fontWeight: '800', letterSpacing: 0.5 },
-  progressBarPercent: { fontSize: 10, fontWeight: '900' },
-  progressBarBg: { height: 6, backgroundColor: '#26282f', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 3 },
-
-  // Section Header
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  sectionLine: { width: 6, height: 18, borderRadius: 3, backgroundColor: '#dc2626', marginRight: 10 },
-  sectionTitle: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 2, flex: 1 },
-
-  // Grilla
-  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  cardStat: {
-    width: '48%',
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    padding: 14,
-    borderLeftWidth: 3,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#26282f',
-  },
-  cardStatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statNumero: { fontSize: 24, fontWeight: '900', color: '#f8fafc' },
-  statLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#94a3b8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // Alert Card (Actividad Reciente)
-  alertCard: {
-    flexDirection: 'row',
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  alertCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  alertIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  alertDetails: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 2,
-  },
-  alertTitle: {
-    color: '#f8fafc',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  alertSubtitle: {
-    color: '#94a3b8',
-    fontSize: 11,
-    marginBottom: 4,
-  },
-  alertBadgesRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  priorityBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 2,
-  },
-  priorityBadgeText: {
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 2,
-  },
-  statusBadgeText: {
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  alertCardRight: {
-    flexDirection: 'row',
-    gap: 4,
-    alignItems: 'center',
-  },
-  alertTime: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '700',
-  },
-
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    gap: 8,
-  },
-  textoVacio: { fontSize: 12, color: '#64748b', fontWeight: '800', letterSpacing: 0.5 },
-  
-  botonTest: {
-    backgroundColor: '#1b1d24',
-    borderWidth: 1,
-    borderColor: '#26282f',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  botonTestText: { fontSize: 9, color: '#e11d48', fontWeight: '900', letterSpacing: 0.5 },
-  logisticCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    borderLeftWidth: 3,
-    borderLeftColor: '#e11d48',
-    padding: 16,
-    marginBottom: 20,
-    marginTop: 8,
-    ...Platform.select({
-      ios: { shadowColor: '#e11d48', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6 },
-      android: { elevation: 3 },
-      web: { boxShadow: '0px 4px 12px rgba(225, 29, 72, 0.08)' }
-    }),
-  },
-  logisticCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 14,
-  },
-  logisticIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 6,
-    backgroundColor: '#e11d48',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logisticDetails: {
-    flex: 1,
-    gap: 2,
-  },
-  logisticCardTitle: {
-    color: '#f8fafc',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
-  logisticCardSub: {
-    color: '#94a3b8',
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  
-  // ── Action Grid Styles ──────────────────────────────────────────
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 20,
-  },
-  gridItem: {
-    width: '48%',
-    backgroundColor: '#1b1d24',
-    borderRadius: 6,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#26282f',
-    gap: 6,
-  },
-  gridItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  gridIconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gridItemTitle: {
-    color: '#f8fafc',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-    marginTop: 2,
-  },
-  gridItemSub: {
-    color: '#64748b',
-    fontSize: 10,
-    fontWeight: '500',
-  },
-});
