@@ -32,7 +32,6 @@ import EstadisticasScreen from '../screens/EstadisticasScreen';
 import GestionPoisScreen from '../screens/GestionPoisScreen';
 import NuevoPOIScreen from '../screens/NuevoPOIScreen';
 
-
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
