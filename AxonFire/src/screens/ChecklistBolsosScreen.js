@@ -147,19 +147,25 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
 
   async function toggleEstadoBolso(bolso) {
     const nuevoEstado = bolso.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    
+    // Optimistic UI update
+    setBolsos(prev => prev.map(b => b.id === bolso.id ? { ...b, estado: nuevoEstado } : b));
+    
     try {
       const res = await fetch(`${API_BASE_URL}/bolsos/${bolso.id}`, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ estado: nuevoEstado }),
+        body: JSON.stringify({ nombre_bolso: bolso.nombre_bolso, estado: nuevoEstado }),
       });
-      if (res.ok) {
-        cargarBolsos();
-      } else {
+      if (!res.ok) {
+        // Revert on error
+        setBolsos(prev => prev.map(b => b.id === bolso.id ? { ...b, estado: bolso.estado } : b));
         Alert.alert('Error', 'No se pudo actualizar el estado del bolso.');
       }
     } catch (err) {
       console.error('Error actualizando bolso:', err);
+      // Revert on error
+      setBolsos(prev => prev.map(b => b.id === bolso.id ? { ...b, estado: bolso.estado } : b));
       Alert.alert('Error', 'No se pudo conectar al servidor.');
     }
   }

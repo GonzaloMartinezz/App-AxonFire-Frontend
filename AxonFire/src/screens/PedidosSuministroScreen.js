@@ -22,13 +22,14 @@ import StatusBadge from '../components/StatusBadge';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { styles } from '../styles/PedidosSuministroScreenStyles';
 
 // Los tipos de refuerzo que el bombero puede solicitar
 const TIPOS_REFUERZO = [
-  { icono: 'water',         nombre: 'CISTERNA',    color: Colors.alertBlue,     tipo: 'cisterna',    subcat: '4' },
-  { icono: 'gas-station',   nombre: 'COMBUSTIBLE', color: Colors.warningOrange, tipo: 'combustible', subcat: '4' },
-  { icono: 'ambulance',     nombre: 'AMBULANCIA',  color: Colors.primary,       tipo: 'ambulancia',  subcat: '4' },
-  { icono: 'hammer-wrench', nombre: 'RESCATE',     color: Colors.secondary,     tipo: 'rescate',     subcat: '2' },
+  { icono: 'water', nombre: 'CISTERNA', color: Colors.alertBlue, tipo: 'cisterna', subcat: '4' },
+  { icono: 'gas-station', nombre: 'COMBUSTIBLE', color: Colors.warningOrange, tipo: 'combustible', subcat: '4' },
+  { icono: 'ambulance', nombre: 'AMBULANCIA', color: Colors.primary, tipo: 'ambulancia', subcat: '4' },
+  { icono: 'hammer-wrench', nombre: 'RESCATE', color: Colors.secondary, tipo: 'rescate', subcat: '2' },
 ];
 
 function tiempoTranscurrido(fechaISO) {
@@ -65,15 +66,16 @@ export default function PedidosSuministroScreen({ navigation }) {
     try {
       // 1. Buscar alerta activa (la más reciente que no sea FINALIZADO)
       const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
-          params: {
-        fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        fecha_hasta: new Date().toISOString()
-      }, headers: { Authorization: `Bearer ${token}` } });
-      
+        params: {
+          fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          fecha_hasta: new Date().toISOString()
+        }, headers: { Authorization: `Bearer ${token}` }
+      });
+
       const activas = (resAlertas.data?.alertas || []).filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
       if (activas.length > 0) {
         setAlertaActiva(activas[0]); // Tomamos la más reciente
-        
+
         // 2. Cargar registros de comunicación de esa alerta
         const resLogs = await axios.get(`${API_BASE_URL}/registros_comunicacion/alerta/${activas[0].id}`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -256,10 +258,10 @@ export default function PedidosSuministroScreen({ navigation }) {
             <TacticalCard key={sol.id || idx}>
               <View style={styles.filaSolicitud}>
                 <View style={[styles.iconoSolicitud, { backgroundColor: `${Colors.alertBlue}18` }]}>
-                  <MaterialCommunityIcons 
-                    name={sol.tipo_comunicacion === 'APOYO' ? 'account-group' : 'truck-check'} 
-                    size={20} 
-                    color={Colors.alertBlue} 
+                  <MaterialCommunityIcons
+                    name={sol.tipo_comunicacion === 'APOYO' ? 'account-group' : 'truck-check'}
+                    size={20}
+                    color={Colors.alertBlue}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -343,109 +345,4 @@ export default function PedidosSuministroScreen({ navigation }) {
       </Modal>
     </View>
   );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm,
-  },
-  botonVolver: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerLow,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  tituloHeader: { fontSize: 17, fontWeight: '800', color: Colors.onSurface },
-  botonRefresh: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerLow,
-    alignItems: 'center', justifyContent: 'center',
-  },
-
-  contenido: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
-
-  labelSeccion: {
-    fontSize: 10, fontWeight: '800', letterSpacing: 1,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase', marginBottom: Spacing.md,
-  },
-
-  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cardRefuerzo: {
-    width: '48%', backgroundColor: Colors.surfaceContainerHigh,
-    borderRadius: Radius.xxl, paddingVertical: Spacing.lg,
-    alignItems: 'center', gap: 8,
-  },
-  iconoRefuerzo: {
-    width: 48, height: 48, borderRadius: 24,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  nombreRefuerzo: {
-    fontSize: 10, fontWeight: '700', letterSpacing: 0.6,
-    color: Colors.onSurface, textTransform: 'uppercase',
-  },
-
-  botonPersonal: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    paddingVertical: 18, borderRadius: Radius.xxl,
-    ...Platform.select({
-      ios: { shadowColor: '#af101a', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12 },
-      android: { elevation: 8 },
-      web: { boxShadow: '0px 6px 16px rgba(175,16,26,0.3)' },
-    }),
-  },
-  textoBotonPersonal: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.6 },
-
-  filaSolicitud: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconoSolicitud: {
-    width: 38, height: 38, borderRadius: Radius.lg,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  tituloSolicitud: { fontSize: 13, fontWeight: '700', color: Colors.onSurface },
-  subtituloSolicitud: {
-    fontSize: 9, fontWeight: '800', letterSpacing: 0.8,
-    color: Colors.onSurfaceVariant, textTransform: 'uppercase', marginTop: 1,
-  },
-
-  centrado: { alignItems: 'center', paddingVertical: 28, gap: 8 },
-  textoVacio: { fontSize: 13, color: '#94a3b8', fontWeight: '600' },
-
-  // Modal
-  fondoModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  contenedorModal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 24, paddingBottom: 40,
-  },
-  headerModal: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 20,
-  },
-  tituloModal: { fontSize: 20, fontWeight: '900', color: '#263238' },
-  cerrarModal: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center',
-  },
-  labelModal: {
-    fontSize: 12, fontWeight: '700', color: '#94a3b8',
-    textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginTop: 12,
-  },
-  filaCantidad: { flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 4 },
-  botonCantidad: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center',
-  },
-  valorCantidad: { fontSize: 28, fontWeight: '900', color: '#263238', minWidth: 40, textAlign: 'center' },
-  inputMotivo: {
-    backgroundColor: '#f8fafc', borderRadius: 14, padding: 14,
-    fontSize: 14, color: '#263238', minHeight: 80,
-    textAlignVertical: 'top', marginBottom: 16,
-  },
-  botonEnviarModal: { borderRadius: Radius.xxl, overflow: 'hidden' },
-  gradientModal: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, paddingVertical: 18,
-  },
-  textoEnviarModal: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
-});
+};

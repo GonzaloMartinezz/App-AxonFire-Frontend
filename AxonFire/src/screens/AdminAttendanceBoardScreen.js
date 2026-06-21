@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '../config/api';
 import { LinearGradient } from 'expo-linear-gradient';
+import { styles } from '../styles/AdminAttendanceBoardScreenStyles';
 
 // ─── Classification Tabs ─────────────────────────────────────
 const CLASSIFICATION_TABS = [
@@ -64,10 +65,10 @@ const classifyRank = (rangoNombre) => {
 };
 
 const STATUS_CONFIG = {
-  ACEPTADO:  { color: '#10b981', bg: '#064e3b', label: 'CONFIRMADO', icon: 'check-circle', key: 'confirmed' },
-  PENDIENTE: { color: '#f59e0b', bg: '#78350f', label: 'PENDIENTE',  icon: 'clock-outline', key: 'pending' },
-  RECHAZADO: { color: '#ef4444', bg: '#7f1d1d', label: 'RECHAZADO',  icon: 'close-circle', key: 'absent' },
-  ABSENT:    { color: '#ef4444', bg: '#7f1d1d', label: 'SIN RESPONDER', icon: 'help-circle', key: 'absent' }
+  ACEPTADO: { color: '#10b981', bg: '#064e3b', label: 'CONFIRMADO', icon: 'check-circle', key: 'confirmed' },
+  PENDIENTE: { color: '#f59e0b', bg: '#78350f', label: 'PENDIENTE', icon: 'clock-outline', key: 'pending' },
+  RECHAZADO: { color: '#ef4444', bg: '#7f1d1d', label: 'RECHAZADO', icon: 'close-circle', key: 'absent' },
+  ABSENT: { color: '#ef4444', bg: '#7f1d1d', label: 'SIN RESPONDER', icon: 'help-circle', key: 'absent' }
 };
 
 // ── Helper: parsea fecha de la base de datos a local ──────────────────────────
@@ -75,7 +76,7 @@ function parseDateLocal(dateInput) {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
   if (typeof dateInput !== 'string') return new Date(dateInput);
-  
+
   // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
   const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
   return new Date(cleaned);
@@ -309,10 +310,10 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           const hasta = new Date().toISOString();
           const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
-          params: { fecha_desde: desde, fecha_hasta: hasta },
-              headers: authHeaders(),
-              timeout: 15000
-            });
+            params: { fecha_desde: desde, fecha_hasta: hasta },
+            headers: authHeaders(),
+            timeout: 15000
+          });
           const data = resAlertas.data;
           const alertas = data.alertas || [];
           if (alertas.length > 0) {
@@ -407,12 +408,12 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
         // ── Consistencia Local: Inyectar/sobreescribir con local_response si existe ──
         const currentUserId = user?.id || '';
         const localResponse = await AsyncStorage.getItem(`local_response_${activeAlertaId}`);
-        
+
         let miRespuestaVal = localResponse;
         const miRespObj = respuestas.find(
           (r) => (r.usuario_id || r.usuarioId?.id || r.usuarioId) === currentUserId
         );
-        
+
         if (miRespObj && miRespObj.estado_respuesta !== 'PENDIENTE' && !miRespuestaVal) {
           miRespuestaVal = miRespObj.estado_respuesta;
           await AsyncStorage.setItem(`local_response_${activeAlertaId}`, miRespuestaVal);
@@ -420,7 +421,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
           const existingIdx = respuestas.findIndex(
             (r) => (r.usuario_id || r.usuarioId?.id || r.usuarioId) === currentUserId
           );
-          
+
           // Cross-reference lookup in bomberosData for current logged-in firefighter profile
           const myProfile = (bomberosData || []).find(
             (b) => (b.usuario_id || b.usuarioId?.id) === currentUserId
@@ -447,14 +448,14 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
             estado_respuesta: miRespuestaVal,
             fecha_hora: respuestas[existingIdx]?.fecha_hora || new Date().toISOString()
           };
-          
+
           if (existingIdx >= 0) {
             respuestas[existingIdx] = updatedResp;
           } else {
             respuestas.push(updatedResp);
           }
         }
-        
+
         setMiRespuesta(miRespuestaVal || 'PENDIENTE');
 
         // Ahora sí, armar respuestasMap y setear confirmedVal con la lista de respuestas resuelta!
@@ -560,15 +561,15 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
     let interval;
     if (activeAlerta && activeAlerta.fecha_hora && activeAlerta.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
       const startTime = parseDateLocal(activeAlerta.fecha_hora).getTime();
-      
+
       const updateTimer = () => {
         const now = new Date().getTime();
         const diff = Math.max(0, now - startTime);
-        
+
         const hours = Math.floor(diff / 3600000);
         const minutes = Math.floor((diff % 3600000) / 60000);
         const seconds = Math.floor((diff % 60000) / 1000);
-        
+
         setTimerText(
           `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
         );
@@ -647,7 +648,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
   const confirmLogout = () => {
     Alert.alert('Cerrar Sesión', '¿Estás seguro que deseas cerrar sesión?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Confirmar', onPress: () => { if(logout) { logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })) } else { navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) } }, style: 'destructive' },
+      { text: 'Confirmar', onPress: () => { if (logout) { logout().then(() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })) } else { navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) } }, style: 'destructive' },
     ]);
   };
 
@@ -711,17 +712,17 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
                 <MaterialCommunityIcons name="clipboard-check-outline" size={64} color="#10b981" />
               </View>
             </View>
-            
+
             <Text style={styles.emptyTitle}>SITUACIÓN BAJO CONTROL</Text>
             <Text style={styles.emptySubtitle}>
               No hay registro de asistencia a revisar ya que no hay ninguna emergencia activa.
             </Text>
-            
+
             <View style={styles.statusBoxActive}>
               <View style={styles.greenDot} />
               <Text style={styles.statusBoxText}>SISTEMA EN ESPERA DE DESPACHOS</Text>
             </View>
-            
+
             <TouchableOpacity style={styles.emptyRefreshButton} onPress={fetchData}>
               <MaterialCommunityIcons name="refresh" size={18} color="#94a3b8" />
               <Text style={styles.emptyRefreshButtonText}>ACTUALIZAR TABLERO</Text>
@@ -934,259 +935,5 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       </ScrollView>
     </View>
   );
-}
+};
 
-// ─── Styles ──────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#16181d' },
-  // Top Bar
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#1a1c23', borderBottomWidth: 1, borderBottomColor: '#26282f' },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  topBarTitle: { color: '#e11d48', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
-  topBarRight: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  iconBtn: { padding: 4 },
-  scrollContent: { padding: 24 },
-  // Header
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 },
-  titleLeftGroup: { flexDirection: 'row', flex: 1 },
-  redAccent: { width: 3, backgroundColor: '#dc2626', marginRight: 12, marginTop: 4 },
-  headerLabel: { fontSize: 10, color: '#fca5a5', letterSpacing: 2, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase' },
-  mainTitle: { fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -1, lineHeight: 33 },
-  rateBox: { alignItems: 'flex-end' },
-  rateLabel: { fontSize: 9, color: '#94a3b8', letterSpacing: 1, marginBottom: 2 },
-  rateValue: { fontSize: 28, fontWeight: '900', color: '#10b981' },
-  // Error banner
-  errorBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: '#ef4444', borderRadius: 6, padding: 12, marginBottom: 16, gap: 8 },
-  errorBannerText: { color: '#fca5a5', fontSize: 11, flex: 1, fontWeight: '600' },
-  retryText: { color: '#ef4444', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  // Summary Cards
-  cardsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  summaryCard: { flex: 1, backgroundColor: '#1b1d24', borderRadius: 6, padding: 14, borderLeftWidth: 3, alignItems: 'center', gap: 6 },
-  cardNumber: { fontSize: 28, fontWeight: '900', color: '#f8fafc' },
-  cardLabel: { fontSize: 8, fontWeight: '800', color: '#94a3b8', letterSpacing: 1 },
-  // Total Card
-  totalCard: { backgroundColor: '#1b1d24', borderRadius: 6, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#26282f' },
-  totalLeft: { marginBottom: 12 },
-  totalLabel: { fontSize: 9, color: '#94a3b8', letterSpacing: 1, fontWeight: '700', marginBottom: 6 },
-  totalValue: { fontSize: 22, fontWeight: '900', color: '#fff' },
-  totalUnit: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
-  progressBarBg: { height: 6, backgroundColor: '#26282f', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 3 },
-  // API Count
-  apiCountBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#064e3b', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 6, marginBottom: 16 },
-  apiCountText: { color: '#10b981', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  // Search
-  searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1b1d24', borderRadius: 6, height: 44, paddingHorizontal: 14, marginBottom: 16 },
-  searchInput: { flex: 1, color: '#f8fafc', fontSize: 11, letterSpacing: 0.5 },
-  // Classification Tabs
-  tabsScroll: { marginBottom: 20 },
-  tabsContainer: { gap: 8 },
-  classTab: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1b1d24', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 6, gap: 8 },
-  classTabActive: { backgroundColor: '#dc2626' },
-  classTabText: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 1 },
-  classTabTextActive: { color: '#fff' },
-  classTabBadge: { backgroundColor: '#26282f', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, minWidth: 22, alignItems: 'center' },
-  classTabBadgeActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
-  classTabBadgeText: { fontSize: 10, fontWeight: '900', color: '#94a3b8' },
-  // Section Header
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  sectionLine: { width: 6, height: 18, borderRadius: 3, backgroundColor: '#dc2626', marginRight: 10 },
-  sectionTitle: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 2, flex: 1 },
-  sectionCountBadge: { backgroundColor: '#26282f', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
-  sectionCountText: { fontSize: 9, fontWeight: '800', color: '#94a3b8', letterSpacing: 0.5 },
-  // Person Card
-  personCard: { backgroundColor: '#1b1d24', borderRadius: 6, padding: 16, marginBottom: 12, borderLeftWidth: 3 },
-  personInfoRow: { flexDirection: 'row', alignItems: 'center' },
-  avatarContainer: { position: 'relative', marginRight: 14 },
-  personAvatar: { width: 48, height: 48, borderRadius: 6 },
-  statusDot: { position: 'absolute', top: -3, right: -3, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#1b1d24' },
-  personDetails: { flex: 1 },
-  rankRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  rankBadge: { backgroundColor: '#fca5a5', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 2, marginRight: 8 },
-  rankText: { color: '#451a1a', fontSize: 7, fontWeight: '900', letterSpacing: 0.5 },
-  unitText: { color: '#94a3b8', fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-  personName: { color: '#f8fafc', fontSize: 14, fontWeight: '800', marginBottom: 6 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, gap: 4 },
-  statusBadgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
-  etaBox: { alignItems: 'flex-end' },
-  etaLabel: { fontSize: 8, color: '#64748b', fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
-  etaValue: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-  // Empty State
-  emptyState: { alignItems: 'center', padding: 40, gap: 12 },
-  emptyText: { color: '#334155', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  // Bottom Summary
-  bottomSummary: { backgroundColor: '#1b1d24', borderRadius: 6, padding: 20, marginTop: 16, borderWidth: 1, borderColor: '#26282f' },
-  bottomSummaryTitle: { color: '#fca5a5', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 16 },
-  bottomSummaryRow: { flexDirection: 'row', gap: 10 },
-  bottomSummaryItem: { backgroundColor: '#16181d', padding: 16, borderRadius: 4, flex: 1 },
-  bottomSummaryLabel: { color: '#e2e8f0', fontSize: 9, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
-  bottomSummaryValue: { color: '#fff', fontSize: 24, fontWeight: '900' },
-  // Finalize Button
-  finalizeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e11d48', paddingVertical: 14, borderRadius: 8, marginBottom: 20, gap: 8 },
-  finalizeBtnText: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
-  // Alert Info
-  alertInfoBox: { backgroundColor: '#1b1d24', borderRadius: 8, padding: 16, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: '#dc2626' },
-  alertInfoTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  alertInfoTitle: { color: '#f8fafc', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
-  alertInfoSub: { color: '#94a3b8', fontSize: 11 },
-  statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
-  statusTagText: { color: '#fff', fontSize: 9, fontWeight: '800' },
-
-  // RSVP Card & Banners unificados
-  rsvpCard: {
-    backgroundColor: '#1c1917',
-    borderWidth: 1,
-    borderColor: '#78350f',
-    borderRadius: 8,
-    padding: 18,
-    marginBottom: 20,
-  },
-  rsvpTitle: { color: '#fbbf24', fontWeight: '900', fontSize: 13, letterSpacing: 0.5, marginBottom: 4 },
-  rsvpSubtitle: { color: '#d6d3d1', fontSize: 12, lineHeight: 16, marginBottom: 14 },
-  rsvpButtons: { flexDirection: 'row', gap: 12 },
-  btnRsvpRechazar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#2d1a1c',
-    borderWidth: 1,
-    borderColor: '#ef4444',
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  btnRsvpRechazarText: { color: '#ef4444', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  btnRsvpAceptar: { flex: 1.5, borderRadius: 8, overflow: 'hidden' },
-  rsvpGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-  },
-  btnRsvpAceptarText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
-  myResponseBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 20,
-  },
-  myResponseText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, flex: 1 },
-  roleBreadcrumb: {
-    height: 24,
-    backgroundColor: '#1b1d24',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    borderLeftWidth: 3,
-    borderBottomWidth: 1,
-    borderBottomColor: '#26282f',
-  },
-  roleBreadcrumbDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 8,
-  },
-  roleBreadcrumbText: {
-    fontSize: 9,
-    fontWeight: '900',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    letterSpacing: 1.2,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    marginTop: 40,
-  },
-  pulseContainer: {
-    position: 'relative',
-    width: 120,
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-  },
-  pulseRing: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  pulseIconContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  emptyTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 1,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: '#94a3b8',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  statusBoxActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 30,
-    marginBottom: 32,
-  },
-  greenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-    marginRight: 10,
-  },
-  statusBoxText: {
-    color: '#10b981',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  emptyRefreshButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#1f2937',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  emptyRefreshButtonText: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-});
