@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import MapView from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 
 const DEFAULT_LAT = -26.8083;
 const DEFAULT_LNG = -65.2176;
@@ -47,6 +48,7 @@ export default function LocationPicker({
   const [searchQuery, setSearchQuery] = useState(initialAddress);
   const [suggestions, setSuggestions] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [isMapMoving, setIsMapMoving] = useState(false);
   const [manualLat, setManualLat] = useState(
     initialLocation?.latitude != null ? String(initialLocation.latitude) : ''
@@ -57,11 +59,16 @@ export default function LocationPicker({
   const [selectedAddress, setSelectedAddress] = useState(initialAddress);
 
   const searchTimeoutRef = useRef(null);
+  const geocodeTimeoutRef = useRef(null);
+  const isProgrammaticRef = useRef(false);
+  const targetLocationRef = useRef(null);
+  const lastGeocodedCoordsRef = useRef({ latitude: null, longitude: null });
 
   // Cleanup
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (geocodeTimeoutRef.current) clearTimeout(geocodeTimeoutRef.current);
     };
   }, []);
 
@@ -72,6 +79,9 @@ export default function LocationPicker({
       const lng = initialLocation.longitude;
       setManualLat(String(lat));
       setManualLng(String(lng));
+      isProgrammaticRef.current = true;
+      targetLocationRef.current = { latitude: lat, longitude: lng };
+      lastGeocodedCoordsRef.current = { latitude: lat, longitude: lng };
       // Small delay to ensure MapView is ready
       setTimeout(() => {
         mapRef.current?.animateToRegion(
@@ -87,21 +97,228 @@ export default function LocationPicker({
     }
   }, []); // Only run on mount
 
+  const reverseGeocode = async (lat, lng) => {
+    targetLocationRef.current = null;
+    lastGeocodedCoordsRef.current = { latitude: lat, longitude: lng };
+    setIsGeocoding(true);
+    try {
+      let resolvedAddress = '';
+      
+      // 1. Intentar geocodificación inversa nativa
+      try {
+        const result = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (result && result.length > 0) {
+          const addr = result[0];
+          const street = addr.street || '';
+          const number = addr.streetNumber || addr.name || '';
+          const city = addr.city || addr.subregion || '';
+          const region = addr.region || '';
+          
+          let formattedAddress = '';
+          if (street) {
+            formattedAddress = street;
+            if (number && !number.includes(street) && number !== street) {
+              formattedAddress += ` ${number}`;
+            }
+          } else if (addr.name) {
+            formattedAddress = addr.name;
+          }
+          
+          const extraParts = [];
+          if (city && city !== street && city !== number) extraParts.push(city);
+          if (region && region !== city) extraParts.push(region);
+          
+          if (extraParts.length > 0) {
+            formattedAddress += (formattedAddress ? ', ' : '') + extraParts.join(', ');
+          }
+          
+          if (!formattedAddress && addr.formattedAddress) {
+            formattedAddress = addr.formattedAddress;
+          }
+          
+          if (formattedAddress) {
+            resolvedAddress = formattedAddress;
+          }
+        }
+      } catch (nativeErr) {
+        console.warn('Native reverse geocoding failed, trying Nominatim fallback:', nativeErr);
+      }
+      
+      // 2. Fallback a Nominatim reverse geocoding en caso de error o datos vacíos
+      if (!resolvedAddress) {
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+            { headers: { 'User-Agent': 'AxonFire-App' } }
+          );
+          const data = await response.json();
+          if (data && data.display_name) {
+            const addr = data.address || {};
+            const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || data.name || '';
+            const numero = addr.house_number || '';
+            const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
+            
+            let formattedAddress = '';
+            if (calle) {
+              formattedAddress = calle;
+              if (numero) formattedAddress += ` ${numero}`;
+              if (ciudad && ciudad !== calle) formattedAddress += `, ${ciudad}`;
+            } else {
+              const partes = data.display_name.split(',');
+              formattedAddress = partes.slice(0, 3).map((p) => p.trim()).join(', ');
+            }
+            
+            if (formattedAddress) {
+              resolvedAddress = formattedAddress;
+            }
+          }
+        } catch (nominatimErr) {
+          console.warn('Nominatim reverse geocoding failed:', nominatimErr);
+        }
+      }
+      
+      if (resolvedAddress) {
+        setSearchQuery(resolvedAddress);
+        setSelectedAddress(resolvedAddress);
+        onLocationSelect?.({
+          latitude: lat,
+          longitude: lng,
+          address: resolvedAddress,
+        });
+      } else {
+        onLocationSelect?.({
+          latitude: lat,
+          longitude: lng,
+          address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        });
+      }
+    } catch (error) {
+      console.warn('Error en reverse geocoding:', error);
+      onLocationSelect?.({
+        latitude: lat,
+        longitude: lng,
+        address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      });
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const debouncedReverseGeocode = (lat, lng) => {
+    if (geocodeTimeoutRef.current) clearTimeout(geocodeTimeoutRef.current);
+    geocodeTimeoutRef.current = setTimeout(() => {
+      reverseGeocode(lat, lng);
+    }, 800);
+  };
+
   const searchAddresses = useCallback(async (text) => {
-    const viewbox = '-65.35,-26.88,-65.15,-26.75';
     let queryText = text;
     if (!text.toLowerCase().includes('tucuman') && !text.toLowerCase().includes('tucumán')) {
       queryText = `${text}, Yerba Buena, Tucumán, Argentina`;
     }
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryText)}&viewbox=${viewbox}&bounded=1&limit=5&addressdetails=1`,
-        { headers: { 'User-Agent': 'AxonFire-App' } }
-      );
-      const data = await response.json();
+      let data = [];
+      
+      // Intentar geocodificación nativa primero
+      try {
+        const geocodeResults = await Location.geocodeAsync(queryText);
+        if (geocodeResults && geocodeResults.length > 0) {
+          const limitedResults = geocodeResults.slice(0, 5);
+          const suggestionPromises = limitedResults.map(async (item) => {
+            try {
+              const rev = await Location.reverseGeocodeAsync({
+                latitude: item.latitude,
+                longitude: item.longitude,
+              });
+              if (rev && rev.length > 0) {
+                const addr = rev[0];
+                const street = addr.street || '';
+                const number = addr.streetNumber || addr.name || '';
+                const city = addr.city || addr.subregion || '';
+                
+                let formattedAddress = '';
+                if (street) {
+                  formattedAddress = street;
+                  if (number && !number.includes(street) && number !== street) {
+                    formattedAddress += ` ${number}`;
+                  }
+                } else if (addr.name) {
+                  formattedAddress = addr.name;
+                }
+                
+                const extraParts = [];
+                if (city && city !== street && city !== number) extraParts.push(city);
+                
+                if (extraParts.length > 0) {
+                  formattedAddress += (formattedAddress ? ', ' : '') + extraParts.join(', ');
+                }
+                
+                if (!formattedAddress && addr.formattedAddress) {
+                  formattedAddress = addr.formattedAddress;
+                }
+                
+                return {
+                  latitude: item.latitude,
+                  longitude: item.longitude,
+                  display_name: formattedAddress || `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+                };
+              }
+            } catch (err) {
+              // Ignorar error individual
+            }
+            return {
+              latitude: item.latitude,
+              longitude: item.longitude,
+              display_name: `${item.latitude.toFixed(6)}, ${item.longitude.toFixed(6)}`,
+            };
+          });
+          data = await Promise.all(suggestionPromises);
+        }
+      } catch (nativeErr) {
+        console.warn('Native autocomplete failed, falling back to Nominatim:', nativeErr);
+      }
+      
+      // Fallback a Nominatim si lo nativo falló o no devolvió resultados
+      if (!data || data.length === 0) {
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryText)}&limit=5&addressdetails=1`,
+            { headers: { 'User-Agent': 'AxonFire-App' } }
+          );
+          const rawData = await response.json();
+          if (rawData && rawData.length > 0) {
+            data = rawData.map(item => {
+              const addr = item.address || {};
+              const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
+              const numero = addr.house_number || '';
+              const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
+              
+              let formattedAddress = '';
+              if (calle) {
+                formattedAddress = calle;
+                if (numero) formattedAddress += ` ${numero}`;
+                if (ciudad && ciudad !== calle) formattedAddress += `, ${ciudad}`;
+              } else {
+                const partes = item.display_name.split(',');
+                formattedAddress = partes.slice(0, 3).map((p) => p.trim()).join(', ');
+              }
+              
+              return {
+                latitude: parseFloat(item.lat),
+                longitude: parseFloat(item.lon),
+                display_name: formattedAddress,
+              };
+            });
+          }
+        } catch (nominatimErr) {
+          console.warn('Nominatim autocomplete fallback failed:', nominatimErr);
+        }
+      }
+      
       setSuggestions(data || []);
     } catch (error) {
       console.warn('Error al buscar dirección:', error);
+      setSuggestions([]);
     } finally {
       setIsSearching(false);
     }
@@ -111,7 +328,7 @@ export default function LocationPicker({
     setSearchQuery(text);
     setSelectedAddress(text);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (!text || text.trim().length < 4) {
+    if (!text || text.trim().length < 3) {
       setSuggestions([]);
       setIsSearching(false);
       return;
@@ -124,23 +341,9 @@ export default function LocationPicker({
   };
 
   const selectSuggestion = (item) => {
-    const addr = item.address || {};
-    const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
-    const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
-    const provincia = addr.state || 'Tucumán';
-
-    let address = '';
-    if (calle) {
-      address = calle;
-      if (ciudad && ciudad !== calle) address += `, ${ciudad}`;
-      if (provincia && provincia !== ciudad) address += `, ${provincia}`;
-    } else {
-      const partes = item.display_name.split(',');
-      address = partes.slice(0, 3).map((p) => p.trim()).join(', ');
-    }
-
-    const lat = parseFloat(item.lat);
-    const lng = parseFloat(item.lon);
+    const lat = item.latitude;
+    const lng = item.longitude;
+    const address = item.display_name;
 
     setSearchQuery(address);
     setSelectedAddress(address);
@@ -150,6 +353,9 @@ export default function LocationPicker({
     setManualLat(String(lat.toFixed(6)));
     setManualLng(String(lng.toFixed(6)));
 
+    targetLocationRef.current = { latitude: lat, longitude: lng };
+    lastGeocodedCoordsRef.current = { latitude: lat, longitude: lng };
+    isProgrammaticRef.current = true;
     mapRef.current?.animateCamera(
       {
         center: { latitude: lat, longitude: lng },
@@ -165,21 +371,157 @@ export default function LocationPicker({
     });
   };
 
+  const handleSearchSubmit = async () => {
+    if (!searchQuery || searchQuery.trim().length < 3) return;
+    setIsSearching(true);
+    setSuggestions([]);
+
+    let queryText = searchQuery;
+    if (!queryText.toLowerCase().includes('tucuman') && !queryText.toLowerCase().includes('tucumán')) {
+      queryText = `${queryText}, Yerba Buena, Tucumán, Argentina`;
+    }
+
+    try {
+      let lat = null;
+      let lng = null;
+
+      // 1. Intentar geocodificación nativa
+      try {
+        const results = await Location.geocodeAsync(queryText);
+        if (results && results.length > 0) {
+          lat = results[0].latitude;
+          lng = results[0].longitude;
+        }
+      } catch (nativeErr) {
+        console.warn('Native geocoding failed on search submit:', nativeErr);
+      }
+
+      // 2. Fallback a Nominatim
+      if (lat === null || lng === null) {
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryText)}&limit=1`,
+            { headers: { 'User-Agent': 'AxonFire-App' } }
+          );
+          const data = await response.json();
+          if (data && data.length > 0) {
+            lat = parseFloat(data[0].lat);
+            lng = parseFloat(data[0].lon);
+          }
+        } catch (nominatimErr) {
+          console.warn('Nominatim geocoding failed on search submit:', nominatimErr);
+        }
+      }
+
+      // 3. Fallback: Limpiar números e intentar de nuevo si falló y la consulta original contiene números
+      if ((lat === null || lng === null) && /\d+/.test(searchQuery)) {
+        const textWithoutNumbers = searchQuery.replace(/\d+/g, '').trim();
+        if (textWithoutNumbers.length >= 3) {
+          let fallbackQuery = textWithoutNumbers;
+          if (!fallbackQuery.toLowerCase().includes('tucuman') && !fallbackQuery.toLowerCase().includes('tucumán')) {
+            fallbackQuery = `${fallbackQuery}, Yerba Buena, Tucumán, Argentina`;
+          }
+
+          // Intentar nativo sin números
+          try {
+            const results = await Location.geocodeAsync(fallbackQuery);
+            if (results && results.length > 0) {
+              lat = results[0].latitude;
+              lng = results[0].longitude;
+            }
+          } catch (err) {}
+
+          // Intentar Nominatim sin números
+          if (lat === null || lng === null) {
+            try {
+              const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fallbackQuery)}&limit=1`,
+                { headers: { 'User-Agent': 'AxonFire-App' } }
+              );
+              const data = await response.json();
+              if (data && data.length > 0) {
+                lat = parseFloat(data[0].lat);
+                lng = parseFloat(data[0].lon);
+              }
+            } catch (err) {}
+          }
+        }
+      }
+
+      if (lat !== null && lng !== null) {
+        targetLocationRef.current = { latitude: lat, longitude: lng };
+        lastGeocodedCoordsRef.current = { latitude: lat, longitude: lng };
+        isProgrammaticRef.current = true;
+        mapRef.current?.animateCamera(
+          {
+            center: { latitude: lat, longitude: lng },
+            zoom: 16,
+          },
+          { duration: 500 }
+        );
+
+        setManualLat(String(lat.toFixed(6)));
+        setManualLng(String(lng.toFixed(6)));
+
+        // Conservar exactamente la dirección que el usuario ingresó
+        setSelectedAddress(searchQuery);
+        onLocationSelect?.({
+          latitude: lat,
+          longitude: lng,
+          address: searchQuery,
+        });
+      } else {
+        console.warn('No se encontraron coordenadas para la búsqueda:', queryText);
+      }
+    } catch (err) {
+      console.warn('Error en proceso de búsqueda:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const handleRegionChange = () => {
     setIsMapMoving(true);
   };
 
-  const handleRegionChangeComplete = (newRegion) => {
+  const handleRegionChangeComplete = (newRegion, gestureInfo) => {
     setIsMapMoving(false);
     const lat = newRegion.latitude;
     const lng = newRegion.longitude;
     setManualLat(String(lat.toFixed(6)));
     setManualLng(String(lng.toFixed(6)));
+
+    const wasProgrammatic = isProgrammaticRef.current;
+
+    const target = targetLocationRef.current;
+    let isCloseToTarget = false;
+    if (target) {
+      const latDiff = Math.abs(lat - target.latitude);
+      const lngDiff = Math.abs(lng - target.longitude);
+      if (latDiff < 0.0002 && lngDiff < 0.0002) {
+        isCloseToTarget = true;
+      }
+    }
+
+    if (wasProgrammatic) {
+      isProgrammaticRef.current = false;
+    }
+
+    const lastGeo = lastGeocodedCoordsRef.current;
+    const hasMovedSignificantly =
+      lastGeo.latitude === null ||
+      Math.abs(lat - lastGeo.latitude) > 0.00005 ||
+      Math.abs(lng - lastGeo.longitude) > 0.00005;
+
     onLocationSelect?.({
       latitude: lat,
       longitude: lng,
       address: selectedAddress || searchQuery,
     });
+
+    if (!wasProgrammatic && !isCloseToTarget && hasMovedSignificantly) {
+      debouncedReverseGeocode(lat, lng);
+    }
   };
 
   const handleManualLatChange = (text) => {
@@ -187,6 +529,7 @@ export default function LocationPicker({
     const lat = parseFloat(text);
     const lng = parseFloat(manualLng);
     if (!isNaN(lat) && !isNaN(lng)) {
+      isProgrammaticRef.current = true;
       mapRef.current?.animateCamera(
         {
           center: { latitude: lat, longitude: lng },
@@ -199,6 +542,7 @@ export default function LocationPicker({
         longitude: lng,
         address: selectedAddress || searchQuery,
       });
+      debouncedReverseGeocode(lat, lng);
     }
   };
 
@@ -207,6 +551,7 @@ export default function LocationPicker({
     const lat = parseFloat(manualLat);
     const lng = parseFloat(text);
     if (!isNaN(lat) && !isNaN(lng)) {
+      isProgrammaticRef.current = true;
       mapRef.current?.animateCamera(
         {
           center: { latitude: lat, longitude: lng },
@@ -219,6 +564,7 @@ export default function LocationPicker({
         longitude: lng,
         address: selectedAddress || searchQuery,
       });
+      debouncedReverseGeocode(lat, lng);
     }
   };
 
@@ -227,40 +573,36 @@ export default function LocationPicker({
       {/* Buscador */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputWrapper}>
-          <MaterialCommunityIcons name="magnify" size={18} color="#64748b" style={styles.searchIcon} />
+          <TouchableOpacity onPress={handleSearchSubmit} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="magnify" size={18} color="#64748b" style={styles.searchIcon} />
+          </TouchableOpacity>
           <TextInput
             style={styles.searchInput}
             placeholder="BUSCAR DIRECCIÓN..."
             placeholderTextColor="#52525b"
             value={searchQuery}
             onChangeText={handleSearchChange}
+            onSubmitEditing={handleSearchSubmit}
+            returnKeyType="search"
             autoCorrect={false}
             autoCapitalize="none"
           />
-          {isSearching && (
+          {(isSearching || isGeocoding) && (
             <ActivityIndicator size="small" color="#22c55e" style={styles.searchLoader} />
           )}
         </View>
         {suggestions.length > 0 && (
           <View style={styles.suggestionsList}>
             {suggestions.map((item, index) => {
-              const addr = item.address || {};
-              const calle = addr.road || addr.pedestrian || addr.footway || addr.suburb || item.name || '';
-              const ciudad = addr.city || addr.town || addr.village || addr.suburb || 'Yerba Buena';
-              let display = item.display_name;
-              if (calle) {
-                display = calle;
-                if (ciudad && ciudad !== calle) display += `, ${ciudad}`;
-              }
               return (
                 <TouchableOpacity
-                  key={item.place_id || String(index)}
+                  key={index}
                   style={styles.suggestionItem}
                   onPress={() => selectSuggestion(item)}
                 >
                   <MaterialCommunityIcons name="map-marker-outline" size={16} color="#22c55e" />
                   <Text style={styles.suggestionText} numberOfLines={2}>
-                    {display}
+                    {item.display_name}
                   </Text>
                 </TouchableOpacity>
               );
@@ -272,12 +614,12 @@ export default function LocationPicker({
       {/* Indicador de estado */}
       <View style={styles.statusBar}>
         <MaterialCommunityIcons
-          name={isMapMoving ? 'map-marker-path' : 'map-marker-check'}
+          name={isMapMoving ? 'map-marker-path' : isGeocoding ? 'autorenew' : 'map-marker-check'}
           size={14}
-          color={isMapMoving ? '#f59e0b' : '#22c55e'}
+          color={isMapMoving ? '#f59e0b' : isGeocoding ? '#3b82f6' : '#22c55e'}
         />
-        <Text style={[styles.statusText, { color: isMapMoving ? '#f59e0b' : '#22c55e' }]}>
-          {isMapMoving ? 'Seleccionando...' : 'Ubicación fijada'}
+        <Text style={[styles.statusText, { color: isMapMoving ? '#f59e0b' : isGeocoding ? '#3b82f6' : '#22c55e' }]}>
+          {isMapMoving ? 'Seleccionando...' : isGeocoding ? 'Obteniendo dirección...' : 'Ubicación fijada'}
         </Text>
       </View>
 
