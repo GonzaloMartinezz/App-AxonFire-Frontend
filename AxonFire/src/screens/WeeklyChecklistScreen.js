@@ -217,12 +217,37 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         const data = await res.json();
         if (Array.isArray(data)) {
           data.sort((a, b) => new Date(b.fecha_control) - new Date(a.fecha_control));
-          setHistorialCuartel(data);
-          if (data.length > 0) {
-            setUltimoCheckCuartel(data[0]);
-          } else {
-            setUltimoCheckCuartel(null);
-          }
+          
+          setUltimoCheckCuartel(current => {
+            if (current && String(current.id).startsWith('temp-')) {
+              if (data.length > 0) {
+                const diffMs = new Date(current.fecha_control).getTime() - new Date(data[0].fecha_control).getTime();
+                if (diffMs > 10000) {
+                  console.log('Backend stale on fetchHistorialCuartel: keeping optimistic check');
+                  return current;
+                }
+              } else {
+                return current;
+              }
+            }
+            return data.length > 0 ? data[0] : null;
+          });
+
+          setHistorialCuartel(currentHistory => {
+            const tempItem = currentHistory.find(item => item.id && String(item.id).startsWith('temp-'));
+            if (tempItem) {
+              if (data.length > 0) {
+                const diffMs = new Date(tempItem.fecha_control).getTime() - new Date(data[0].fecha_control).getTime();
+                if (diffMs > 10000) {
+                  const filteredData = data.filter(item => item.id !== tempItem.id);
+                  return [tempItem, ...filteredData];
+                }
+              } else {
+                return [tempItem];
+              }
+            }
+            return data;
+          });
         }
       }
     } catch (err) {
@@ -711,6 +736,18 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       await AsyncStorage.setItem('weekly_checklist_history', JSON.stringify(history));
 
       // ── OPTIMISTIC UPDATE: actualizar "último control" inmediatamente ──
+      const detallesConHerramientas = detalles.map(d => {
+        const tool = herramientas.find(t => t.id === d.herramientaId);
+        return {
+          ...d,
+          id: `temp-det-${d.herramientaId}-${Date.now()}`,
+          herramienta: {
+            id: d.herramientaId,
+            nombre_herramienta: tool?.nombre_herramienta || 'Herramienta',
+          }
+        };
+      });
+
       const nuevoCheckCuartel = {
         id: `temp-${Date.now()}`,
         fecha_control: new Date().toISOString(),
@@ -719,7 +756,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           nombre_usuario: user?.nombre_usuario || 'Bombero',
           bombero: user?.bombero || null,
         },
-        detalles,
+        detalles: detallesConHerramientas,
       };
       setUltimoCheckCuartel(nuevoCheckCuartel);
       setHistorialCuartel(prev => [nuevoCheckCuartel, ...prev]);
@@ -732,8 +769,10 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       setInventoryItems(resetInv);
       setForceShowBaseInventoryList(false);
 
-      // Refrescar desde backend en segundo plano
-      fetchHistorialCuartel().catch(err => console.log('Error refreshing cuartel history:', err));
+      // Refrescar desde backend en segundo plano con un delay para evitar race condition
+      setTimeout(() => {
+        fetchHistorialCuartel().catch(err => console.log('Error refreshing cuartel history:', err));
+      }, 3000);
 
       if (Platform.OS === 'web') {
         alert('Inventario de base guardado correctamente.');
