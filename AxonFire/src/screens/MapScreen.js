@@ -62,6 +62,21 @@ const POI_COLORS = {
   CUARTEL_APOYO: '#37474f',
 };
 
+function parseCoordinate(value) {
+  const parsed = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizePoi(poi) {
+  const latitud = parseCoordinate(poi?.latitud ?? poi?.latitude ?? poi?.lat);
+  const longitud = parseCoordinate(poi?.longitud ?? poi?.longitude ?? poi?.lng);
+
+  if (latitud == null || longitud == null) return null;
+  if (latitud === 0 && longitud === 0) return null;
+
+  return { ...poi, latitud, longitud };
+}
+
 // Estilo táctico oscuro para Google Maps (Android)
 // En iOS se usa Apple Maps estándar (no soporta customMapStyle)
 const tacticalMapStyle = [
@@ -426,11 +441,24 @@ export default function MapScreen({ navigation, route }) {
   async function cargarPOIs() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/maps/pois`, { headers });
-      if (!res.ok) return;
+      if (res.status === 403) {
+        console.warn('[MapScreen/F3] POIs no disponibles para este rol.');
+        setPois([]);
+        return;
+      }
+      if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
-      if (Array.isArray(data)) setPois(data);
+      const rawPois = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.pois)
+          ? data.pois
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setPois(rawPois.map(normalizePoi).filter(Boolean));
     } catch (err) {
       console.warn('[MapScreen/F3] POIs:', err.message);
+      setPois([]);
     }
   }
 
@@ -459,6 +487,8 @@ export default function MapScreen({ navigation, route }) {
             routeCoords: routeCoords
           }, '*');
         }
+      } else if (e.data && e.data.type === 'MAP_ERROR') {
+        console.warn('[MapScreen/WebLeaflet]', e.data.message);
       }
     };
 
@@ -614,7 +644,7 @@ export default function MapScreen({ navigation, route }) {
                     border: 1px solid #26282f;
                   }
                 </style>
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onload="initMap()"></script>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
               </head>
               <body>
                 <div id="map"></div>
@@ -633,7 +663,17 @@ export default function MapScreen({ navigation, route }) {
                     CUARTEL_APOYO: '#37474f'
                   };
 
+                  function notifyError(message) {
+                    window.parent.postMessage({ type: 'MAP_ERROR', message: message }, '*');
+                  }
+
                   function initMap() {
+                    if (map) return;
+                    if (!window.L) {
+                      notifyError('Leaflet no se pudo cargar.');
+                      return;
+                    }
+
                     map = L.map('map', { zoomControl: false }).setView([${lat}, ${lng}], 15);
                     
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -642,6 +682,13 @@ export default function MapScreen({ navigation, route }) {
                     }).addTo(map);
 
                     poiMarkersGroup = L.layerGroup().addTo(map);
+
+                    setTimeout(function() {
+                      map.invalidateSize();
+                    }, 0);
+                    window.addEventListener('resize', function() {
+                      if (map) map.invalidateSize();
+                    });
 
                     // Signal ready to parent
                     window.parent.postMessage({ type: 'MAP_READY' }, '*');
@@ -676,13 +723,15 @@ export default function MapScreen({ navigation, route }) {
                     }
 
                     // 2. POIs
+                    var visiblePoiPoints = [];
                     if (poiMarkersGroup) {
                       poiMarkersGroup.clearLayers();
                       if (data.pois && Array.isArray(data.pois)) {
                         data.pois.forEach(function(poi) {
                           var plat = parseFloat(poi.latitud);
                           var plng = parseFloat(poi.longitud);
-                          if (!isNaN(plat) && !isNaN(plng)) {
+                          if (!isNaN(plat) && !isNaN(plng) && !(plat === 0 && plng === 0)) {
+                            visiblePoiPoints.push([plat, plng]);
                             var color = POI_COLORS[poi.categoria] || '#37474f';
                             L.marker([plat, plng], {
                               icon: L.divIcon({
@@ -735,7 +784,12 @@ export default function MapScreen({ navigation, route }) {
                       routePolyline = L.polyline(points, { color: '#dc2626', weight: 4 }).addTo(map);
                       map.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
                     } else if (data.stationCoords && !data.incident) {
-                      map.setView([parseFloat(data.stationCoords.lat), parseFloat(data.stationCoords.lng)], 15);
+                      var stationPoint = [parseFloat(data.stationCoords.lat), parseFloat(data.stationCoords.lng)];
+                      if (visiblePoiPoints.length > 0 && !isNaN(stationPoint[0]) && !isNaN(stationPoint[1])) {
+                        map.fitBounds(L.latLngBounds([stationPoint].concat(visiblePoiPoints)), { padding: [70, 70], maxZoom: 15 });
+                      } else if (!isNaN(stationPoint[0]) && !isNaN(stationPoint[1])) {
+                        map.setView(stationPoint, 15);
+                      }
                     }
                   }
 
@@ -763,6 +817,31 @@ export default function MapScreen({ navigation, route }) {
                       }
                     }
                   });
+
+                  function bootstrapMap() {
+                    if (document.readyState === 'loading') {
+                      document.addEventListener('DOMContentLoaded', bootstrapMap, { once: true });
+                      return;
+                    }
+
+                    var attempts = 0;
+                    var timer = setInterval(function() {
+                      attempts += 1;
+                      if (window.L) {
+                        clearInterval(timer);
+                        initMap();
+                      } else if (attempts >= 80) {
+                        clearInterval(timer);
+                        notifyError('Leaflet no esta disponible despues de esperar la carga.');
+                      }
+                    }, 50);
+                  }
+
+                  window.addEventListener('error', function(event) {
+                    notifyError(event.message || 'Error inesperado en el mapa.');
+                  });
+
+                  bootstrapMap();
                 </script>
               </body>
               </html>
@@ -1175,4 +1254,3 @@ export default function MapScreen({ navigation, route }) {
     </View>
   );
 };
-
