@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Platform, View, ActivityIndicator, StyleSheet, Alert, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { Platform, View, ActivityIndicator, StyleSheet, Alert, Text, TouchableOpacity, ScrollView, useWindowDimensions } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { API_BASE_URL } from './src/config/api';
@@ -113,6 +113,7 @@ function AppContent() {
 export default function App() {
   const notificationListener = useRef();
   const responseListener = useRef();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   // Web custom alert and desktop layout states
   const [customAlert, setCustomAlert] = useState(null);
@@ -267,9 +268,20 @@ export default function App() {
   }
 
   if (useDesktopLayout) {
+    const isWideDesktop = windowWidth >= 1280;
+    const isUltraWide = windowWidth >= 1600;
+    const desktopFrameStyle = {
+      width: isUltraWide ? '94%' : '96%',
+      maxWidth: isUltraWide ? 1480 : (isWideDesktop ? 1320 : 1120),
+      height: windowHeight >= 850 ? '92%' : '94%',
+      maxHeight: isUltraWide ? 920 : 860,
+      borderWidth: isWideDesktop ? 8 : 10,
+      borderRadius: isWideDesktop ? 22 : 26,
+    };
+
     return (
       <View style={styles.webOuterContainer}>
-        <View style={styles.webPhoneContainer}>
+        <View style={[styles.webPhoneContainer, desktopFrameStyle]}>
           <SafeAreaProvider>
             <AuthProvider>
               <AppContent />
@@ -349,21 +361,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: '100%',
+    paddingHorizontal: 24,
+    paddingVertical: 18,
   },
   webPhoneContainer: {
-    width: '95%',
-    maxWidth: 1024,
-    height: '90%',
-    maxHeight: 720,
+    width: '96%',
+    maxWidth: 1320,
+    height: '92%',
+    maxHeight: 860,
     backgroundColor: '#16181d',
-    borderRadius: 28,
-    borderWidth: 12,
+    borderRadius: 22,
+    borderWidth: 8,
     borderColor: '#2d3139',
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.58,
-    shadowRadius: 16.00,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
   },
   webModalOverlay: {
     position: 'absolute',
