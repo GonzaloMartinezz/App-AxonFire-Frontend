@@ -220,20 +220,14 @@ export default function PanelControlScreen({ navigation }) {
               const changeView = () => {
                 navigation.navigate('MainApp');
               };
-              if (Platform.OS === 'web') {
-                if (window.confirm("¿Deseas visualizar la aplicación con el rol de Bombero?")) {
-                  changeView();
-                }
-              } else {
-                Alert.alert(
-                  "Vista Bombero",
-                  "¿Deseas visualizar la aplicación con el rol de Bombero?",
-                  [
-                    { text: "Cancelar", style: "cancel" },
-                    { text: "Cambiar Vista", onPress: changeView }
-                  ]
-                );
-              }
+              Alert.alert(
+                "Vista Bombero",
+                "¿Deseas visualizar la aplicación con el rol de Bombero?",
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  { text: "Cambiar Vista", onPress: changeView }
+                ]
+              );
             }}
             activeOpacity={0.7}
           >
@@ -283,6 +277,35 @@ export default function PanelControlScreen({ navigation }) {
                 </View>
               </View>
             </View>
+
+            {/* Active Emergency Banner */}
+            {(() => {
+              const alertaActiva = clasificadas.find(a => a.estado === 'activa' || a.estado === 'progreso');
+              if (!alertaActiva) return null;
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => navigation.navigate('Asistencia', { alerta_id: alertaActiva.id })}
+                  style={styles.activeEmergencyBanner}
+                >
+                  <View style={styles.emergencyBannerLeft}>
+                    <View style={styles.emergencyPulseIcon}>
+                      <MaterialCommunityIcons name="alarm-light" size={20} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.emergencyBannerTitle}>EMERGENCIA EN CURSO</Text>
+                      <Text style={styles.emergencyBannerDesc} numberOfLines={1}>
+                        {alertaActiva.tipo.toUpperCase()} • {alertaActiva.ubicacion.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.emergencyBannerRight}>
+                    <Text style={styles.emergencyBannerBtnText}>VER ASISTENCIA</Text>
+                    <MaterialCommunityIcons name="chevron-right" size={18} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              );
+            })()}
 
             {/* ── Stat grande: total de alertas con barra de resolución ── */}
             <View style={styles.totalCard}>
@@ -393,12 +416,13 @@ export default function PanelControlScreen({ navigation }) {
               <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
             </TouchableOpacity>
 
-            {/* ── Centro de Acciones y Registro (Grid) ───────────────────── */}
+            {/* ── Centro de Acciones y Registro (Grid Categorizado) ──────────── */}
             <View style={[styles.sectionHeader, { marginTop: 12 }]}>
               <View style={styles.sectionLine} />
               <Text style={styles.sectionTitle}>CENTRO DE ACCIONES Y REGISTRO</Text>
             </View>
 
+            <Text style={styles.gridSectionTitle}>Operaciones y Mapa</Text>
             <View style={styles.gridContainer}>
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -417,49 +441,37 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => navigation.navigate('AddFirefighter')}
+                onPress={() => navigation.navigate('GestionPois')}
                 style={styles.gridItem}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
-                    <MaterialCommunityIcons name="account-plus" size={18} color="#3b82f6" />
+                    <MaterialCommunityIcons name="map-marker-radius" size={18} color="#3b82f6" />
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
                 </View>
-                <Text style={styles.gridItemTitle}>Cargar Bombero</Text>
-                <Text style={styles.gridItemSub}>Registrar nuevo personal</Text>
+                <Text style={styles.gridItemTitle}>Gestión de POIs</Text>
+                <Text style={styles.gridItemSub}>Puntos de interés</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => navigation.navigate('AdminEquipment')}
-                style={styles.gridItem}
-              >
-                <View style={styles.gridItemHeader}>
-                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(249, 115, 22, 0.12)' }]}>
-                    <MaterialCommunityIcons name="package-variant-closed" size={18} color="#f97316" />
-                  </View>
-                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
-                </View>
-                <Text style={styles.gridItemTitle}>Cargar Inventario</Text>
-                <Text style={styles.gridItemSub}>Móviles y herramientas</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('PedidosSuministro')}
+                onPress={() => navigation.navigate('Asistencia')}
                 style={styles.gridItem}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-                    <MaterialCommunityIcons name="cart-outline" size={18} color="#10b981" />
+                    <MaterialCommunityIcons name="clipboard-check" size={18} color="#10b981" />
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
                 </View>
-                <Text style={styles.gridItemTitle}>Pedidos Suministro</Text>
-                <Text style={styles.gridItemSub}>Solicitud de insumos</Text>
+                <Text style={styles.gridItemTitle}>Planilla Asistencia</Text>
+                <Text style={styles.gridItemSub}>Presencia en vivo</Text>
               </TouchableOpacity>
+            </View>
 
+            <Text style={styles.gridSectionTitle}>Servicios y Control</Text>
+            <View style={styles.gridContainer}>
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('WeeklyChecklist')}
@@ -477,19 +489,22 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => navigation.navigate('Reports')}
+                onPress={() => navigation.navigate('PedidosSuministro')}
                 style={styles.gridItem}
               >
                 <View style={styles.gridItemHeader}>
-                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
-                    <MaterialCommunityIcons name="file-chart" size={18} color="#94a3b8" />
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(249, 115, 22, 0.12)' }]}>
+                    <MaterialCommunityIcons name="cart-outline" size={18} color="#f97316" />
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
                 </View>
-                <Text style={styles.gridItemTitle}>Reportes Legales</Text>
-                <Text style={styles.gridItemSub}>Historial de actas</Text>
+                <Text style={styles.gridItemTitle}>Pedidos Suministro</Text>
+                <Text style={styles.gridItemSub}>Solicitud de insumos</Text>
               </TouchableOpacity>
+            </View>
 
+            <Text style={styles.gridSectionTitle}>Informes y Estadísticas</Text>
+            <View style={styles.gridContainer}>
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Estadisticas')}
@@ -501,23 +516,23 @@ export default function PanelControlScreen({ navigation }) {
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
                 </View>
-                <Text style={styles.gridItemTitle}>Métricas y Reportes</Text>
-                <Text style={styles.gridItemSub}>Estadísticas RUBA</Text>
+                <Text style={styles.gridItemTitle}>Métricas RUBA</Text>
+                <Text style={styles.gridItemSub}>Estadísticas generales</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => navigation.navigate('GestionPois')}
+                onPress={() => navigation.navigate('Reports')}
                 style={styles.gridItem}
               >
                 <View style={styles.gridItemHeader}>
-                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
-                    <MaterialCommunityIcons name="map-marker-radius" size={18} color="#3b82f6" />
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
+                    <MaterialCommunityIcons name="file-chart" size={18} color="#94a3b8" />
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
                 </View>
-                <Text style={styles.gridItemTitle}>Gestión de POIs</Text>
-                <Text style={styles.gridItemSub}>Puntos de interés</Text>
+                <Text style={styles.gridItemTitle}>Reportes Legales</Text>
+                <Text style={styles.gridItemSub}>Historial de actas</Text>
               </TouchableOpacity>
             </View>
 

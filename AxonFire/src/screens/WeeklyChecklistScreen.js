@@ -364,22 +364,14 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         minute: '2-digit'
       });
 
-      if (Platform.OS === 'web') {
-        const confirmar = window.confirm(
-          `¡Atención! El ${camion.nombre_camion?.toUpperCase()} ya fue controlado hoy a las ${horaText} por ${bomberoNombre}.\n\n¿Deseas iniciar un nuevo control de inventario de todas formas?`
-        );
-        if (!confirmar) return;
-      } else {
-        Alert.alert(
-          '⚠️ Móvil ya Controlado',
-          `El ${camion.nombre_camion?.toUpperCase()} ya fue controlado hoy a las ${horaText} por ${bomberoNombre}.\n\n¿Deseas iniciar un nuevo control de inventario de todas formas?`,
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Iniciar Nuevo Control', style: 'destructive', onPress: () => setCamionSeleccionado(camion) }
-          ]
-        );
-        return;
-      }
+      Alert.alert(
+        '⚠️ Móvil ya Controlado',
+        `El ${camion.nombre_camion?.toUpperCase()} ya fue controlado hoy a las ${horaText} por ${bomberoNombre}.\n\n¿Deseas iniciar un nuevo control de inventario de todas formas?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Iniciar Nuevo Control', style: 'destructive', onPress: () => setCamionSeleccionado(camion) }
+        ]
+      );
     }
 
     setCamionSeleccionado(camion);

@@ -342,20 +342,14 @@ export default function AdminEquipmentScreen({ navigation }) {
   const getStockLabel = (qty) => qty > 5 ? 'ÓPTIMO' : qty > 0 ? 'BAJO' : 'SIN STOCK';
 
   const confirmLogout = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('¿Estás seguro que deseas cerrar sesión?')) {
-        navigation.replace('Login');
-      }
-    } else {
-      Alert.alert(
-        'Cerrar Sesión',
-        '¿Estás seguro que deseas cerrar sesión?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Confirmar', onPress: () => navigation.replace('Login'), style: 'destructive' }
-        ]
-      );
-    }
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => navigation.replace('Login'), style: 'destructive' }
+      ]
+    );
   };
 
   return (

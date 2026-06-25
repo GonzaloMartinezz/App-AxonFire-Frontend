@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   StatusBar,
@@ -13,23 +12,20 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Spacing, Radius } from '../theme';
+import { Colors, Spacing } from '../theme';
 import TacticalCard from '../components/TacticalCard';
-import StatusBadge from '../components/StatusBadge';
-
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { styles } from '../styles/PedidosSuministroScreenStyles';
 
-// Los tipos de refuerzo que el bombero puede solicitar
 const TIPOS_REFUERZO = [
-  { icono: 'water', nombre: 'CISTERNA', color: Colors.alertBlue, tipo: 'cisterna', subcat: '4' },
-  { icono: 'gas-station', nombre: 'COMBUSTIBLE', color: Colors.warningOrange, tipo: 'combustible', subcat: '4' },
-  { icono: 'ambulance', nombre: 'AMBULANCIA', color: Colors.primary, tipo: 'ambulancia', subcat: '4' },
-  { icono: 'hammer-wrench', nombre: 'RESCATE', color: Colors.secondary, tipo: 'rescate', subcat: '2' },
+  { icono: 'water', nombre: 'CISTERNA', color: '#38bdf8', tipo: 'cisterna', subcat: '4' },
+  { icono: 'gas-station', nombre: 'COMBUSTIBLE', color: '#fbbf24', tipo: 'combustible', subcat: '4' },
+  { icono: 'ambulance', nombre: 'AMBULANCIA', color: '#fca5a5', tipo: 'ambulancia', subcat: '4' },
+  { icono: 'hammer-wrench', nombre: 'RESCATE', color: '#34d399', tipo: 'rescate', subcat: '2' },
 ];
 
 function tiempoTranscurrido(fechaISO) {
@@ -37,7 +33,9 @@ function tiempoTranscurrido(fechaISO) {
   const min = Math.floor((Date.now() - new Date(fechaISO).getTime()) / 60000);
   if (min < 1) return 'Ahora';
   if (min < 60) return `Hace ${min} min`;
-  return `Hace ${Math.floor(min / 60)} hs`;
+  const hs = Math.floor(min / 60);
+  if (hs < 24) return `Hace ${hs} hs`;
+  return `Hace ${Math.floor(hs / 24)} días`;
 }
 
 export default function PedidosSuministroScreen({ navigation }) {
@@ -48,14 +46,13 @@ export default function PedidosSuministroScreen({ navigation }) {
   // ── Estado ────────────────────────────────────────────────────────────────
   const [solicitudes, setSolicitudes] = useState([]);
   const [cargando, setCargando] = useState(true);
-  // Cuál botón de refuerzo está enviando (para mostrar spinner solo en ese)
-  const [enviandoTipo, setEnviandoTipo] = useState(null);
+  const [enviando, setEnviando] = useState(false);
 
-  // Modal de solicitar personal
+  // Modal Único / Unificado
   const [modalVisible, setModalVisible] = useState(false);
-  const [cantidadPersonal, setCantidadPersonal] = useState(1);
-  const [motivoPersonal, setMotivoPersonal] = useState('');
-  const [enviandoPersonal, setEnviandoPersonal] = useState(false);
+  const [selectedRefuerzo, setSelectedRefuerzo] = useState(null); // null = Personal, object = Cisterna, etc.
+  const [cantidad, setCantidad] = useState(1);
+  const [observaciones, setObservaciones] = useState('');
 
   // Alerta activa a la cual ligar el pedido
   const [alertaActiva, setAlertaActiva] = useState(null);
@@ -67,14 +64,16 @@ export default function PedidosSuministroScreen({ navigation }) {
       // 1. Buscar alerta activa (la más reciente que no sea FINALIZADO)
       const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
         params: {
-          fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          fecha_desde: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días para ver historial
           fecha_hasta: new Date().toISOString()
         }, headers: { Authorization: `Bearer ${token}` }
       });
 
-      const activas = (resAlertas.data?.alertas || []).filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
+      const lista = resAlertas.data?.alertas || [];
+      const activas = lista.filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
+      
       if (activas.length > 0) {
-        setAlertaActiva(activas[0]); // Tomamos la más reciente
+        setAlertaActiva(activas[0]); // Tomamos la más reciente activa
 
         // 2. Cargar registros de comunicación de esa alerta
         const resLogs = await axios.get(`${API_BASE_URL}/registros_comunicacion/alerta/${activas[0].id}`, {
@@ -96,66 +95,33 @@ export default function PedidosSuministroScreen({ navigation }) {
     if (usuarioId) cargarDatos();
   }, [usuarioId]);
 
-  function pedirRefuerzo(refuerzo) {
+  // ── Abrir Modal de Solicitud ─────────────────────────────────────────────
+  function openRequestModal(refuerzo) {
     if (!alertaActiva) {
-      Alert.alert("Atención", "No hay ninguna emergencia activa en este momento para ligar el pedido.");
+      Alert.alert("Atención", "No hay ninguna emergencia activa en este momento para enviar solicitudes.");
       return;
     }
-
-    Alert.alert(
-      `Solicitar ${refuerzo.nombre}`,
-      `¿Confirmás que necesitás ${refuerzo.nombre} para la emergencia activa en ${alertaActiva.ubicacion}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Solicitar',
-          onPress: async () => {
-            setEnviandoTipo(refuerzo.tipo);
-            try {
-              const body = {
-                alerta_id: alertaActiva.id,
-                usuario_id: usuarioId,
-                mensaje: `[${refuerzo.nombre}] Solicitado para la emergencia.`,
-                tipo_comunicacion: 'SUMINISTROS',
-                fecha_hora: new Date().toISOString()
-              };
-
-              await axios.post(`${API_BASE_URL}/registros_comunicacion/crear`, body, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-
-              Alert.alert('✅ Enviado', `Pedido de ${refuerzo.nombre} enviado silenciosamente.`);
-              cargarDatos();
-            } catch (err) {
-              console.error('Error enviando solicitud:', err);
-              Alert.alert('Error', 'No se pudo enviar. Intentá de nuevo.');
-            } finally {
-              setEnviandoTipo(null);
-            }
-          },
-        },
-      ]
-    );
+    setSelectedRefuerzo(refuerzo); // null representa a "PERSONAL"
+    setCantidad(1);
+    setObservaciones('');
+    setModalVisible(true);
   }
 
-  async function pedirPersonal() {
-    if (!alertaActiva) {
-      Alert.alert("Atención", "No hay ninguna emergencia activa para pedir personal.");
-      return;
-    }
+  // ── Enviar Solicitud Unificada ───────────────────────────────────────────
+  async function enviarSolicitud() {
+    if (!alertaActiva) return;
 
-    if (!motivoPersonal.trim()) {
-      Alert.alert('Falta el motivo', 'Escribí por qué necesitás refuerzo de personal.');
-      return;
-    }
-
-    setEnviandoPersonal(true);
+    setEnviando(true);
     try {
+      const esPersonal = selectedRefuerzo === null;
+      const keyLabel = esPersonal ? 'REFUERZO PERSONAL' : selectedRefuerzo.nombre;
+      const detailMsg = observaciones.trim() ? `: ${observaciones.trim()}` : '';
+      
       const body = {
         alerta_id: alertaActiva.id,
         usuario_id: usuarioId,
-        mensaje: `[REFUERZO PERSONAL] ${cantidadPersonal} bomberos: ${motivoPersonal}`,
-        tipo_comunicacion: 'APOYO',
+        mensaje: `[${keyLabel}] Cantidad: ${cantidad}${detailMsg}`,
+        tipo_comunicacion: esPersonal ? 'APOYO' : 'SUMINISTROS',
         fecha_hora: new Date().toISOString()
       };
 
@@ -164,61 +130,84 @@ export default function PedidosSuministroScreen({ navigation }) {
       });
 
       setModalVisible(false);
-      setCantidadPersonal(1);
-      setMotivoPersonal('');
-      Alert.alert('✅ Enviado', 'Pedido de personal enviado silenciosamente.');
+      Alert.alert('✅ Enviado', `Pedido de ${keyLabel.toLowerCase()} registrado con éxito.`);
       cargarDatos();
     } catch (err) {
-      console.error('Error enviando pedido de personal:', err);
-      Alert.alert('Error', 'No se pudo enviar. Intentá de nuevo.');
+      console.error('Error enviando solicitud:', err);
+      Alert.alert('Error', 'No se pudo registrar la solicitud en la bitácora táctica.');
     } finally {
-      setEnviandoPersonal(false);
+      setEnviando(false);
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Obtener Icono de Solicitud para Historial ────────────────────────────
+  function getSolicitudIcon(msg = '') {
+    const text = msg.toUpperCase();
+    if (text.includes('PERSONAL')) return { name: 'account-multiple', color: '#818cf8', bg: 'rgba(129, 140, 248, 0.12)' };
+    if (text.includes('CISTERNA')) return { name: 'water', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.12)' };
+    if (text.includes('COMBUSTIBLE')) return { name: 'gas-station', color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.12)' };
+    if (text.includes('AMBULANCIA')) return { name: 'ambulance', color: '#fca5a5', bg: 'rgba(252, 165, 165, 0.12)' };
+    if (text.includes('RESCATE')) return { name: 'hammer-wrench', color: '#34d399', bg: 'rgba(52, 211, 153, 0.12)' };
+    return { name: 'package-variant', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.12)' };
+  }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#1a1c23" />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <TouchableOpacity style={styles.botonVolver} onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#263238" />
+          <MaterialCommunityIcons name="arrow-left" size={20} color="#94a3b8" />
         </TouchableOpacity>
-        <Text style={styles.tituloHeader}>Pedidos de Suministro</Text>
+        <Text style={styles.tituloHeader}>PEDIDOS DE SUMINISTRO</Text>
         <TouchableOpacity style={styles.botonRefresh} onPress={cargarDatos}>
-          <MaterialCommunityIcons name="refresh" size={20} color="#263238" />
+          <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.contenido, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.contenido, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Emergencia Activa Card */}
+        <Text style={styles.labelSeccion}>Contexto de Emergencia</Text>
+        {alertaActiva ? (
+          <View style={styles.activeEmergencyCard}>
+            <View style={styles.emergencyCardHeader}>
+              <MaterialCommunityIcons name="alert-circle" size={16} color="#dc2626" />
+              <Text style={styles.emergencyLabel}>INCIDENTE ACTIVO EN VIVO</Text>
+            </View>
+            <Text style={styles.emergencyTitle}>
+              {(alertaActiva.subCategoriaAlerta?.nombre_sub_categoria || alertaActiva.subCategoriaAlerta?.nombre || alertaActiva.observaciones || 'INCIDENTE').toUpperCase()}
+            </Text>
+            <Text style={styles.emergencySub}>Ubicación: {alertaActiva.ubicacion || '—'}</Text>
+          </View>
+        ) : (
+          <View style={[styles.activeEmergencyCard, { borderLeftColor: '#475569' }]}>
+            <View style={styles.emergencyCardHeader}>
+              <MaterialCommunityIcons name="shield-check" size={16} color="#475569" />
+              <Text style={[styles.emergencyLabel, { color: '#64748b' }]}>SITUACIÓN CONTROLADA</Text>
+            </View>
+            <Text style={[styles.emergencyTitle, { color: '#64748b' }]}>SIN EMERGENCIAS ACTIVAS</Text>
+            <Text style={styles.emergencySub}>Para solicitar suministros, debe existir un despacho en curso.</Text>
+          </View>
+        )}
+
         {/* Grilla de refuerzos */}
-        <Text style={styles.labelSeccion}>SOLICITAR REFUERZO</Text>
+        <Text style={styles.labelSeccion}>Solicitar Refuerzo</Text>
         <View style={styles.grilla}>
           {TIPOS_REFUERZO.map((item) => (
             <TouchableOpacity
               key={item.tipo}
-              style={[
-                styles.cardRefuerzo,
-                enviandoTipo === item.tipo && { opacity: 0.6 },
-              ]}
-              onPress={() => pedirRefuerzo(item)}
-              disabled={enviandoTipo !== null}
-              activeOpacity={0.7}
+              style={styles.cardRefuerzo}
+              onPress={() => openRequestModal(item)}
+              activeOpacity={0.8}
             >
-              {enviandoTipo === item.tipo ? (
-                <ActivityIndicator size="small" color={item.color} />
-              ) : (
-                <View style={[styles.iconoRefuerzo, { backgroundColor: `${item.color}18` }]}>
-                  <MaterialCommunityIcons name={item.icono} size={24} color={item.color} />
-                </View>
-              )}
+              <View style={[styles.iconoRefuerzo, { backgroundColor: `${item.color}15` }]}>
+                <MaterialCommunityIcons name={item.icono} size={24} color={item.color} />
+              </View>
               <Text style={styles.nombreRefuerzo}>{item.nombre}</Text>
             </TouchableOpacity>
           ))}
@@ -226,116 +215,120 @@ export default function PedidosSuministroScreen({ navigation }) {
 
         {/* Botón de solicitar personal */}
         <TouchableOpacity
-          style={{ marginTop: Spacing.lg }}
-          onPress={() => setModalVisible(true)}
+          onPress={() => openRequestModal(null)}
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={[Colors.primaryGradientStart, Colors.primaryGradientEnd]}
+            colors={['#dc2626', '#b91c1c']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.botonPersonal}
           >
-            <MaterialCommunityIcons name="account-plus" size={22} color="#fff" />
-            <Text style={styles.textoBotonPersonal}>SOLICITAR PERSONAL</Text>
+            <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
+            <Text style={styles.textoBotonPersonal}>SOLICITAR REFUERZO DE PERSONAL</Text>
           </LinearGradient>
         </TouchableOpacity>
 
         {/* Historial de solicitudes */}
         <Text style={[styles.labelSeccion, { marginTop: Spacing.xl }]}>
-          SOLICITUDES ENVIADAS
+          Bitácora de Pedidos Enviados
         </Text>
 
         {cargando ? (
-          <ActivityIndicator size="small" color="#af101a" style={{ marginVertical: 16 }} />
+          <ActivityIndicator size="small" color="#dc2626" style={{ marginVertical: 20 }} />
         ) : solicitudes.length === 0 ? (
           <View style={styles.centrado}>
-            <MaterialCommunityIcons name="inbox-outline" size={40} color="#cfd8dc" />
-            <Text style={styles.textoVacio}>Todavía no enviaste ninguna solicitud</Text>
+            <MaterialCommunityIcons name="inbox-outline" size={36} color="#334155" />
+            <Text style={styles.textoVacio}>Sin pedidos cargados para esta emergencia</Text>
           </View>
         ) : (
-          solicitudes.map((sol, idx) => (
-            <TacticalCard key={sol.id || idx}>
-              <View style={styles.filaSolicitud}>
-                <View style={[styles.iconoSolicitud, { backgroundColor: `${Colors.alertBlue}18` }]}>
-                  <MaterialCommunityIcons
-                    name={sol.tipo_comunicacion === 'APOYO' ? 'account-group' : 'truck-check'}
-                    size={20}
-                    color={Colors.alertBlue}
-                  />
+          solicitudes.map((sol, idx) => {
+            const iconInfo = getSolicitudIcon(sol.mensaje);
+            return (
+              <TacticalCard key={sol.id || idx}>
+                <View style={styles.filaSolicitud}>
+                  <View style={[styles.iconoSolicitud, { backgroundColor: iconInfo.bg }]}>
+                    <MaterialCommunityIcons
+                      name={iconInfo.name}
+                      size={20}
+                      color={iconInfo.color}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tituloSolicitud} numberOfLines={2}>
+                      {sol.mensaje.replace(/[\[\]]/g, '') || sol.tipo_comunicacion}
+                    </Text>
+                    <Text style={styles.subtituloSolicitud}>
+                      {sol.usuarioId?.bombero ? `${sol.usuarioId.bombero.nombre} ${sol.usuarioId.bombero.apellido}` : 'SISTEMA'} · {tiempoTranscurrido(sol.fecha_hora)}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons name="check-all" size={18} color="#10b981" />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tituloSolicitud} numberOfLines={2}>
-                    {sol.mensaje.replace(/[\[\]]/g, '') || sol.tipo_comunicacion}
-                  </Text>
-                  <Text style={styles.subtituloSolicitud}>
-                    {sol.usuarioId?.bombero ? `${sol.usuarioId.bombero.nombre} ${sol.usuarioId.bombero.apellido}` : 'Sistema'} · {tiempoTranscurrido(sol.fecha_hora)}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons name="check-all" size={18} color={Colors.success} />
-              </View>
-            </TacticalCard>
-          ))
+              </TacticalCard>
+            );
+          })
         )}
       </ScrollView>
 
-      {/* Modal de solicitar personal */}
+      {/* Modal de Carga de Pedido Unificado */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.fondoModal}>
           <View style={styles.contenedorModal}>
             <View style={styles.headerModal}>
-              <Text style={styles.tituloModal}>Solicitar Personal</Text>
+              <Text style={styles.tituloModal}>
+                {selectedRefuerzo ? `Solicitar ${selectedRefuerzo.nombre}` : 'Solicitar Personal'}
+              </Text>
               <TouchableOpacity style={styles.cerrarModal} onPress={() => setModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={22} color="#263238" />
+                <MaterialCommunityIcons name="close" size={20} color="#94a3b8" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.labelModal}>Cantidad de bomberos</Text>
+            <Text style={styles.labelModal}>Cantidad solicitada</Text>
             <View style={styles.filaCantidad}>
               <TouchableOpacity
                 style={styles.botonCantidad}
-                onPress={() => setCantidadPersonal(c => Math.max(1, c - 1))}
+                onPress={() => setCantidad(c => Math.max(1, c - 1))}
               >
-                <MaterialCommunityIcons name="minus" size={20} color="#263238" />
+                <MaterialCommunityIcons name="minus" size={18} color="#94a3b8" />
               </TouchableOpacity>
-              <Text style={styles.valorCantidad}>{cantidadPersonal}</Text>
+              <Text style={styles.valorCantidad}>{cantidad}</Text>
               <TouchableOpacity
                 style={styles.botonCantidad}
-                onPress={() => setCantidadPersonal(c => c + 1)}
+                onPress={() => setCantidad(c => c + 1)}
               >
-                <MaterialCommunityIcons name="plus" size={20} color="#263238" />
+                <MaterialCommunityIcons name="plus" size={18} color="#94a3b8" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.labelModal}>Motivo</Text>
+            <Text style={styles.labelModal}>Detalles / Motivo táctico</Text>
             <TextInput
               style={styles.inputMotivo}
-              placeholder="Ej: Necesito refuerzo en el flanco norte..."
-              placeholderTextColor="#94a3b8"
+              placeholder="Ej: Se requieren litros extra de agua, apoyo flanco norte..."
+              placeholderTextColor="#475569"
               multiline
               numberOfLines={3}
-              value={motivoPersonal}
-              onChangeText={setMotivoPersonal}
+              value={observaciones}
+              onChangeText={setObservaciones}
             />
 
             <TouchableOpacity
-              style={[styles.botonEnviarModal, enviandoPersonal && { opacity: 0.7 }]}
-              onPress={pedirPersonal}
-              disabled={enviandoPersonal}
+              style={[styles.botonEnviarModal, enviando && { opacity: 0.7 }]}
+              onPress={enviarSolicitud}
+              disabled={enviando}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#af101a', '#d32f2f']}
+                colors={['#dc2626', '#b91c1c']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.gradientModal}
               >
-                {enviandoPersonal ? (
+                {enviando ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="send" size={18} color="#fff" />
-                    <Text style={styles.textoEnviarModal}>ENVIAR SOLICITUD</Text>
+                    <MaterialCommunityIcons name="send" size={16} color="#fff" />
+                    <Text style={styles.textoEnviarModal}>ENVIAR PEDIDO A CENTRAL</Text>
                   </>
                 )}
               </LinearGradient>

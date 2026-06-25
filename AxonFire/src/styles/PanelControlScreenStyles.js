@@ -315,4 +315,71 @@ export const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '500',
     },
+
+    // Active Emergency Banner
+    activeEmergencyBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#dc2626',
+        borderRadius: 6,
+        padding: 14,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#b91c1c',
+        ...Platform.select({
+            ios: { shadowColor: '#dc2626', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+            android: { elevation: 6 },
+            web: { boxShadow: '0px 4px 16px rgba(220, 38, 38, 0.4)' }
+        }),
+    },
+    emergencyPulseIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.22)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    emergencyBannerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 2,
+    },
+    emergencyBannerTitle: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '900',
+        letterSpacing: 1.2,
+    },
+    emergencyBannerDesc: {
+        color: '#fca5a5',
+        fontSize: 10,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    emergencyBannerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    emergencyBannerBtnText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+    },
+
+    // Grid section headers
+    gridSectionTitle: {
+        color: '#475569',
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 1.5,
+        marginBottom: 8,
+        marginTop: 14,
+        textTransform: 'uppercase',
+    },
 });
