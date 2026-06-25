@@ -42,7 +42,7 @@ export const styles = StyleSheet.create({
         maxWidth: 1180,
         alignSelf: 'center',
         paddingHorizontal: 28,
-        paddingTop: 28,
+        paddingTop: 22,
     },
 
     // Header Row
@@ -53,7 +53,7 @@ export const styles = StyleSheet.create({
         marginBottom: 28,
     },
     headerRowDesktop: {
-        marginBottom: 24,
+        marginBottom: 18,
     },
     titleLeftGroup: {
         flexDirection: 'row',
@@ -103,6 +103,10 @@ export const styles = StyleSheet.create({
         borderLeftWidth: 3,
         borderLeftColor: '#dc2626',
     },
+    totalCardDesktop: {
+        padding: 16,
+        marginBottom: 18,
+    },
     totalLeft: { marginBottom: 16 },
     totalLabel: { fontSize: 9, color: '#94a3b8', letterSpacing: 1, fontWeight: '700', marginBottom: 6 },
     totalValue: { fontSize: 32, fontWeight: '900', color: '#fff' },
@@ -114,10 +118,29 @@ export const styles = StyleSheet.create({
     // Section Header
     sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
     sectionLine: { width: 6, height: 18, borderRadius: 3, backgroundColor: '#dc2626', marginRight: 10 },
+    sectionLineMuted: { width: 6, height: 18, borderRadius: 3, backgroundColor: '#475569', marginRight: 10 },
     sectionTitle: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 2, flex: 1 },
+
+    desktopBody: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 18,
+        marginTop: 6,
+    },
+    desktopMainColumn: {
+        flex: 1,
+        minWidth: 0,
+    },
+    desktopSideColumn: {
+        width: 360,
+        flexShrink: 0,
+    },
 
     // Grilla
     grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
+    grillaDesktop: {
+        marginBottom: 2,
+    },
     cardStat: {
         backgroundColor: '#1b1d24',
         borderRadius: 8,
@@ -134,7 +157,10 @@ export const styles = StyleSheet.create({
     cardStatDesktop: {
         flex: 1,
         minWidth: 0,
-        minHeight: 92,
+        minHeight: 78,
+    },
+    quickActionStat: {
+        backgroundColor: '#1f222b',
     },
     cardStatHeader: {
         flexDirection: 'row',
@@ -142,6 +168,12 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statNumero: { fontSize: 24, fontWeight: '900', color: '#f8fafc' },
+    statActionTitle: {
+        color: '#f8fafc',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.2,
+    },
     statLabel: {
         fontSize: 9,
         fontWeight: '800',
@@ -155,11 +187,11 @@ export const styles = StyleSheet.create({
         flexDirection: 'row',
         backgroundColor: '#1b1d24',
         borderRadius: 8,
-        marginBottom: 12,
+        marginBottom: 10,
         borderLeftWidth: 3,
         borderWidth: 1,
         borderColor: '#26282f',
-        padding: 16,
+        padding: 14,
         alignItems: 'center',
         justifyContent: 'space-between',
     },
@@ -169,8 +201,8 @@ export const styles = StyleSheet.create({
         flex: 1,
     },
     alertIconBg: {
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         borderRadius: 6,
         alignItems: 'center',
         justifyContent: 'center',
@@ -183,7 +215,7 @@ export const styles = StyleSheet.create({
     },
     alertTitle: {
         color: '#f8fafc',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         letterSpacing: 0.5,
     },
@@ -227,6 +259,41 @@ export const styles = StyleSheet.create({
         fontWeight: '700',
     },
 
+    activityPanel: {
+        marginTop: 28,
+    },
+    activityPanelDesktop: {
+        marginTop: 8,
+        backgroundColor: '#1a1c23',
+        borderWidth: 1,
+        borderColor: '#26282f',
+        borderRadius: 8,
+        padding: 14,
+        ...Platform.select({
+            web: { boxShadow: '0px 10px 24px rgba(0, 0, 0, 0.18)' }
+        }),
+    },
+    activityHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 14,
+    },
+    activityKicker: {
+        color: '#e11d48',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 1.5,
+        marginBottom: 3,
+    },
+    activityTitle: {
+        color: '#f8fafc',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 1.2,
+    },
+
     emptyState: {
         alignItems: 'center',
         paddingVertical: 32,
@@ -264,6 +331,17 @@ export const styles = StyleSheet.create({
             android: { elevation: 3 },
             web: { boxShadow: '0px 4px 12px rgba(225, 29, 72, 0.08)' }
         }),
+    },
+    adminCard: {
+        borderLeftColor: '#6366f1',
+        marginTop: 0,
+        marginBottom: 10,
+        opacity: 0.92,
+    },
+    adminIconBg: {
+        backgroundColor: 'rgba(99, 102, 241, 0.16)',
+        borderWidth: 1,
+        borderColor: 'rgba(129, 140, 248, 0.28)',
     },
     logisticCardLeft: {
         flexDirection: 'row',

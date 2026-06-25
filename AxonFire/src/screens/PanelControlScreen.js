@@ -90,6 +90,16 @@ function getPriorityColor(prioridad = '') {
   return '#6ee7b7';
 }
 
+function formatAlertTitle(tipo = '') {
+  const clean = String(tipo)
+    .replace(/^\[[^\]]+\]\s*-\s*/i, '')
+    .trim();
+  if (!clean || clean.toLowerCase() === 'sin descripcion' || clean.toLowerCase() === 'sin descripción') {
+    return 'Alerta registrada';
+  }
+  return clean;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function PanelControlScreen({ navigation }) {
@@ -195,7 +205,6 @@ export default function PanelControlScreen({ navigation }) {
 
   const totalAlertas = clasificadas.length;
   const cantActivas = clasificadas.filter(a => a.estado === 'activa' || a.estado === 'progreso').length;
-  const cantDespachadas = clasificadas.filter(a => a.estado === 'despachada').length;
   const cantResueltas = clasificadas.filter(a => a.estado === 'resuelta').length;
 
   const resolucionRate = totalAlertas > 0 ? (cantResueltas / totalAlertas) * 100 : 0;
@@ -210,6 +219,74 @@ export default function PanelControlScreen({ navigation }) {
   const actionCardStyle = isWideWeb ? styles.gridItemWide : styles.gridItemDefault;
   const desktopContentStyle = isDesktopWeb ? styles.contenidoDesktop : null;
   const desktopHeaderStyle = isDesktopWeb ? styles.headerRowDesktop : null;
+  const desktopActivityStyle = isDesktopWeb ? styles.activityPanelDesktop : null;
+  const desktopTotalStyle = isDesktopWeb ? styles.totalCardDesktop : null;
+  const desktopTotalLeftStyle = isDesktopWeb ? styles.totalLeftDesktop : null;
+  const desktopTotalProgressStyle = isDesktopWeb ? styles.totalProgressDesktop : null;
+  const desktopGridStyle = isDesktopWeb ? styles.grillaDesktop : null;
+
+  const renderRecentActivity = () => (
+    <View style={[styles.activityPanel, desktopActivityStyle]}>
+      <View style={styles.activityHeader}>
+        <View>
+          <Text style={styles.activityKicker}>HISTORIAL</Text>
+          <Text style={styles.activityTitle}>ÚLTIMAS ALERTAS</Text>
+        </View>
+        <TouchableOpacity onPress={limpiarBaseDeDatos} style={styles.botonTest}>
+          <MaterialCommunityIcons name="delete-sweep" size={14} color="#e11d48" />
+          <Text style={styles.botonTestText}>LIMPIAR</Text>
+        </TouchableOpacity>
+      </View>
+
+      {ultimasAlertas.length === 0 ? (
+        <View style={styles.emptyState}>
+          <MaterialCommunityIcons name="shield-check" size={40} color="#334155" />
+          <Text style={styles.textoVacio}>Sin actividad registrada</Text>
+        </View>
+      ) : (
+        ultimasAlertas.map((a, idx) => {
+          const iconInfo = getAlertIcon(a.tipo);
+          const priorityColor = getPriorityColor(a.prioridad);
+          const statusStyle = getStatusBadgeStyles(a.estado);
+          const alertTitle = formatAlertTitle(a.tipo);
+          return (
+            <TouchableOpacity
+              key={a.id || idx}
+              onPress={() => navigation.navigate('AlertDetail', { alerta_id: a.id })}
+              activeOpacity={0.8}
+              style={[styles.alertCard, { borderLeftColor: priorityColor }]}
+            >
+              <View style={styles.alertCardLeft}>
+                <View style={[styles.alertIconBg, { backgroundColor: iconInfo.bg }]}>
+                  <MaterialCommunityIcons name={iconInfo.icon} size={22} color={iconInfo.color} />
+                </View>
+                <View style={styles.alertDetails}>
+                  <Text style={styles.alertTitle} numberOfLines={1}>{alertTitle.toUpperCase()}</Text>
+                  <Text style={styles.alertSubtitle} numberOfLines={1}>{a.ubicacion}</Text>
+                  <View style={styles.alertBadgesRow}>
+                    <View style={[styles.priorityBadge, { backgroundColor: priorityColor + '20' }]}>
+                      <Text style={[styles.priorityBadgeText, { color: priorityColor }]}>
+                        {a.prioridad.toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                      <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
+                        {statusStyle.label}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.alertCardRight}>
+                <Text style={styles.alertTime}>{tiempoTranscurrido(a.fecha)}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
+              </View>
+            </TouchableOpacity>
+          );
+        })
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -320,13 +397,13 @@ export default function PanelControlScreen({ navigation }) {
             })()}
 
             {/* ── Stat grande: total de alertas con barra de resolución ── */}
-            <View style={styles.totalCard}>
-              <View style={styles.totalLeft}>
+            <View style={[styles.totalCard, desktopTotalStyle]}>
+              <View style={[styles.totalLeft, desktopTotalLeftStyle]}>
                 <Text style={styles.totalLabel}>ALERTAS REGISTRADAS (ÚLTIMOS 30 DÍAS)</Text>
                 <Text style={styles.totalValue}>{String(totalAlertas).padStart(2, '0')}</Text>
               </View>
-              <View style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={[styles.totalProgress, desktopTotalProgressStyle]}>
+                <View style={styles.progressBarHeader}>
                   <Text style={styles.progressBarLabel}>EFICIENCIA DE RESOLUCIÓN</Text>
                   <Text style={[styles.progressBarPercent, { color: '#10b981' }]}>{resolucionRate.toFixed(0)}%</Text>
                 </View>
@@ -342,7 +419,7 @@ export default function PanelControlScreen({ navigation }) {
               <Text style={styles.sectionTitle}>ESTADOS DE EMERGENCIA</Text>
             </View>
 
-            <View style={styles.grilla}>
+            <View style={[styles.grilla, desktopGridStyle]}>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Activas' })}
@@ -357,14 +434,15 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigation.navigate('Alertas', { filtro: 'Despachadas' })}
-                style={[styles.cardStat, statCardStyle, { borderLeftColor: '#3b82f6' }]}
+                onPress={() => navigation.navigate('NewAlert')}
+                style={[styles.cardStat, statCardStyle, styles.quickActionStat, { borderLeftColor: '#e11d48' }]}
               >
                 <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons name="truck-delivery" size={20} color="#3b82f6" />
-                  <Text style={styles.statNumero}>{cantDespachadas}</Text>
+                  <MaterialCommunityIcons name="alarm-plus" size={20} color="#e11d48" />
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
                 </View>
-                <Text style={styles.statLabel}>Despachadas</Text>
+                <Text style={styles.statActionTitle}>Cargar Emergencia</Text>
+                <Text style={styles.statLabel}>Alta rápida</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -381,75 +459,60 @@ export default function PanelControlScreen({ navigation }) {
 
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => navigation.navigate('Alertas', { filtro: 'Todas' })}
-                style={[styles.cardStat, statCardStyle, { borderLeftColor: '#94a3b8' }]}
+                onPress={() => navigation.navigate('Mapa')}
+                style={[styles.cardStat, statCardStyle, styles.quickActionStat, { borderLeftColor: '#38bdf8' }]}
               >
                 <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons name="clipboard-list" size={20} color="#94a3b8" />
-                  <Text style={styles.statNumero}>{totalAlertas}</Text>
+                  <MaterialCommunityIcons name="map-marker-radius" size={20} color="#38bdf8" />
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
                 </View>
-                <Text style={styles.statLabel}>Total</Text>
+                <Text style={styles.statActionTitle}>Mapa Operativo</Text>
+                <Text style={styles.statLabel}>Vista territorial</Text>
               </TouchableOpacity>
             </View>
 
-            {/* ── Acceso a Centro Logístico ───────────────────────────────── */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('Logistica')}
-              style={styles.logisticCard}
-            >
-              <View style={styles.logisticCardLeft}>
-                <View style={styles.logisticIconBg}>
-                  <MaterialCommunityIcons name="truck-delivery" size={22} color="#fff" />
-                </View>
-                <View style={styles.logisticDetails}>
-                  <Text style={styles.logisticCardTitle}>CENTRO LOGÍSTICO</Text>
-                  <Text style={styles.logisticCardSub}>Control de móviles, checklists de servicio y refuerzos</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
-            </TouchableOpacity>
-
-            {/* ── Acceso a Gestión de Personal ────────────────────────────── */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('Personal')}
-              style={[styles.logisticCard, { marginTop: 8 }]}
-            >
-              <View style={styles.logisticCardLeft}>
-                <View style={[styles.logisticIconBg, { backgroundColor: '#4f46e5' }]}>
-                  <MaterialCommunityIcons name="account-group" size={22} color="#fff" />
-                </View>
-                <View style={styles.logisticDetails}>
-                  <Text style={styles.logisticCardTitle}>GESTIÓN DE PERSONAL</Text>
-                  <Text style={styles.logisticCardSub}>Administración de bomberos, rangos y estado operativo</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
-            </TouchableOpacity>
-
-            {/* ── Centro de Acciones y Registro (Grid Categorizado) ──────────── */}
-            <View style={[styles.sectionHeader, { marginTop: 12 }]}>
-              <View style={styles.sectionLine} />
-              <Text style={styles.sectionTitle}>CENTRO DE ACCIONES Y REGISTRO</Text>
-            </View>
-
-            <Text style={styles.gridSectionTitle}>Operaciones y Mapa</Text>
-            <View style={styles.gridContainer}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('NewAlert')}
-                style={[styles.gridItem, actionCardStyle]}
-              >
-                <View style={styles.gridItemHeader}>
-                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
-                    <MaterialCommunityIcons name="alarm-light" size={18} color="#ef4444" />
+            <View style={isDesktopWeb ? styles.desktopBody : null}>
+              <View style={isDesktopWeb ? styles.desktopMainColumn : null}>
+                {/* ── Acceso a Centro Logístico ───────────────────────────────── */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => navigation.navigate('Logistica')}
+                  style={styles.logisticCard}
+                >
+                  <View style={styles.logisticCardLeft}>
+                    <View style={styles.logisticIconBg}>
+                      <MaterialCommunityIcons name="truck-delivery" size={22} color="#fff" />
+                    </View>
+                    <View style={styles.logisticDetails}>
+                      <Text style={styles.logisticCardTitle}>CENTRO LOGÍSTICO</Text>
+                      <Text style={styles.logisticCardSub}>Control de móviles, checklists de servicio y refuerzos</Text>
+                    </View>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
+                </TouchableOpacity>
+
+                {/* ── Centro de Acciones y Registro (Grid Categorizado) ──────────── */}
+                <View style={[styles.sectionHeader, { marginTop: 12 }]}>
+                  <View style={styles.sectionLine} />
+                  <Text style={styles.sectionTitle}>CENTRO DE ACCIONES Y REGISTRO</Text>
                 </View>
-                <Text style={styles.gridItemTitle}>Cargar Emergencia</Text>
-                <Text style={styles.gridItemSub}>Iniciar reporte táctico</Text>
-              </TouchableOpacity>
+
+                <Text style={styles.gridSectionTitle}>Operaciones y Mapa</Text>
+                <View style={styles.gridContainer}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('NewAlert')}
+                    style={[styles.gridItem, actionCardStyle]}
+                  >
+                    <View style={styles.gridItemHeader}>
+                      <View style={[styles.gridIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                        <MaterialCommunityIcons name="alarm-light" size={18} color="#ef4444" />
+                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                    </View>
+                    <Text style={styles.gridItemTitle}>Cargar Emergencia</Text>
+                    <Text style={styles.gridItemSub}>Iniciar reporte táctico</Text>
+                  </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -480,10 +543,10 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemTitle}>Planilla Asistencia</Text>
                 <Text style={styles.gridItemSub}>Presencia en vivo</Text>
               </TouchableOpacity>
-            </View>
+                </View>
 
-            <Text style={styles.gridSectionTitle}>Servicios y Control</Text>
-            <View style={styles.gridContainer}>
+                <Text style={styles.gridSectionTitle}>Servicios y Control</Text>
+                <View style={styles.gridContainer}>
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('WeeklyChecklist')}
@@ -513,10 +576,10 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemTitle}>Pedidos Suministro</Text>
                 <Text style={styles.gridItemSub}>Solicitud de insumos</Text>
               </TouchableOpacity>
-            </View>
+                </View>
 
-            <Text style={styles.gridSectionTitle}>Informes y Estadísticas</Text>
-            <View style={styles.gridContainer}>
+                <Text style={styles.gridSectionTitle}>Informes y Estadísticas</Text>
+                <View style={styles.gridContainer}>
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Estadisticas')}
@@ -546,64 +609,40 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemTitle}>Reportes Legales</Text>
                 <Text style={styles.gridItemSub}>Historial de actas</Text>
               </TouchableOpacity>
-            </View>
-
-            {/* ── Actividad reciente ────────────────────────────────────── */}
-            <View style={[styles.sectionHeader, { marginTop: 28 }]}>
-              <View style={styles.sectionLine} />
-              <Text style={styles.sectionTitle}>ACTIVIDAD RECIENTE</Text>
-              <TouchableOpacity onPress={limpiarBaseDeDatos} style={styles.botonTest}>
-                <MaterialCommunityIcons name="delete-sweep" size={14} color="#e11d48" />
-                <Text style={styles.botonTestText}>LIMPIAR</Text>
-              </TouchableOpacity>
-            </View>
-
-            {ultimasAlertas.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="shield-check" size={40} color="#334155" />
-                <Text style={styles.textoVacio}>Sin actividad registrada</Text>
+                </View>
               </View>
-            ) : (
-              ultimasAlertas.map((a, idx) => {
-                const iconInfo = getAlertIcon(a.tipo);
-                const priorityColor = getPriorityColor(a.prioridad);
-                const statusStyle = getStatusBadgeStyles(a.estado);
-                return (
-                  <TouchableOpacity
-                    key={a.id || idx}
-                    onPress={() => navigation.navigate('AlertDetail', { alerta_id: a.id })}
-                    activeOpacity={0.8}
-                    style={[styles.alertCard, { borderLeftColor: priorityColor }]}
-                  >
-                    <View style={styles.alertCardLeft}>
-                      <View style={[styles.alertIconBg, { backgroundColor: iconInfo.bg }]}>
-                        <MaterialCommunityIcons name={iconInfo.icon} size={22} color={iconInfo.color} />
-                      </View>
-                      <View style={styles.alertDetails}>
-                        <Text style={styles.alertTitle} numberOfLines={1}>{a.tipo.toUpperCase()}</Text>
-                        <Text style={styles.alertSubtitle} numberOfLines={1}>{a.ubicacion}</Text>
-                        <View style={styles.alertBadgesRow}>
-                          <View style={[styles.priorityBadge, { backgroundColor: priorityColor + '20' }]}>
-                            <Text style={[styles.priorityBadgeText, { color: priorityColor }]}>
-                              {a.prioridad.toUpperCase()}
-                            </Text>
-                          </View>
-                          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                            <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
-                              {statusStyle.label}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                    <View style={styles.alertCardRight}>
-                      <Text style={styles.alertTime}>{tiempoTranscurrido(a.fecha)}</Text>
-                      <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-            )}
+
+              {isDesktopWeb ? (
+                <View style={styles.desktopSideColumn}>
+                  {renderRecentActivity()}
+                </View>
+              ) : null}
+            </View>
+
+            {!isDesktopWeb ? renderRecentActivity() : null}
+
+            {/* ── Administración secundaria ────────────────────────────── */}
+            <View style={[styles.sectionHeader, { marginTop: 26 }]}>
+              <View style={styles.sectionLineMuted} />
+              <Text style={styles.sectionTitle}>ADMINISTRACIÓN</Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Personal')}
+              style={[styles.logisticCard, styles.adminCard]}
+            >
+              <View style={styles.logisticCardLeft}>
+                <View style={[styles.logisticIconBg, styles.adminIconBg]}>
+                  <MaterialCommunityIcons name="account-group" size={22} color="#c7d2fe" />
+                </View>
+                <View style={styles.logisticDetails}>
+                  <Text style={styles.logisticCardTitle}>GESTIÓN DE PERSONAL</Text>
+                  <Text style={styles.logisticCardSub}>Administración de bomberos, rangos y estado operativo</Text>
+                </View>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>
