@@ -10,8 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
-  Dimensions,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -94,6 +94,7 @@ function getPriorityColor(prioridad = '') {
 
 export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { user, token } = useAuth();
 
   const [alertas, setAlertas] = useState([]);
@@ -203,6 +204,13 @@ export default function PanelControlScreen({ navigation }) {
     .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
     .slice(0, 5);
 
+  const isDesktopWeb = Platform.OS === 'web' && width >= 900;
+  const isWideWeb = Platform.OS === 'web' && width >= 1200;
+  const statCardStyle = isDesktopWeb ? styles.cardStatDesktop : styles.cardStatMobile;
+  const actionCardStyle = isWideWeb ? styles.gridItemWide : styles.gridItemDefault;
+  const desktopContentStyle = isDesktopWeb ? styles.contenidoDesktop : null;
+  const desktopHeaderStyle = isDesktopWeb ? styles.headerRowDesktop : null;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1c23" />
@@ -241,7 +249,11 @@ export default function PanelControlScreen({ navigation }) {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.contenido, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[
+          styles.contenido,
+          desktopContentStyle,
+          { paddingBottom: insets.bottom + (isDesktopWeb ? 128 : 120) },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -268,7 +280,7 @@ export default function PanelControlScreen({ navigation }) {
         ) : (
           <>
             {/* Header Row */}
-            <View style={styles.headerRow}>
+            <View style={[styles.headerRow, desktopHeaderStyle]}>
               <View style={styles.titleLeftGroup}>
                 <View style={styles.redAccent} />
                 <View>
@@ -334,7 +346,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Activas' })}
-                style={[styles.cardStat, { borderLeftColor: '#ef4444' }]}
+                style={[styles.cardStat, statCardStyle, { borderLeftColor: '#ef4444' }]}
               >
                 <View style={styles.cardStatHeader}>
                   <MaterialCommunityIcons name="alert-circle" size={20} color="#ef4444" />
@@ -346,7 +358,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Despachadas' })}
-                style={[styles.cardStat, { borderLeftColor: '#3b82f6' }]}
+                style={[styles.cardStat, statCardStyle, { borderLeftColor: '#3b82f6' }]}
               >
                 <View style={styles.cardStatHeader}>
                   <MaterialCommunityIcons name="truck-delivery" size={20} color="#3b82f6" />
@@ -358,7 +370,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Resueltas' })}
-                style={[styles.cardStat, { borderLeftColor: '#10b981' }]}
+                style={[styles.cardStat, statCardStyle, { borderLeftColor: '#10b981' }]}
               >
                 <View style={styles.cardStatHeader}>
                   <MaterialCommunityIcons name="check-circle" size={20} color="#10b981" />
@@ -370,7 +382,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Alertas', { filtro: 'Todas' })}
-                style={[styles.cardStat, { borderLeftColor: '#94a3b8' }]}
+                style={[styles.cardStat, statCardStyle, { borderLeftColor: '#94a3b8' }]}
               >
                 <View style={styles.cardStatHeader}>
                   <MaterialCommunityIcons name="clipboard-list" size={20} color="#94a3b8" />
@@ -427,7 +439,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('NewAlert')}
-                style={styles.gridItem}
+                style={[styles.gridItem, actionCardStyle]}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
@@ -442,7 +454,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('GestionPois')}
-                style={styles.gridItem}
+                style={[styles.gridItem, actionCardStyle]}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
@@ -457,7 +469,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Asistencia')}
-                style={styles.gridItem}
+                style={[styles.gridItem, actionCardStyle]}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
@@ -475,7 +487,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('WeeklyChecklist')}
-                style={styles.gridItem}
+                style={[styles.gridItem, actionCardStyle]}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(139, 92, 246, 0.12)' }]}>
@@ -490,7 +502,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('PedidosSuministro')}
-                style={styles.gridItem}
+                style={[styles.gridItem, actionCardStyle]}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(249, 115, 22, 0.12)' }]}>
@@ -508,7 +520,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Estadisticas')}
-                style={styles.gridItem}
+                style={[styles.gridItem, actionCardStyle]}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(225, 29, 72, 0.12)' }]}>
@@ -523,7 +535,7 @@ export default function PanelControlScreen({ navigation }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Reports')}
-                style={styles.gridItem}
+                style={[styles.gridItem, actionCardStyle]}
               >
                 <View style={styles.gridItemHeader}>
                   <View style={[styles.gridIconBg, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
@@ -598,4 +610,3 @@ export default function PanelControlScreen({ navigation }) {
     </View>
   );
 };
-

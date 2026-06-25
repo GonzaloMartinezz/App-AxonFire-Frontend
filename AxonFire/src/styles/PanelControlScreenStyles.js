@@ -33,7 +33,17 @@ export const styles = StyleSheet.create({
         padding: 4,
     },
 
-    contenido: { padding: 24 },
+    contenido: {
+        paddingHorizontal: 20,
+        paddingTop: 24,
+    },
+    contenidoDesktop: {
+        width: '100%',
+        maxWidth: 1180,
+        alignSelf: 'center',
+        paddingHorizontal: 28,
+        paddingTop: 28,
+    },
 
     // Header Row
     headerRow: {
@@ -41,6 +51,9 @@ export const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         marginBottom: 28,
+    },
+    headerRowDesktop: {
+        marginBottom: 24,
     },
     titleLeftGroup: {
         flexDirection: 'row',
@@ -82,8 +95,8 @@ export const styles = StyleSheet.create({
     // Total Card
     totalCard: {
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
-        padding: 18,
+        borderRadius: 8,
+        padding: 20,
         marginBottom: 24,
         borderWidth: 1,
         borderColor: '#26282f',
@@ -104,16 +117,24 @@ export const styles = StyleSheet.create({
     sectionTitle: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 2, flex: 1 },
 
     // Grilla
-    grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
     cardStat: {
-        width: '48%',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
-        padding: 14,
+        borderRadius: 8,
+        padding: 16,
         borderLeftWidth: 3,
         gap: 8,
         borderWidth: 1,
         borderColor: '#26282f',
+    },
+    cardStatMobile: {
+        width: '47.5%',
+        minHeight: 86,
+    },
+    cardStatDesktop: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 92,
     },
     cardStatHeader: {
         flexDirection: 'row',
@@ -133,12 +154,12 @@ export const styles = StyleSheet.create({
     alertCard: {
         flexDirection: 'row',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
+        borderRadius: 8,
         marginBottom: 12,
         borderLeftWidth: 3,
         borderWidth: 1,
         borderColor: '#26282f',
-        padding: 14,
+        padding: 16,
         alignItems: 'center',
         justifyContent: 'space-between',
     },
@@ -230,12 +251,12 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#26282f',
         borderLeftWidth: 3,
         borderLeftColor: '#e11d48',
-        padding: 16,
+        padding: 18,
         marginBottom: 20,
         marginTop: 8,
         ...Platform.select({
@@ -278,18 +299,25 @@ export const styles = StyleSheet.create({
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
         gap: 10,
         marginBottom: 20,
     },
     gridItem: {
-        width: '48%',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
-        padding: 12,
+        borderRadius: 8,
+        padding: 14,
         borderWidth: 1,
         borderColor: '#26282f',
         gap: 6,
+        minHeight: 106,
+    },
+    gridItemDefault: {
+        width: '47.5%',
+    },
+    gridItemWide: {
+        flexBasis: '24%',
+        flexGrow: 1,
+        minWidth: 210,
     },
     gridItemHeader: {
         flexDirection: 'row',
@@ -322,8 +350,8 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         backgroundColor: '#dc2626',
-        borderRadius: 6,
-        padding: 14,
+        borderRadius: 8,
+        padding: 16,
         marginBottom: 20,
         borderWidth: 1,
         borderColor: '#b91c1c',
