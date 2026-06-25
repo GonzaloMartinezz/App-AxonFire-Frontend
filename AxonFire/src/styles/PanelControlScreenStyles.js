@@ -113,7 +113,7 @@ export const styles = StyleSheet.create({
     },
     totalLeft: { marginBottom: 14 },
     totalLeftDesktop: {
-        width: 190,
+        width: 260,
         marginBottom: 0,
     },
     totalProgress: { gap: 8 },
@@ -122,7 +122,7 @@ export const styles = StyleSheet.create({
         minWidth: 0,
     },
     totalLabel: { fontSize: 9, color: '#94a3b8', letterSpacing: 1, fontWeight: '700', marginBottom: 6 },
-    totalValue: { fontSize: 26, fontWeight: '900', color: '#fff', lineHeight: 30 },
+    totalValue: { fontSize: 24, fontWeight: '900', color: '#fff', lineHeight: 28 },
     progressBarHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
