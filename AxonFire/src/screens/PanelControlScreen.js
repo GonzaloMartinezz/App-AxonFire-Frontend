@@ -604,6 +604,21 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemTitle}>Control de Fluidos</Text>
                 <Text style={styles.gridItemSub}>Niveles de vehículos</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('MantenimientoHidraulico')}
+                style={[styles.gridItem, actionCardStyle]}
+              >
+                <View style={styles.gridItemHeader}>
+                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                    <MaterialCommunityIcons name="wrench-clock" size={18} color="#ef4444" />
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
+                </View>
+                <Text style={styles.gridItemTitle}>Mantenimiento Hidráulico</Text>
+                <Text style={styles.gridItemSub}>Control de herramientas</Text>
+              </TouchableOpacity>
                 </View>
 
                 <Text style={styles.gridSectionTitle}>Informes y Estadísticas</Text>
