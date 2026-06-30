@@ -20,6 +20,7 @@ import DamageReportField, { isDamageReportComplete } from '../components/DamageR
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import SelectorBomberos from '../components/SelectorBomberos';
+import { useNotifications } from '../context/NotificationContext';
 import { styles } from '../styles/WeeklyChecklistScreenStyles';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -127,6 +128,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
   const userId = user?.id || '';
+  const { addNotification } = useNotifications();
 
   // Parámetros de navegación para el tab diario (opcionales)
   const camionId = route?.params?.camionId || null;
@@ -575,6 +577,16 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       // Refrescar camiones desde la API en segundo plano con cache-buster
       cargarCamionesDisponibles().catch(err => console.log('Error refreshing backend checklist state:', err));
 
+      // RF-03: Emitir notificación para el panel del administrador
+      const numFaltantesDiario = detalles.filter(d => d.controlado === 'FALTANTE').length;
+      addNotification({
+        tipo: 'CONTROL_DIARIO',
+        bomberoNombre: user?.bombero ? `${user.bombero.nombre} ${user.bombero.apellido}` : user?.nombre_usuario || 'Bombero',
+        recursoNombre: camionSeleccionado?.nombre_camion || 'Móvil',
+        tieneFaltantes: numFaltantesDiario > 0,
+        cantidadFaltantes: numFaltantesDiario,
+      });
+
       if (Platform.OS === 'web') {
         alert('El checklist diario fue guardado correctamente.');
         // Reset para volver al grid con los datos actualizados
@@ -726,6 +738,16 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
       // Refrescar desde backend en segundo plano
       fetchHistorialCuartel().catch(err => console.log('Error refreshing cuartel history:', err));
+
+      // RF-03: Emitir notificación para el panel del administrador
+      const numFaltantesCuartel = detalles.filter(d => d.controlado === 'FALTANTE').length;
+      addNotification({
+        tipo: 'CONTROL_CUARTEL',
+        bomberoNombre: user?.bombero ? `${user.bombero.nombre} ${user.bombero.apellido}` : user?.nombre_usuario || 'Bombero',
+        recursoNombre: 'Inventario Base',
+        tieneFaltantes: numFaltantesCuartel > 0,
+        cantidadFaltantes: numFaltantesCuartel,
+      });
 
       if (Platform.OS === 'web') {
         alert('Inventario de base guardado correctamente.');

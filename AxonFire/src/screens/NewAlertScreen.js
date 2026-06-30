@@ -172,7 +172,16 @@ export default function NewAlertScreen({ navigation }) {
         latitud: '',
         longitud: '',
       });
-      navigation.goBack();
+      // RF-02: Redireccion segun rol tras emision de alerta
+      if (user?.rol === 'ADMIN') {
+        navigation.navigate('AdminApp', { screen: 'Panel' });
+      } else {
+        navigation.navigate('Mapa', { alertaId: data.id || data.alerta_id });
+        navigation.navigate('MainApp', {
+          screen: 'Mapa',
+          params: { alertaId: data.id || data.alerta_id },
+        });
+      }
     } catch (error) {
       Alert.alert('Error', error.message || 'No se pudo crear la alerta.');
     } finally {

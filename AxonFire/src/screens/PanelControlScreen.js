@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
@@ -12,6 +12,7 @@ import {
   Platform,
   Alert,
   useWindowDimensions,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
+import { useNotifications } from '../context/NotificationContext';
 import { styles } from '../styles/PanelControlScreenStyles';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,6 +108,9 @@ export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { user, token } = useAuth();
+  const { notifications, getUnreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  const unreadCount = getUnreadCount();
 
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -317,6 +322,14 @@ export default function PanelControlScreen({ navigation }) {
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="account-switch" size={20} color="#dc2626" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setNotifModalVisible(true)} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="bell-outline" size={20} color="#94a3b8" />
+            {unreadCount > 0 && (
+              <View style={notifStyles.bellBadge}>
+                <Text style={notifStyles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => cargarDatos(true)} activeOpacity={0.7}>
             <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
@@ -622,30 +635,356 @@ export default function PanelControlScreen({ navigation }) {
             {!isDesktopWeb ? renderRecentActivity() : null}
 
             {/* ── Administración secundaria ────────────────────────────── */}
-            <View style={[styles.sectionHeader, { marginTop: 26 }]}>
-              <View style={styles.sectionLineMuted} />
-              <Text style={styles.sectionTitle}>ADMINISTRACIÓN</Text>
-            </View>
+            {/* RF-04: Solo visible para usuarios ADMIN */}
+            {user?.rol === 'ADMIN' && (
+              <>
+                <View style={[styles.sectionHeader, { marginTop: 26 }]}>
+                  <View style={styles.sectionLineMuted} />
+                  <Text style={styles.sectionTitle}>ADMINISTRACIÓN</Text>
+                </View>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('Personal')}
-              style={[styles.logisticCard, styles.adminCard]}
-            >
-              <View style={styles.logisticCardLeft}>
-                <View style={[styles.logisticIconBg, styles.adminIconBg]}>
-                  <MaterialCommunityIcons name="account-group" size={22} color="#c7d2fe" />
-                </View>
-                <View style={styles.logisticDetails}>
-                  <Text style={styles.logisticCardTitle}>GESTIÓN DE PERSONAL</Text>
-                  <Text style={styles.logisticCardSub}>Administración de bomberos, rangos y estado operativo</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
-            </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => navigation.navigate('Personal')}
+                  style={[styles.logisticCard, styles.adminCard]}
+                >
+                  <View style={styles.logisticCardLeft}>
+                    <View style={[styles.logisticIconBg, styles.adminIconBg]}>
+                      <MaterialCommunityIcons name="account-group" size={22} color="#c7d2fe" />
+                    </View>
+                    <View style={styles.logisticDetails}>
+                      <Text style={styles.logisticCardTitle}>GESTIÓN DE PERSONAL</Text>
+                      <Text style={styles.logisticCardSub}>Administración de bomberos, rangos y estado operativo</Text>
+                    </View>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => navigation.navigate('AdminEquipment')}
+                  style={[styles.logisticCard, styles.adminCard, { marginTop: 10 }]}
+                >
+                  <View style={styles.logisticCardLeft}>
+                    <View style={[styles.logisticIconBg, { backgroundColor: '#1a2332' }]}>
+                      <MaterialCommunityIcons name="package-variant-closed" size={22} color="#60a5fa" />
+                    </View>
+                    <View style={styles.logisticDetails}>
+                      <Text style={styles.logisticCardTitle}>GESTIÓN DE SUMINISTROS</Text>
+                      <Text style={styles.logisticCardSub}>Control maestro de equipamiento e inventario</Text>
+                    </View>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="#64748b" />
+                </TouchableOpacity>
+              </>
+            )}
           </>
         )}
       </ScrollView>
+
+      {/* RF-03: Modal de notificaciones de controles de inventario */}
+      <Modal
+        visible={notifModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setNotifModalVisible(false)}
+      >
+        <View style={notifStyles.overlay}>
+          <View style={notifStyles.panel}>
+            {/* Header */}
+            <View style={notifStyles.header}>
+              <View style={notifStyles.headerLeft}>
+                <MaterialCommunityIcons name="bell" size={20} color="#e11d48" />
+                <Text style={notifStyles.title}>NOTIFICACIONES</Text>
+                {unreadCount > 0 && (
+                  <View style={notifStyles.headerBadge}>
+                    <Text style={notifStyles.headerBadgeText}>{unreadCount}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={notifStyles.headerActions}>
+                {notifications.length > 0 && (
+                  <>
+                    <TouchableOpacity onPress={markAllAsRead} style={notifStyles.headerBtn}>
+                      <Text style={notifStyles.headerBtnText}>LEER TODO</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={clearAll} style={notifStyles.headerBtn}>
+                      <MaterialCommunityIcons name="delete-sweep-outline" size={16} color="#64748b" />
+                    </TouchableOpacity>
+                  </>
+                )}
+                <TouchableOpacity onPress={() => setNotifModalVisible(false)}>
+                  <MaterialCommunityIcons name="close" size={22} color="#94a3b8" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Lista */}
+            <ScrollView style={notifStyles.list} showsVerticalScrollIndicator={false}>
+              {notifications.length === 0 ? (
+                <View style={notifStyles.emptyState}>
+                  <MaterialCommunityIcons name="bell-check-outline" size={48} color="#334155" />
+                  <Text style={notifStyles.emptyText}>Sin notificaciones</Text>
+                  <Text style={notifStyles.emptySubtext}>
+                    Aquí aparecerán los controles de inventario realizados por los bomberos.
+                  </Text>
+                </View>
+              ) : (
+                notifications.map((n) => {
+                  const isFaltante = n.tieneFaltantes;
+                  const tipoLabel =
+                    n.tipo === 'CONTROL_DIARIO' ? 'Control Diario' :
+                    n.tipo === 'CONTROL_BOLSO' ? 'Control Post-Emergencia' :
+                    n.tipo === 'CONTROL_CUARTEL' ? 'Inventario de Base' : 'Control';
+                  const tipoIcon =
+                    n.tipo === 'CONTROL_DIARIO' ? 'clipboard-check-outline' :
+                    n.tipo === 'CONTROL_BOLSO' ? 'bag-personal-outline' :
+                    'package-variant-closed';
+                  const fecha = n.fechaHora ? new Date(n.fechaHora) : new Date();
+                  const horaText = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                  const fechaText = fecha.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+
+                  return (
+                    <TouchableOpacity
+                      key={n.id}
+                      style={[
+                        notifStyles.item,
+                        !n.leida && notifStyles.itemUnread,
+                        isFaltante && notifStyles.itemFaltante,
+                      ]}
+                      onPress={() => markAsRead(n.id)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[
+                        notifStyles.itemIcon,
+                        { backgroundColor: isFaltante ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)' },
+                      ]}>
+                        <MaterialCommunityIcons
+                          name={isFaltante ? 'alert-circle' : tipoIcon}
+                          size={20}
+                          color={isFaltante ? '#ef4444' : '#10b981'}
+                        />
+                      </View>
+                      <View style={notifStyles.itemContent}>
+                        <View style={notifStyles.itemTopRow}>
+                          <Text style={notifStyles.itemBombero} numberOfLines={1}>
+                            {n.bomberoNombre || 'Bombero'}
+                          </Text>
+                          {!n.leida && <View style={notifStyles.unreadDot} />}
+                        </View>
+                        <Text style={notifStyles.itemTipo}>{tipoLabel}</Text>
+                        {n.recursoNombre && (
+                          <Text style={notifStyles.itemRecurso}>{n.recursoNombre}</Text>
+                        )}
+                        {isFaltante && (
+                          <View style={notifStyles.faltanteBadge}>
+                            <MaterialCommunityIcons name="alert" size={11} color="#fbbf24" />
+                            <Text style={notifStyles.faltanteText}>
+                              {n.cantidadFaltantes} FALTANTE{n.cantidadFaltantes > 1 ? 'S' : ''}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={notifStyles.itemTime}>{horaText}{'\n'}{fechaText}</Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
+
+// RF-03: Estilos del sistema de notificaciones
+const notifStyles = StyleSheet.create({
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#e11d48',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#1a1c23',
+  },
+  bellBadgeText: {
+    color: '#fff',
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'flex-end',
+  },
+  panel: {
+    backgroundColor: '#16181d',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: '#26282f',
+    borderBottomWidth: 0,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#26282f',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  headerBadge: {
+    backgroundColor: '#e11d48',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  headerBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  headerBtnText: {
+    color: '#64748b',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    gap: 8,
+  },
+  emptyText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  emptySubtext: {
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 16,
+    paddingHorizontal: 20,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1b1d24',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#26282f',
+  },
+  itemUnread: {
+    borderColor: '#334155',
+    backgroundColor: '#1e2028',
+  },
+  itemFaltante: {
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#ef4444',
+  },
+  itemIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemContent: {
+    flex: 1,
+  },
+  itemTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  itemBombero: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '800',
+    flex: 1,
+  },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#3b82f6',
+  },
+  itemTipo: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  itemRecurso: {
+    color: '#475569',
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  faltanteBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  faltanteText: {
+    color: '#fbbf24',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  itemTime: {
+    color: '#475569',
+    fontSize: 9,
+    fontWeight: '600',
+    textAlign: 'right',
+    lineHeight: 13,
+  },
+});

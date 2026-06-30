@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   const camionNombre = route?.params?.camionNombre || 'Móvil';
   const { user, token: userToken } = useAuth();
   const token = userToken ?? user?.token ?? '';
+  const { addNotification } = useNotifications();
 
   // Si viene con un bolsoId fijo (desde el disparador de emergencia), lo usamos
   const bolsoIdParam = route?.params?.bolsoId || null;
@@ -292,6 +294,15 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
       if (!res.ok) throw new Error(`Error ${res.status}`);
 
       const faltantes = Object.values(estadoItems).filter(v => v === 'FALTANTE').length;
+
+      // RF-03: Emitir notificación para el panel del administrador
+      addNotification({
+        tipo: 'CONTROL_BOLSO',
+        bomberoNombre: user?.bombero ? `${user.bombero.nombre} ${user.bombero.apellido}` : user?.nombre_usuario || 'Bombero',
+        recursoNombre: bolsoActivo?.nombre_bolso || 'Bolso de Emergencia',
+        tieneFaltantes: faltantes > 0,
+        cantidadFaltantes: faltantes,
+      });
 
       Alert.alert(
         '✅ Checklist guardado',

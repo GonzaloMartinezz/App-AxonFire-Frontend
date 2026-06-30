@@ -9,6 +9,7 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 
 export const navigationRef = createNavigationContainerRef();
 
@@ -284,8 +285,10 @@ export default function App() {
         <View style={[styles.webPhoneContainer, desktopFrameStyle]}>
           <SafeAreaProvider>
             <AuthProvider>
-              <AppContent />
-              {renderCustomAlert()}
+              <NotificationProvider>
+                <AppContent />
+                {renderCustomAlert()}
+              </NotificationProvider>
             </AuthProvider>
           </SafeAreaProvider>
         </View>
@@ -296,8 +299,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppContent />
-        {renderCustomAlert()}
+        <NotificationProvider>
+          <AppContent />
+          {renderCustomAlert()}
+        </NotificationProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
