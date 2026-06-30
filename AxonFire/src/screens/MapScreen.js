@@ -25,7 +25,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
-import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
+import MapView, { Marker, Polyline, Callout } from '../components/NativeMap';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,6 +62,21 @@ const POI_COLORS = {
   CUARTEL_APOYO: '#37474f',
 };
 
+function parseCoordinate(value) {
+  const parsed = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizePoi(poi) {
+  const latitud = parseCoordinate(poi?.latitud ?? poi?.latitude ?? poi?.lat);
+  const longitud = parseCoordinate(poi?.longitud ?? poi?.longitude ?? poi?.lng);
+
+  if (latitud == null || longitud == null) return null;
+  if (latitud === 0 && longitud === 0) return null;
+
+  return { ...poi, latitud, longitud };
+}
+
 // Estilo táctico oscuro para Google Maps (Android)
 // En iOS se usa Apple Maps estándar (no soporta customMapStyle)
 const tacticalMapStyle = [
@@ -91,6 +106,7 @@ export default function MapScreen({ navigation, route }) {
   const { user, token, logout } = useAuth();
 
   const mapRef = useRef(null);
+  const iframeRef = useRef(null);
 
   // Animaciones
   const bannerPulseAnim = useRef(new Animated.Value(1)).current;
@@ -101,7 +117,7 @@ export default function MapScreen({ navigation, route }) {
   const [coords, setCoords] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [mapaListo, setMapaListo] = useState(false);
+  const [mapaListo, setMapaListo] = useState(Platform.OS === 'web');
   const [currentRegion, setCurrentRegion] = useState(null);
   const [alertasActivas, setAlertasActivas] = useState(0);
 
@@ -125,6 +141,8 @@ export default function MapScreen({ navigation, route }) {
     CUARTEL_APOYO: true,
   });
 
+  const poisVisibles = pois.filter(p => capasActivas[p.categoria]);
+
   const [routeOrigin, setRouteOrigin] = useState('STATION'); // 'STATION' or 'USER'
 
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
@@ -145,14 +163,10 @@ export default function MapScreen({ navigation, route }) {
   };
 
   const handleLogout = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('¿Deseas cerrar sesión?')) logout();
-    } else {
-      Alert.alert('Cerrar Sesión', '¿Deseas cerrar sesión?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Salir', style: 'destructive', onPress: () => logout() },
-      ]);
-    }
+    Alert.alert('Cerrar Sesión', '¿Deseas cerrar sesión?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => logout() },
+    ]);
   };
 
   const abrirNavegacionGPS = () => {
@@ -184,45 +198,68 @@ export default function MapScreen({ navigation, route }) {
 
   // ─── Controles de mapa ──────────────────────────────────────────────────────
   function centerOnStation() {
-    if (!coords || !mapRef.current) return;
-    mapRef.current.animateToRegion({
-      latitude: coords.latitud,
-      longitude: coords.longitud,
-      latitudeDelta: DEFAULT_DELTA,
-      longitudeDelta: DEFAULT_DELTA,
-    }, 500);
+    if (!coords) return;
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage({
+        type: 'CENTER_STATION',
+        stationCoords: { lat: coords.latitud, lng: coords.longitud }
+      }, '*');
+    } else {
+      if (!mapRef.current) return;
+      mapRef.current.animateToRegion({
+        latitude: coords.latitud,
+        longitude: coords.longitud,
+        latitudeDelta: DEFAULT_DELTA,
+        longitudeDelta: DEFAULT_DELTA,
+      }, 500);
+    }
   }
 
   async function centerOnUser() {
     try {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      mapRef.current?.animateToRegion({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      }, 500);
+      if (Platform.OS === 'web') {
+        iframeRef.current?.contentWindow?.postMessage({
+          type: 'CENTER_USER',
+          userCoords: { lat: loc.coords.latitude, lng: loc.coords.longitude }
+        }, '*');
+      } else {
+        mapRef.current?.animateToRegion({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        }, 500);
+      }
     } catch (e) {
       Alert.alert('Ubicación', 'No se pudo obtener tu ubicación actual.');
     }
   }
 
   function zoomIn() {
-    if (!currentRegion || !mapRef.current) return;
-    mapRef.current.animateToRegion({
-      ...currentRegion,
-      latitudeDelta: currentRegion.latitudeDelta / 2,
-      longitudeDelta: currentRegion.longitudeDelta / 2,
-    }, 300);
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage({ type: 'ZOOM_IN' }, '*');
+    } else {
+      if (!currentRegion || !mapRef.current) return;
+      mapRef.current.animateToRegion({
+        ...currentRegion,
+        latitudeDelta: currentRegion.latitudeDelta / 2,
+        longitudeDelta: currentRegion.longitudeDelta / 2,
+      }, 300);
+    }
   }
 
   function zoomOut() {
-    if (!currentRegion || !mapRef.current) return;
-    mapRef.current.animateToRegion({
-      ...currentRegion,
-      latitudeDelta: Math.min(currentRegion.latitudeDelta * 2, 5),
-      longitudeDelta: Math.min(currentRegion.longitudeDelta * 2, 5),
-    }, 300);
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage({ type: 'ZOOM_OUT' }, '*');
+    } else {
+      if (!currentRegion || !mapRef.current) return;
+      mapRef.current.animateToRegion({
+        ...currentRegion,
+        latitudeDelta: Math.min(currentRegion.latitudeDelta * 2, 5),
+        longitudeDelta: Math.min(currentRegion.longitudeDelta * 2, 5),
+      }, 300);
+    }
   }
 
   function handleToggleCapa(categoria) {
@@ -288,9 +325,16 @@ export default function MapScreen({ navigation, route }) {
         throw new Error('Coordenadas inválidas en la respuesta del servidor.');
       }
       setCoords({ latitud: data.latitud, longitud: data.longitud });
+      if (Platform.OS === 'web') {
+        setMapaListo(true);
+      }
     } catch (err) {
-      setError(err.message);
+      console.warn('Error al cargar config de mapa:', err.message);
       setCoords({ latitud: FALLBACK_LAT, longitud: FALLBACK_LNG });
+      setMapaListo(true);
+      if (Platform.OS !== 'web') {
+        setError(err.message);
+      }
     } finally {
       setCargando(false);
     }
@@ -397,11 +441,24 @@ export default function MapScreen({ navigation, route }) {
   async function cargarPOIs() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/maps/pois`, { headers });
-      if (!res.ok) return;
+      if (res.status === 403) {
+        console.warn('[MapScreen/F3] POIs no disponibles para este rol.');
+        setPois([]);
+        return;
+      }
+      if (!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
-      if (Array.isArray(data)) setPois(data);
+      const rawPois = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.pois)
+          ? data.pois
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+      setPois(rawPois.map(normalizePoi).filter(Boolean));
     } catch (err) {
       console.warn('[MapScreen/F3] POIs:', err.message);
+      setPois([]);
     }
   }
 
@@ -413,6 +470,50 @@ export default function MapScreen({ navigation, route }) {
     const paramId = route?.params?.incidenteId || route?.params?.alertaId;
     if (paramId) cargarIncidente(paramId);
   }, []);
+
+  // Sincronización Leaflet en Web y manejo del evento MAP_READY
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handleIframeMessage = (e) => {
+      if (e.data && e.data.type === 'MAP_READY') {
+        setMapaListo(true);
+        if (iframeRef.current && iframeRef.current.contentWindow && coords) {
+          iframeRef.current.contentWindow.postMessage({
+            type: 'UPDATE_STATE',
+            stationCoords: { lat: coords.latitud, lng: coords.longitud },
+            pois: poisVisibles,
+            incident: incidente,
+            routeCoords: routeCoords
+          }, '*');
+        }
+      } else if (e.data && e.data.type === 'MAP_ERROR') {
+        console.warn('[MapScreen/WebLeaflet]', e.data.message);
+      }
+    };
+
+    window.addEventListener('message', handleIframeMessage);
+    return () => window.removeEventListener('message', handleIframeMessage);
+  }, [coords, poisVisibles, incidente, routeCoords]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !coords) return;
+
+    const sendStateUpdate = () => {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'UPDATE_STATE',
+          stationCoords: { lat: coords.latitud, lng: coords.longitud },
+          pois: poisVisibles,
+          incident: incidente,
+          routeCoords: routeCoords
+        }, '*');
+      }
+    };
+
+    const timeout = setTimeout(sendStateUpdate, 150);
+    return () => clearTimeout(timeout);
+  }, [coords, poisVisibles, incidente, routeCoords]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -484,109 +585,367 @@ export default function MapScreen({ navigation, route }) {
     longitudeDelta: DEFAULT_DELTA,
   };
 
-  const poisVisibles = pois.filter(p => capasActivas[p.categoria]);
-
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ── F1: Mapa nativo ──────────────────────────────────────────────── */}
-      {coords && (
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          initialRegion={initialRegion}
-          customMapStyle={Platform.OS === 'android' ? tacticalMapStyle : undefined}
-          showsUserLocation={locationGranted}
-          showsMyLocationButton={false}
-          showsCompass={false}
-          showsScale={false}
-          rotateEnabled={false}
-          onMapReady={() => setMapaListo(true)}
-          onRegionChangeComplete={region => setCurrentRegion(region)}
-        >
-          {/* Marcador del cuartel */}
-          <Marker
-            coordinate={{ latitude: lat, longitude: lng }}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
+      {/* ── F1: Mapa nativo / Web Leaflet Map ──────────────────────────────────────── */}
+      {Platform.OS === 'web' ? (
+        <View style={StyleSheet.absoluteFill}>
+          <iframe
+            ref={iframeRef}
+            srcDoc={`
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+                <style>
+                  body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #16181d; }
+                  .leaflet-tile-pane {
+                    filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
+                  }
+                  .station-marker {
+                    background-color: #3b82f6;
+                    width: 14px;
+                    height: 14px;
+                    border-radius: 50%;
+                    border: 2px solid #fff;
+                    box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+                  }
+                  .poi-marker {
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    border: 2px solid #fff;
+                    box-shadow: 0 0 6px rgba(0,0,0,0.5);
+                  }
+                  .incident-marker {
+                    font-size: 24px;
+                    text-align: center;
+                    animation: pulse 1.5s infinite;
+                  }
+                  @keyframes pulse {
+                    0% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.3); opacity: 0.7; }
+                    100% { transform: scale(1); opacity: 1; }
+                  }
+                  .leaflet-popup-content-wrapper {
+                    background: #1b1d24;
+                    color: #f8fafc;
+                    border: 1px solid #26282f;
+                    border-radius: 8px;
+                    font-family: sans-serif;
+                  }
+                  .leaflet-popup-tip {
+                    background: #1b1d24;
+                    border: 1px solid #26282f;
+                  }
+                </style>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+              </head>
+              <body>
+                <div id="map"></div>
+                <script>
+                  var map = null;
+                  var stationMarker = null;
+                  var incidentMarker = null;
+                  var routePolyline = null;
+                  var poiMarkersGroup = null;
+                  var pendingData = null;
+
+                  var POI_COLORS = {
+                    HIDRANTE: '#1565c0',
+                    SALUD: '#2e7d32',
+                    MATERIAL_PELIGROSO: '#c2410c',
+                    CUARTEL_APOYO: '#37474f'
+                  };
+
+                  function notifyError(message) {
+                    window.parent.postMessage({ type: 'MAP_ERROR', message: message }, '*');
+                  }
+
+                  function initMap() {
+                    if (map) return;
+                    if (!window.L) {
+                      notifyError('Leaflet no se pudo cargar.');
+                      return;
+                    }
+
+                    map = L.map('map', { zoomControl: false }).setView([${lat}, ${lng}], 15);
+                    
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                      maxZoom: 20,
+                      attribution: '&copy; OpenStreetMap'
+                    }).addTo(map);
+
+                    poiMarkersGroup = L.layerGroup().addTo(map);
+
+                    setTimeout(function() {
+                      map.invalidateSize();
+                    }, 0);
+                    window.addEventListener('resize', function() {
+                      if (map) map.invalidateSize();
+                    });
+
+                    // Signal ready to parent
+                    window.parent.postMessage({ type: 'MAP_READY' }, '*');
+
+                    // If we have any buffered state, update now
+                    if (pendingData) {
+                      updateState(pendingData);
+                      pendingData = null;
+                    }
+                  }
+
+                  function updateState(data) {
+                    if (!map) return;
+
+                    // 1. Station
+                    if (data.stationCoords) {
+                      var slat = parseFloat(data.stationCoords.lat);
+                      var slng = parseFloat(data.stationCoords.lng);
+                      if (!isNaN(slat) && !isNaN(slng)) {
+                        if (!stationMarker) {
+                          stationMarker = L.marker([slat, slng], {
+                            icon: L.divIcon({
+                              className: 'station-marker',
+                              iconSize: [14, 14],
+                              iconAnchor: [7, 7]
+                            })
+                          }).addTo(map).bindPopup('<b>Tu cuartel</b>');
+                        } else {
+                          stationMarker.setLatLng([slat, slng]);
+                        }
+                      }
+                    }
+
+                    // 2. POIs
+                    var visiblePoiPoints = [];
+                    if (poiMarkersGroup) {
+                      poiMarkersGroup.clearLayers();
+                      if (data.pois && Array.isArray(data.pois)) {
+                        data.pois.forEach(function(poi) {
+                          var plat = parseFloat(poi.latitud);
+                          var plng = parseFloat(poi.longitud);
+                          if (!isNaN(plat) && !isNaN(plng) && !(plat === 0 && plng === 0)) {
+                            visiblePoiPoints.push([plat, plng]);
+                            var color = POI_COLORS[poi.categoria] || '#37474f';
+                            L.marker([plat, plng], {
+                              icon: L.divIcon({
+                                className: 'poi-marker',
+                                html: '<div style="background-color: ' + color + '; width: 100%; height: 100%; border-radius: 50%;"></div>',
+                                iconSize: [12, 12],
+                                iconAnchor: [6, 6]
+                              })
+                            }).addTo(poiMarkersGroup)
+                              .bindPopup('<b>' + (poi.nombre || poi.categoria) + '</b><br>' + (poi.descripcion || ''));
+                          }
+                        });
+                      }
+                    }
+
+                    // 3. Incident
+                    if (data.incident) {
+                      var ilat = parseFloat(data.incident.latitud);
+                      var ilng = parseFloat(data.incident.longitud);
+                      if (!isNaN(ilat) && !isNaN(ilng)) {
+                        if (!incidentMarker) {
+                          incidentMarker = L.marker([ilat, ilng], {
+                            icon: L.divIcon({
+                              className: 'incident-marker',
+                              html: '🔥',
+                              iconSize: [30, 30],
+                              iconAnchor: [15, 15]
+                            })
+                          }).addTo(map);
+                        } else {
+                          incidentMarker.setLatLng([ilat, ilng]);
+                        }
+                        incidentMarker.bindPopup('<b>🔥 ' + (data.incident.tipo_emergencia || 'Incidente') + '</b><br>' + (data.incident.direccion_exacta || ''));
+                      } else if (incidentMarker) {
+                        map.removeLayer(incidentMarker);
+                        incidentMarker = null;
+                      }
+                    } else if (incidentMarker) {
+                      map.removeLayer(incidentMarker);
+                      incidentMarker = null;
+                    }
+
+                    // 4. Route
+                    if (routePolyline) {
+                      map.removeLayer(routePolyline);
+                      routePolyline = null;
+                    }
+                    if (data.routeCoords && Array.isArray(data.routeCoords) && data.routeCoords.length > 1) {
+                      var points = data.routeCoords.map(function(c) { return [c.latitude, c.longitude]; });
+                      routePolyline = L.polyline(points, { color: '#dc2626', weight: 4 }).addTo(map);
+                      map.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
+                    } else if (data.stationCoords && !data.incident) {
+                      var stationPoint = [parseFloat(data.stationCoords.lat), parseFloat(data.stationCoords.lng)];
+                      if (visiblePoiPoints.length > 0 && !isNaN(stationPoint[0]) && !isNaN(stationPoint[1])) {
+                        map.fitBounds(L.latLngBounds([stationPoint].concat(visiblePoiPoints)), { padding: [70, 70], maxZoom: 15 });
+                      } else if (!isNaN(stationPoint[0]) && !isNaN(stationPoint[1])) {
+                        map.setView(stationPoint, 15);
+                      }
+                    }
+                  }
+
+                  window.addEventListener('message', function(event) {
+                    var data = event.data;
+                    if (!data) return;
+
+                    if (data.type === 'UPDATE_STATE') {
+                      if (!map) {
+                        pendingData = data;
+                      } else {
+                        updateState(data);
+                      }
+                    } else if (data.type === 'ZOOM_IN') {
+                      if (map) map.zoomIn();
+                    } else if (data.type === 'ZOOM_OUT') {
+                      if (map) map.zoomOut();
+                    } else if (data.type === 'CENTER_STATION') {
+                      if (map && data.stationCoords) {
+                        map.setView([parseFloat(data.stationCoords.lat), parseFloat(data.stationCoords.lng)], 15);
+                      }
+                    } else if (data.type === 'CENTER_USER') {
+                      if (map && data.userCoords) {
+                        map.setView([parseFloat(data.userCoords.lat), parseFloat(data.userCoords.lng)], 15);
+                      }
+                    }
+                  });
+
+                  function bootstrapMap() {
+                    if (document.readyState === 'loading') {
+                      document.addEventListener('DOMContentLoaded', bootstrapMap, { once: true });
+                      return;
+                    }
+
+                    var attempts = 0;
+                    var timer = setInterval(function() {
+                      attempts += 1;
+                      if (window.L) {
+                        clearInterval(timer);
+                        initMap();
+                      } else if (attempts >= 80) {
+                        clearInterval(timer);
+                        notifyError('Leaflet no esta disponible despues de esperar la carga.');
+                      }
+                    }, 50);
+                  }
+
+                  window.addEventListener('error', function(event) {
+                    notifyError(event.message || 'Error inesperado en el mapa.');
+                  });
+
+                  bootstrapMap();
+                </script>
+              </body>
+              </html>
+            `}
+            style={{ border: 0, width: '100%', height: '100%' }}
+          />
+        </View>
+      ) : (
+          coords && (
+            <MapView
+              ref={mapRef}
+            style={StyleSheet.absoluteFill}
+            initialRegion={initialRegion}
+            customMapStyle={Platform.OS === 'android' ? tacticalMapStyle : undefined}
+            showsUserLocation={locationGranted}
+            showsMyLocationButton={false}
+            showsCompass={false}
+            showsScale={false}
+            rotateEnabled={false}
+            onMapReady={() => setMapaListo(true)}
+            onRegionChangeComplete={region => setCurrentRegion(region)}
           >
-            <View style={styles.stationMarker} />
-            <Callout>
-              <View style={styles.calloutBox}>
-                <Text style={styles.calloutTitle}>Tu cuartel</Text>
-              </View>
-            </Callout>
-          </Marker>
-
-          {/* F3: POI markers (filtrados por capas activas) */}
-          {poisVisibles.map((poi, idx) => {
-            const color = POI_COLORS[poi.categoria] || '#37474f';
-            const icon = POI_ICONS[poi.categoria] || 'map-marker';
-
-            return (
-              <Marker
-                key={poi.id || `poi-${idx}`}
-                coordinate={{
-                  latitude: parseFloat(poi.latitud),
-                  longitude: parseFloat(poi.longitud),
-                }}
-                anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
-              >
-                <View style={[styles.poiMarker, { backgroundColor: color }]}>
-                  <MaterialCommunityIcons name={icon} size={14} color="#fff" />
-                </View>
-                <Callout>
-                  <View style={styles.calloutBox}>
-                    <Text style={styles.calloutTitle}>{poi.nombre || poi.categoria}</Text>
-                    {poi.descripcion ? (
-                      <Text style={styles.calloutDesc}>{poi.descripcion}</Text>
-                    ) : null}
-                  </View>
-                </Callout>
-              </Marker>
-            );
-          })}
-
-          {/* F2: Marcador de incidente con pulso */}
-          {incidente && (
+            {/* Marcador del cuartel */}
             <Marker
-              coordinate={{ latitude: incidente.latitud, longitude: incidente.longitud }}
+              coordinate={{ latitude: lat, longitude: lng }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={true}
-              onPress={() => setModalBomberosVisible(true)}
+              tracksViewChanges={false}
             >
-              <View style={styles.incidentMarkerContainer}>
-                <Animated.View
-                  style={[
-                    styles.incidentPulseRing,
-                    {
-                      opacity: incidentPulseOpacity,
-                      transform: [{ scale: incidentPulseScale }],
-                    },
-                  ]}
-                />
-                <View style={styles.incidentPin}>
-                  <Text style={{ fontSize: 16 }}>🔥</Text>
+              <View style={styles.stationMarker} />
+              <Callout>
+                <View style={styles.calloutBox}>
+                  <Text style={styles.calloutTitle}>Tu cuartel</Text>
                 </View>
-              </View>
+              </Callout>
             </Marker>
-          )}
 
-          {/* F2: Ruta cuartel → incidente */}
-          {routeCoords.length > 1 && (
-            <Polyline
-              coordinates={routeCoords}
-              strokeColor="#dc2626"
-              strokeWidth={4}
-              lineDashPattern={null}
-              lineJoin="round"
-              lineCap="round"
-            />
-          )}
-        </MapView>
+            {/* F3: POI markers (filtrados por capas activas) */}
+            {poisVisibles.map((poi, idx) => {
+              const color = POI_COLORS[poi.categoria] || '#37474f';
+              const icon = POI_ICONS[poi.categoria] || 'map-marker';
+
+              return (
+                <Marker
+                  key={poi.id || `poi-${idx}`}
+                  coordinate={{
+                    latitude: parseFloat(poi.latitud),
+                    longitude: parseFloat(poi.longitud),
+                  }}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  tracksViewChanges={false}
+                >
+                  <View style={[styles.poiMarker, { backgroundColor: color }]}>
+                    <MaterialCommunityIcons name={icon} size={14} color="#fff" />
+                  </View>
+                  <Callout>
+                    <View style={styles.calloutBox}>
+                      <Text style={styles.calloutTitle}>{poi.nombre || poi.categoria}</Text>
+                      {poi.descripcion ? (
+                        <Text style={styles.calloutDesc}>{poi.descripcion}</Text>
+                      ) : null}
+                    </View>
+                  </Callout>
+                </Marker>
+              );
+            })}
+
+            {/* F2: Marcador de incidente con pulso */}
+            {incidente && (
+              <Marker
+                coordinate={{ latitude: incidente.latitud, longitude: incidente.longitud }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={true}
+                onPress={() => setModalBomberosVisible(true)}
+              >
+                <View style={styles.incidentMarkerContainer}>
+                  <Animated.View
+                    style={[
+                      styles.incidentPulseRing,
+                      {
+                        opacity: incidentPulseOpacity,
+                        transform: [{ scale: incidentPulseScale }],
+                      },
+                    ]}
+                  />
+                  <View style={styles.incidentPin}>
+                    <Text style={{ fontSize: 16 }}>🔥</Text>
+                  </View>
+                </View>
+              </Marker>
+            )}
+
+            {/* F2: Ruta cuartel → incidente */}
+            {routeCoords.length > 1 && (
+              <Polyline
+                coordinates={routeCoords}
+                strokeColor="#dc2626"
+                strokeWidth={4}
+                lineDashPattern={null}
+                lineJoin="round"
+                lineCap="round"
+              />
+            )}
+          </MapView>
+        )
       )}
 
       {/* ── Header + Mission card ────────────────────────────────────────── */}
@@ -895,4 +1254,3 @@ export default function MapScreen({ navigation, route }) {
     </View>
   );
 };
-

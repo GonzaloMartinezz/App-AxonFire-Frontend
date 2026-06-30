@@ -30,7 +30,6 @@ import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
 import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
 import GestionPoisScreen from '../screens/GestionPoisScreen';
-import NuevoPOIScreen from '../screens/NuevoPOIScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -252,24 +251,28 @@ export default function AppNavigator() {
           <Stack.Screen name="AlertDetail" component={AlertDetailScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="NewAlert" component={NewAlertScreen} />
 
-          <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
+          {/* RF-04: Pantallas restringidas solo para ADMIN */}
+          {user?.rol === 'ADMIN' && (
+            <>
+              <Stack.Screen name="AddFirefighter" component={AddFirefighterScreen} />
+              <Stack.Screen name="Personal" component={AdminPersonnelScreen} />
+              <Stack.Screen name="AdminEquipment" component={AdminEquipmentScreen} />
+            </>
+          )}
 
           <Stack.Screen name="AttendanceBoard" component={AdminAttendanceBoardScreen} />
           <Stack.Screen name="Emergency" component={EmergencyScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
-          <Stack.Screen name="Personal" component={AdminPersonnelScreen} />
 
           {/* Pantallas nuevas */}
           <Stack.Screen name="PanelControl" component={PanelControlScreen} />
           <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
           <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
-          <Stack.Screen name="AdminEquipment" component={AdminEquipmentScreen} />
           <Stack.Screen name="InformePostEmergencia" component={InformePostEmergenciaScreen} />
           <Stack.Screen name="ChecklistBolsos" component={ChecklistBolsosScreen} />
           <Stack.Screen name="Logistica" component={ResourcesScreen} />
           <Stack.Screen name="Estadisticas" component={EstadisticasScreen} />
           <Stack.Screen name="GestionPois" component={GestionPoisScreen} />
-          <Stack.Screen name="NuevoPOI" component={NuevoPOIScreen} />
         </>
       )}
     </Stack.Navigator>

@@ -20,6 +20,7 @@ import { Audio } from 'expo-av';
 import { Vibration } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import { useNotifications } from '../context/NotificationContext';
 import ModalRevisionBolsos, { useRevisionBolsos } from '../components/ModalRevisionBolsos';
 import { styles } from '../styles/EmergencyScreenStyles';
 
@@ -298,6 +299,7 @@ export default function EmergencyScreen({ route, navigation }) {
   // Parámetros de navegación y contexto de autenticación unificados
   const alertaId = route?.params?.alerta_id ?? null;
   const { user, token: userToken } = useAuth();
+  const { addNotification } = useNotifications();
   const usuarioId = user?.id ?? null;
   const token = userToken ?? user?.token ?? null;
 
@@ -703,6 +705,33 @@ export default function EmergencyScreen({ route, navigation }) {
       setRespuesta(estadoRespuesta);
       animateIn();
       fetchEmergencyData();
+
+      // RF-02: Redirección automática al mapa si se confirma asistencia
+      if (estadoRespuesta === 'ACEPTADO') {
+        const targetAlertId = resolvedAlertaId || alertaId;
+        setTimeout(() => {
+          // Intentar navegación directa de pestañas
+          navigation.navigate('Mapa', { alertaId: targetAlertId });
+          
+          // Intentar navegación a través del stack parent para cerrar modales/pantallas apiladas
+          try {
+            const parent = navigation.getParent();
+            if (parent) {
+              parent.navigate('MainApp', {
+                screen: 'Mapa',
+                params: { alertaId: targetAlertId },
+              });
+            } else {
+              navigation.navigate('MainApp', {
+                screen: 'Mapa',
+                params: { alertaId: targetAlertId },
+              });
+            }
+          } catch (e) {
+            console.log('Error en navegación parent:', e);
+          }
+        }, 600);
+      }
     } catch (err) {
       console.error('Error al enviar respuesta:', err);
       setError('No se pudo registrar la respuesta. Intenta nuevamente.');
@@ -1034,6 +1063,58 @@ export default function EmergencyScreen({ route, navigation }) {
                 <MaterialCommunityIcons name="refresh" size={18} color="#94a3b8" />
                 <Text style={styles.emptyRefreshButtonText}>VERIFICAR ALERTA</Text>
               </TouchableOpacity>
+
+              {/* RF-04: Accesos rápidos operativos para bomberos */}
+              {user?.rol !== 'ADMIN' && (
+                <View style={quickStyles.container}>
+                  <Text style={quickStyles.sectionTitle}>ACCESOS RÁPIDOS</Text>
+                  
+                  <TouchableOpacity
+                    style={quickStyles.card}
+                    onPress={() => navigation.navigate('PedidosSuministro')}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[quickStyles.iconBox, { backgroundColor: 'rgba(249, 115, 22, 0.12)' }]}>
+                      <MaterialCommunityIcons name="cart-outline" size={22} color="#f97316" />
+                    </View>
+                    <View style={quickStyles.cardTextBox}>
+                      <Text style={quickStyles.cardTitle}>PEDIR SUMINISTROS</Text>
+                      <Text style={quickStyles.cardSub}>Solicitar insumos operativos</Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-right" size={20} color="#475569" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={quickStyles.card}
+                    onPress={() => navigation.navigate('WeeklyChecklist')}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[quickStyles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.12)' }]}>
+                      <MaterialCommunityIcons name="clipboard-check-outline" size={22} color="#8b5cf6" />
+                    </View>
+                    <View style={quickStyles.cardTextBox}>
+                      <Text style={quickStyles.cardTitle}>REALIZAR CONTROLES</Text>
+                      <Text style={quickStyles.cardSub}>Checklists diarios y de servicio</Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-right" size={20} color="#475569" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={quickStyles.card}
+                    onPress={() => navigation.navigate('MainApp', { screen: 'Mapa' })}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[quickStyles.iconBox, { backgroundColor: 'rgba(56, 189, 248, 0.12)' }]}>
+                      <MaterialCommunityIcons name="map-marker-radius" size={22} color="#38bdf8" />
+                    </View>
+                    <View style={quickStyles.cardTextBox}>
+                      <Text style={quickStyles.cardTitle}>VER MAPA</Text>
+                      <Text style={quickStyles.cardSub}>Mapa operativo táctico</Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-right" size={20} color="#475569" />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ) : (
             <>
@@ -1142,3 +1223,52 @@ export default function EmergencyScreen({ route, navigation }) {
     </View>
   );
 };
+
+// RF-04: Estilos para tarjetas de acceso rápido del bombero
+const quickStyles = StyleSheet.create({
+  container: {
+    marginTop: 28,
+    width: '100%',
+    paddingHorizontal: 8,
+    gap: 10,
+  },
+  sectionTitle: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1b1d24',
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#26282f',
+    gap: 12,
+  },
+  iconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTextBox: {
+    flex: 1,
+  },
+  cardTitle: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  cardSub: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+});

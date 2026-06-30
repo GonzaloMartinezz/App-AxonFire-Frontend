@@ -646,8 +646,19 @@ export default function AlertDetailScreen({ route, navigation }) {
               // Always write local override
               await AsyncStorage.setItem(`finalized_alert_${alertaId}`, 'true');
 
-              Alert.alert("Éxito", "La emergencia ha sido finalizada.");
-              fetchDetail();
+              Alert.alert("Éxito", "La emergencia ha sido finalizada.", [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    // RF-02: Redirigir al dashboard tras finalizar emergencia
+                    if (rol === 'ADMIN') {
+                      navigation.navigate('AdminApp', { screen: 'Panel' });
+                    } else {
+                      fetchDetail();
+                    }
+                  }
+                }
+              ]);
             } catch (e) {
               Alert.alert("Error", e.message);
             } finally {

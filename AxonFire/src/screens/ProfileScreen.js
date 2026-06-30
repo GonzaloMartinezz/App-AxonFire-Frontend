@@ -337,14 +337,6 @@ export default function ProfileScreen({ navigation }) {
                 title="Gestión de Usuarios"
                 sub="Agregar o gestionar bomberos"
                 onPress={() => navigation.navigate('AddFirefighter')}
-              />
-              <ActionRow
-                icon="fire-truck"
-                iconBg="#2d1515"
-                iconColor="#dc2626"
-                title="Flota Vehicular"
-                sub="Mantenimiento y estado de unidades"
-                onPress={() => navigation?.navigate('AdminEquipment')}
                 noBorder
               />
             </View>
