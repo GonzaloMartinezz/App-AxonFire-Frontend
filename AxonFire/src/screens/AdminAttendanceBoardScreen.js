@@ -315,7 +315,7 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
             timeout: 15000
           });
           const data = resAlertas.data;
-          const alertas = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+          const alertas = data.alertas || [];
           if (alertas.length > 0) {
             const activas = [];
             for (const a of alertas) {

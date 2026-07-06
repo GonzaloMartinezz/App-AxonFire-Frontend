@@ -71,8 +71,7 @@ export default function PedidosSuministroScreen({ navigation }) {
         }, headers: { Authorization: `Bearer ${token}` }
       });
 
-      const data = resAlertas.data;
-      const lista = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+      const lista = resAlertas.data?.alertas || [];
       const activas = lista.filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
       
       if (activas.length > 0) {
