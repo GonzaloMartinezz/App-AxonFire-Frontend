@@ -166,3 +166,105 @@ paths:
       responses:
         '200':
           description: OK
+  /control_fluidos/guardar:
+    post:
+      summary: Guardar Control de Fluidos de Móvil
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - camionId
+                - aceite_motor
+                - liquido_refrigerante
+                - liquido_frenos
+                - liquido_direccion
+              properties:
+                camionId:
+                  type: string
+                aceite_motor:
+                  type: string
+                  enum: [OK, BAJO, CRITICO]
+                liquido_refrigerante:
+                  type: string
+                  enum: [OK, BAJO, CRITICO]
+                liquido_frenos:
+                  type: string
+                  enum: [OK, BAJO, CRITICO]
+                liquido_direccion:
+                  type: string
+                  enum: [OK, BAJO, CRITICO]
+                observaciones:
+                  type: string
+      responses:
+        '201':
+          description: Created
+  /control_fluidos/historial/{camionId}:
+    get:
+      summary: Obtener Historial de Control de Fluidos por Móvil
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: camionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /mantenimiento_herramientas/guardar:
+    post:
+      summary: Guardar Mantenimiento de Herramienta Hidráulica
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - herramientaId
+                - nivel_aceite
+                - estado_mangueras
+                - presion_trabajo
+                - estado_limpieza
+              properties:
+                herramientaId:
+                  type: string
+                nivel_aceite:
+                  type: string
+                  enum: [OK, BAJO, CRITICO]
+                estado_mangueras:
+                  type: string
+                  enum: [OK, DANADO]
+                presion_trabajo:
+                  type: string
+                  enum: [OK, DESVIACION]
+                estado_limpieza:
+                  type: string
+                  enum: [OK, REQUIERE_LIMPIEZA]
+                observaciones:
+                  type: string
+      responses:
+        '201':
+          description: Created
+  /mantenimiento_herramientas/historial/{herramientaId}:
+    get:
+      summary: Obtener Historial de Mantenimiento de Herramienta Hidráulica
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: herramientaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK

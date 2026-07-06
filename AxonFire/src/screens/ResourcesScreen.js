@@ -607,6 +607,36 @@ export default function ResourcesScreen({ navigation }) {
             <Text style={styles.auditTitle}>Bolsos de Trauma/EPP</Text>
             <Text style={styles.auditSub}>Revisión de botiquines y bolsos post-alarma</Text>
           </TouchableOpacity>
+
+          {/* 5. Control de Fluidos */}
+          <TouchableOpacity
+            style={[styles.auditCard, { borderLeftColor: '#0284c7' }]}
+            onPress={() => {
+              navigation.navigate('ControlFluidos');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.auditIconBg}>
+              <MaterialCommunityIcons name="water-pump" size={20} color="#0284c7" />
+            </View>
+            <Text style={styles.auditTitle}>Control de Fluidos</Text>
+            <Text style={styles.auditSub}>Niveles de lubricantes y fluidos de flota</Text>
+          </TouchableOpacity>
+
+          {/* 6. Mantenimiento Hidráulico */}
+          <TouchableOpacity
+            style={[styles.auditCard, { borderLeftColor: '#dc2626' }]}
+            onPress={() => {
+              navigation.navigate('MantenimientoHidraulico');
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.auditIconBg}>
+              <MaterialCommunityIcons name="wrench-clock" size={20} color="#dc2626" />
+            </View>
+            <Text style={styles.auditTitle}>Mantenimiento Hidráulico</Text>
+            <Text style={styles.auditSub}>Controles de herramientas hidráulicas de base</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── 5. Feed de Comunicaciones Logísticas (Bitácora Vivo) ── */}

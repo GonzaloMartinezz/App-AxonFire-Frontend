@@ -33,7 +33,17 @@ export const styles = StyleSheet.create({
         padding: 4,
     },
 
-    contenido: { padding: 24 },
+    contenido: {
+        paddingHorizontal: 20,
+        paddingTop: 24,
+    },
+    contenidoDesktop: {
+        width: '100%',
+        maxWidth: 1180,
+        alignSelf: 'center',
+        paddingHorizontal: 28,
+        paddingTop: 22,
+    },
 
     // Header Row
     headerRow: {
@@ -41,6 +51,9 @@ export const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         marginBottom: 28,
+    },
+    headerRowDesktop: {
+        marginBottom: 18,
     },
     titleLeftGroup: {
         flexDirection: 'row',
@@ -82,38 +95,90 @@ export const styles = StyleSheet.create({
     // Total Card
     totalCard: {
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
-        padding: 18,
-        marginBottom: 24,
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 20,
         borderWidth: 1,
         borderColor: '#26282f',
         borderLeftWidth: 3,
         borderLeftColor: '#dc2626',
     },
-    totalLeft: { marginBottom: 16 },
+    totalCardDesktop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 18,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        marginBottom: 16,
+    },
+    totalLeft: { marginBottom: 14 },
+    totalLeftDesktop: {
+        width: 260,
+        marginBottom: 0,
+    },
+    totalProgress: { gap: 8 },
+    totalProgressDesktop: {
+        flex: 1,
+        minWidth: 0,
+    },
     totalLabel: { fontSize: 9, color: '#94a3b8', letterSpacing: 1, fontWeight: '700', marginBottom: 6 },
-    totalValue: { fontSize: 32, fontWeight: '900', color: '#fff' },
+    totalValue: { fontSize: 24, fontWeight: '900', color: '#fff', lineHeight: 28 },
+    progressBarHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
     progressBarLabel: { fontSize: 8, color: '#94a3b8', fontWeight: '800', letterSpacing: 0.5 },
     progressBarPercent: { fontSize: 10, fontWeight: '900' },
-    progressBarBg: { height: 6, backgroundColor: '#26282f', borderRadius: 3, overflow: 'hidden' },
+    progressBarBg: { height: 5, backgroundColor: '#26282f', borderRadius: 3, overflow: 'hidden' },
     progressBarFill: { height: '100%', backgroundColor: '#10b981', borderRadius: 3 },
 
     // Section Header
     sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
     sectionLine: { width: 6, height: 18, borderRadius: 3, backgroundColor: '#dc2626', marginRight: 10 },
+    sectionLineMuted: { width: 6, height: 18, borderRadius: 3, backgroundColor: '#475569', marginRight: 10 },
     sectionTitle: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 2, flex: 1 },
 
+    desktopBody: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 18,
+        marginTop: 6,
+    },
+    desktopMainColumn: {
+        flex: 1,
+        minWidth: 0,
+    },
+    desktopSideColumn: {
+        width: 360,
+        flexShrink: 0,
+    },
+
     // Grilla
-    grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
+    grillaDesktop: {
+        marginBottom: 2,
+    },
     cardStat: {
-        width: '48%',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
-        padding: 14,
+        borderRadius: 8,
+        padding: 16,
         borderLeftWidth: 3,
         gap: 8,
         borderWidth: 1,
         borderColor: '#26282f',
+    },
+    cardStatMobile: {
+        width: '47.5%',
+        minHeight: 86,
+    },
+    cardStatDesktop: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 78,
+    },
+    quickActionStat: {
+        backgroundColor: '#1f222b',
     },
     cardStatHeader: {
         flexDirection: 'row',
@@ -121,6 +186,12 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statNumero: { fontSize: 24, fontWeight: '900', color: '#f8fafc' },
+    statActionTitle: {
+        color: '#f8fafc',
+        fontSize: 13,
+        fontWeight: '900',
+        letterSpacing: 0.2,
+    },
     statLabel: {
         fontSize: 9,
         fontWeight: '800',
@@ -133,8 +204,8 @@ export const styles = StyleSheet.create({
     alertCard: {
         flexDirection: 'row',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
-        marginBottom: 12,
+        borderRadius: 8,
+        marginBottom: 10,
         borderLeftWidth: 3,
         borderWidth: 1,
         borderColor: '#26282f',
@@ -148,8 +219,8 @@ export const styles = StyleSheet.create({
         flex: 1,
     },
     alertIconBg: {
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         borderRadius: 6,
         alignItems: 'center',
         justifyContent: 'center',
@@ -162,7 +233,7 @@ export const styles = StyleSheet.create({
     },
     alertTitle: {
         color: '#f8fafc',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         letterSpacing: 0.5,
     },
@@ -206,6 +277,41 @@ export const styles = StyleSheet.create({
         fontWeight: '700',
     },
 
+    activityPanel: {
+        marginTop: 28,
+    },
+    activityPanelDesktop: {
+        marginTop: 8,
+        backgroundColor: '#1a1c23',
+        borderWidth: 1,
+        borderColor: '#26282f',
+        borderRadius: 8,
+        padding: 14,
+        ...Platform.select({
+            web: { boxShadow: '0px 10px 24px rgba(0, 0, 0, 0.18)' }
+        }),
+    },
+    activityHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 14,
+    },
+    activityKicker: {
+        color: '#e11d48',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 1.5,
+        marginBottom: 3,
+    },
+    activityTitle: {
+        color: '#f8fafc',
+        fontSize: 14,
+        fontWeight: '900',
+        letterSpacing: 1.2,
+    },
+
     emptyState: {
         alignItems: 'center',
         paddingVertical: 32,
@@ -230,12 +336,12 @@ export const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#26282f',
         borderLeftWidth: 3,
         borderLeftColor: '#e11d48',
-        padding: 16,
+        padding: 18,
         marginBottom: 20,
         marginTop: 8,
         ...Platform.select({
@@ -243,6 +349,17 @@ export const styles = StyleSheet.create({
             android: { elevation: 3 },
             web: { boxShadow: '0px 4px 12px rgba(225, 29, 72, 0.08)' }
         }),
+    },
+    adminCard: {
+        borderLeftColor: '#6366f1',
+        marginTop: 0,
+        marginBottom: 10,
+        opacity: 0.92,
+    },
+    adminIconBg: {
+        backgroundColor: 'rgba(99, 102, 241, 0.16)',
+        borderWidth: 1,
+        borderColor: 'rgba(129, 140, 248, 0.28)',
     },
     logisticCardLeft: {
         flexDirection: 'row',
@@ -278,18 +395,25 @@ export const styles = StyleSheet.create({
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
         gap: 10,
         marginBottom: 20,
     },
     gridItem: {
-        width: '48%',
         backgroundColor: '#1b1d24',
-        borderRadius: 6,
-        padding: 12,
+        borderRadius: 8,
+        padding: 14,
         borderWidth: 1,
         borderColor: '#26282f',
         gap: 6,
+        minHeight: 106,
+    },
+    gridItemDefault: {
+        width: '47.5%',
+    },
+    gridItemWide: {
+        flexBasis: '24%',
+        flexGrow: 1,
+        minWidth: 210,
     },
     gridItemHeader: {
         flexDirection: 'row',
@@ -314,5 +438,72 @@ export const styles = StyleSheet.create({
         color: '#64748b',
         fontSize: 10,
         fontWeight: '500',
+    },
+
+    // Active Emergency Banner
+    activeEmergencyBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#dc2626',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#b91c1c',
+        ...Platform.select({
+            ios: { shadowColor: '#dc2626', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+            android: { elevation: 6 },
+            web: { boxShadow: '0px 4px 16px rgba(220, 38, 38, 0.4)' }
+        }),
+    },
+    emergencyPulseIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255, 255, 255, 0.22)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    emergencyBannerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 2,
+    },
+    emergencyBannerTitle: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '900',
+        letterSpacing: 1.2,
+    },
+    emergencyBannerDesc: {
+        color: '#fca5a5',
+        fontSize: 10,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    emergencyBannerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    emergencyBannerBtnText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+    },
+
+    // Grid section headers
+    gridSectionTitle: {
+        color: '#475569',
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 1.5,
+        marginBottom: 8,
+        marginTop: 14,
+        textTransform: 'uppercase',
     },
 });

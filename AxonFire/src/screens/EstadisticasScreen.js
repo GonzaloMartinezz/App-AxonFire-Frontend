@@ -67,9 +67,41 @@ function calcularDuracionAlerta(alerta) {
   return 0;
 }
 
-// Helper: extrae el tipo/categoría de una alerta de forma resiliente y clasificada
+const CATEGORIAS_CONFIG = {
+  'INCENDIOS': {
+    color: '#e11d48',
+    icon: 'fire',
+    label: 'INCENDIOS'
+  },
+  'RESCATES': {
+    color: '#f97316',
+    icon: 'car-wrench',
+    label: 'RESCATES'
+  },
+  'ACCIDENTES': {
+    color: '#fbbf24',
+    icon: 'car-crash',
+    label: 'ACCIDENTES'
+  },
+  'MAT-PEL (HAZMAT)': {
+    color: '#a855f7',
+    icon: 'biohazard',
+    label: 'MAT-PEL'
+  },
+  'SERVICIOS': {
+    color: '#3b82f6',
+    icon: 'tools',
+    label: 'SERVICIOS'
+  },
+  'OTROS': {
+    color: '#64748b',
+    icon: 'alert-circle',
+    label: 'OTROS'
+  }
+};
+
+// Helper: extrae el tipo/categoría de una alerta de forma resiliente y clasificada bajo criterios RUBA
 function extraerTipoAlerta(alerta) {
-  // 1. Intentar obtener de la relación subCategoriaAlerta
   const subCat = alerta.subCategoriaAlerta?.nombre_sub_categoria
     || alerta.subCategoriaAlerta?.nombre;
 
@@ -77,75 +109,120 @@ function extraerTipoAlerta(alerta) {
   if (subCat) {
     rawText = subCat.toUpperCase().trim();
   } else {
-    // Fallback: extraer de observaciones
     rawText = (alerta.observaciones || '').toUpperCase().trim();
   }
 
-  if (!rawText) return 'INCIDENTE GENERAL';
+  if (!rawText) return 'OTROS';
 
-  // Limpiar cualquier prefijo de severidad como "[NIVEL 4 - CRÍTICO] -"
-  let cleanText = rawText.replace(/^\[NIVEL\s+\d+\s+-\s+[^\]]+\]\s*-\s*/i, '').trim();
+  // Eliminar acentos y caracteres especiales para hacer una comparación robusta
+  const normalizeText = (str) => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  };
 
-  // Limpiar prefijos de tipo comunes
-  cleanText = cleanText
-    .replace(/^INCIDENTE DE /i, '')
-    .replace(/^INCENDIO DE /i, '')
-    .trim();
+  const text = normalizeText(rawText);
 
-  // Clasificar según palabras clave para agrupar y mostrar información de valor
-  if (cleanText.includes('INCENDIO ESTRUCTURAL') || cleanText === 'ESTRUCTURAL') {
-    return 'INCENDIO ESTRUCTURAL';
-  }
-  if (cleanText.includes('INCENDIO FORESTAL') || cleanText === 'FORESTAL') {
-    return 'INCENDIO FORESTAL';
-  }
-  if (cleanText.includes('INCENDIO') || cleanText.includes('FUEGO')) {
-    return 'INCENDIO';
-  }
-  if (cleanText.includes('RESCATE VEHICULAR') || cleanText.includes('CHOQUE') || cleanText.includes('COLISION') || cleanText.includes('COLISIÓN')) {
-    return 'RESCATE VEHICULAR';
-  }
-  if (cleanText.includes('RESCATE')) {
-    return 'RESCATE';
-  }
-  if (cleanText.includes('MEDICA') || cleanText.includes('MÉDICA') || cleanText.includes('AMBULANCIA') || cleanText.includes('PARO')) {
-    return 'EMERGENCIA MÉDICA';
-  }
-  if (cleanText.includes('GAS') || cleanText.includes('FUGA')) {
-    return 'FUGA DE GAS';
-  }
-  if (cleanText.includes('INDUSTRIAL') || cleanText.includes('ACCIDENTE INDUSTRIAL')) {
-    return 'ACCIDENTE INDUSTRIAL';
-  }
-  if (cleanText.includes('HAZMAT') || cleanText.includes('QUIMICO') || cleanText.includes('QUÍMICO')) {
-    return 'HAZMAT';
-  }
-
-  // Agrupar datos ruidosos o de test comunes en desarrollo
-  const lowerText = cleanText.toLowerCase();
+  // 1. INCENDIOS
   if (
-    lowerText === 'sef' ||
-    lowerText === 'papas' ||
-    lowerText === '3e3e3e' ||
-    lowerText === 'sin descripción' ||
-    lowerText === 'sin descripcion' ||
-    lowerText.length < 3
+    text.includes('incendio') ||
+    text.includes('fuego') ||
+    text.includes('quema') ||
+    text.includes('humo') ||
+    text.includes('forestal') ||
+    text.includes('estructural') ||
+    text.includes('pastizal') ||
+    text.includes('interfase') ||
+    text.includes('se quema') ||
+    text.includes('quemando')
   ) {
-    return 'INCIDENTE GENERAL';
+    return 'INCENDIOS';
   }
 
-  // Si no coincide con ninguna palabra clave, retornar el texto limpio acotado (máximo 25 caracteres)
-  return cleanText.length > 25 ? cleanText.substring(0, 22) + '...' : cleanText;
+  // 2. RESCATES
+  if (
+    text.includes('rescate') ||
+    text.includes('atrapado') ||
+    text.includes('altura') ||
+    text.includes('acuatico') ||
+    text.includes('pozo') ||
+    text.includes('ascensor') ||
+    text.includes('animal') ||
+    text.includes('perro') ||
+    text.includes('gato')
+  ) {
+    return 'RESCATES';
+  }
+
+  // 3. ACCIDENTES
+  if (
+    text.includes('choque') ||
+    text.includes('colision') ||
+    text.includes('accidente') ||
+    text.includes('despiste') ||
+    text.includes('vuelco') ||
+    text.includes('volcamiento') ||
+    text.includes('transito') ||
+    text.includes('vial') ||
+    text.includes('vehiculo') ||
+    text.includes('auto') ||
+    text.includes('moto') ||
+    text.includes('camion') ||
+    text.includes('colectivo')
+  ) {
+    return 'ACCIDENTES';
+  }
+
+  // 4. MATERIALES PELIGROSOS (HAZMAT)
+  if (
+    text.includes('gas') ||
+    text.includes('fuga') ||
+    text.includes('derrame') ||
+    text.includes('quimico') ||
+    text.includes('hazmat') ||
+    text.includes('matpel') ||
+    text.includes('explosiv') ||
+    text.includes('combustible') ||
+    text.includes('nafta') ||
+    text.includes('toxico')
+  ) {
+    return 'MAT-PEL (HAZMAT)';
+  }
+
+  // 5. SERVICIOS Y PREVENCIÓN
+  if (
+    text.includes('limpieza') ||
+    text.includes('arbol') ||
+    text.includes('calzada') ||
+    text.includes('abastecimiento') ||
+    text.includes('agua') ||
+    text.includes('cable') ||
+    text.includes('prevencion') ||
+    text.includes('capacitacion') ||
+    text.includes('simulacro') ||
+    text.includes('inspeccion') ||
+    text.includes('seguridad') ||
+    text.includes('guardia') ||
+    text.includes('prueba') ||
+    text.includes('test') ||
+    text.includes('live') ||
+    text.includes('modal') ||
+    text.includes('rkt') ||
+    text.includes('creado desde')
+  ) {
+    return 'SERVICIOS';
+  }
+
+  // 6. OTROS (incluye médicas, incidentes generales, etc.)
+  return 'OTROS';
 }
 
 // Helper: mapea el tipo de emergencia a un icono de MaterialCommunityIcons
 function getTipoIcon(tipo) {
-  const t = tipo.toLowerCase();
-  if (t.includes('incendio') || t.includes('fuego')) return 'fire';
-  if (t.includes('rescate') || t.includes('accidente') || t.includes('vehicular')) return 'car-wrench';
-  if (t.includes('gas') || t.includes('quimico') || t.includes('hazmat')) return 'biohazard';
-  if (t.includes('medic') || t.includes('ambulancia')) return 'ambulance';
-  return 'alert-circle';
+  const config = CATEGORIAS_CONFIG[tipo];
+  return config ? config.icon : 'alert-circle';
 }
 
 export default function EstadisticasScreen({ navigation }) {
@@ -161,7 +238,6 @@ export default function EstadisticasScreen({ navigation }) {
 
   // States for fetched datasets
   const [alerts, setAlerts] = useState([]);
-  const [responders, setResponders] = useState([]);
 
   // Computed states
   const [statsTipos, setStatsTipos] = useState({});
@@ -183,7 +259,6 @@ export default function EstadisticasScreen({ navigation }) {
       console.log('EstadisticasScreen - Rango de fechas para consulta:', { desde, hasta });
 
       let alertsData = [];
-      let responsesData = [];
 
       // 1. Fetch Alerts in range
       try {
@@ -192,37 +267,13 @@ export default function EstadisticasScreen({ navigation }) {
           params: { fecha_desde: desde, fecha_hasta: hasta },
           timeout: 5000
         });
-        alertsData = resAlerts.data?.alertas || [];
+        const data = resAlerts.data;
+        alertsData = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
       } catch (err) {
         console.log('Error loading range alerts:', err?.message || err);
       }
 
-      // 2. Fetch responses for the alerts in this period (using the alert-specific endpoint)
-      try {
-        if (alertsData.length > 0) {
-          const promises = alertsData.map(async (alert) => {
-            try {
-              const resResp = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alert.id}`, {
-                headers,
-                timeout: 5000
-              });
-              return Array.isArray(resResp.data) ? resResp.data : [];
-            } catch (err) {
-              console.log(`Error loading responses for alert ${alert.id}:`, err?.message || err);
-              return [];
-            }
-          });
-          const results = await Promise.all(promises);
-          responsesData = results.flat();
-        } else {
-          responsesData = [];
-        }
-      } catch (err) {
-        console.log('Error loading alert responses:', err?.message || err);
-      }
-
       setAlerts(alertsData);
-      setResponders(responsesData);
 
       // Compute statistics by type
       const counts = {};
@@ -230,57 +281,40 @@ export default function EstadisticasScreen({ navigation }) {
         const cleanType = extraerTipoAlerta(a);
         counts[cleanType] = (counts[cleanType] || 0) + 1;
       });
-      setStatsTipos(counts);
 
-      // Build a lookup of alert durations by alert id
-      const alertDurationMap = {};
-      alertsData.forEach(a => {
-        alertDurationMap[a.id] = calcularDuracionAlerta(a);
-      });
+      // Sort the counts object by value descending
+      const sortedCounts = {};
+      Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([key, val]) => {
+          sortedCounts[key] = val;
+        });
 
-      // Get the set of alert IDs in the current period
-      const alertIdsInPeriod = new Set(alertsData.map(a => a.id));
+      setStatsTipos(sortedCounts);
 
-      // Filter responses: only ACEPTADO and linked to alerts in current period
-      const acceptedResponses = responsesData.filter(r => {
-        if (r.estado_respuesta !== 'ACEPTADO') return false;
-        const rAlertaId = r.alerta_id || r.alertaId?.id || r.alertaId;
-        return alertIdsInPeriod.has(rAlertaId);
-      });
+      // 2. Fetch monthly firefighter statistics from the backend metrics endpoint (avoids N+1 query loop)
+      let mappedParticipation = [];
+      try {
+        const resMetricas = await axios.get(`${API_BASE_URL}/metricas/mensuales`, {
+          headers,
+          params: { mes: selectedMes + 1, anio: selectedAnio },
+          timeout: 5000
+        });
 
-      // Derive unique firefighters from accepted responses
-      // The backend includes usuarioId relation in responses
-      const firefighterMap = {};
-      acceptedResponses.forEach(r => {
-        const userId = r.usuario_id || r.usuarioId?.id;
-        if (!userId) return;
+        const bomberosMetricas = resMetricas.data?.bomberos || [];
+        mappedParticipation = bomberosMetricas.map(b => ({
+          id: b.usuario_id,
+          nombre: `${b.nombre} ${b.apellido || ''}`.trim().toUpperCase(),
+          asistencias: b.total_asistencias,
+          horas: b.total_horas
+        }));
+      } catch (err) {
+        console.log('Error loading monthly metrics:', err?.message || err);
+      }
 
-        if (!firefighterMap[userId]) {
-          // Extract name info from the included usuario relation
-          const b = r.usuarioId?.bombero || r.bombero || {};
-          const nombreUsuario = r.usuarioId?.nombre_usuario || r.usuarioId?.nombre || '';
-          const fullLabel = b.nombre ? `${b.nombre} ${b.apellido || ''}`.trim() : nombreUsuario || userId;
-          firefighterMap[userId] = {
-            id: userId,
-            nombre: fullLabel.toUpperCase(),
-            asistencias: 0,
-            horas: 0
-          };
-        }
-
-        firefighterMap[userId].asistencias += 1;
-
-        // Add duration of this specific alert
-        const rAlertaId = r.alerta_id || r.alertaId?.id || r.alertaId;
-        const duration = alertDurationMap[rAlertaId] || 0;
-        firefighterMap[userId].horas += duration;
-      });
-
-      const parsedParticipation = Object.values(firefighterMap);
-
-      // Sort by assistances descending (horas may be 0 if durations aren't filled)
-      parsedParticipation.sort((a, b) => b.asistencias - a.asistencias || b.horas - a.horas);
-      setParticipationList(parsedParticipation);
+      // Sort by assistances descending
+      mappedParticipation.sort((a, b) => b.asistencias - a.asistencias || b.horas - a.horas);
+      setParticipationList(mappedParticipation);
 
     } catch (err) {
       console.log('Error calculating stats:', err);
@@ -328,16 +362,9 @@ export default function EstadisticasScreen({ navigation }) {
   const kpis = React.useMemo(() => {
     const totalEmergencias = alerts.length;
 
-    // Filter accepted responses for this period's alerts
-    const alertIdsInPeriod = new Set(alerts.map(a => a.id));
-    const acceptedInPeriod = responders.filter(r => {
-      if (r.estado_respuesta !== 'ACEPTADO') return false;
-      const rAlertaId = r.alerta_id || r.alertaId?.id || r.alertaId;
-      return alertIdsInPeriod.has(rAlertaId);
-    });
-
+    const totalAcceptedResponses = participationList.reduce((sum, b) => sum + b.asistencias, 0);
     const avgResponders = totalEmergencias > 0
-      ? (acceptedInPeriod.length / totalEmergencias).toFixed(1)
+      ? (totalAcceptedResponses / totalEmergencias).toFixed(1)
       : '0.0';
 
     // Calculate alert durations in hours
@@ -356,7 +383,7 @@ export default function EstadisticasScreen({ navigation }) {
       avgDuration,
       bomberoDestacado
     };
-  }, [alerts, responders, participationList]);
+  }, [alerts, participationList]);
 
   if (loading) {
     return (
@@ -472,7 +499,10 @@ export default function EstadisticasScreen({ navigation }) {
                 <View style={styles.chartWrapper}>
                   <BarChart
                     data={{
-                      labels: Object.keys(statsTipos).map(tipo => tipo.length > 15 ? tipo.substring(0, 13) + '..' : tipo),
+                      labels: Object.keys(statsTipos).map(tipo => {
+                        const config = CATEGORIAS_CONFIG[tipo] || CATEGORIAS_CONFIG['OTROS'];
+                        return config.label;
+                      }),
                       datasets: [{ data: Object.values(statsTipos) }]
                     }}
                     width={width - 80}
@@ -493,7 +523,7 @@ export default function EstadisticasScreen({ navigation }) {
                       },
                     }}
                     fromZero
-                    verticalLabelRotation={20}
+                    verticalLabelRotation={0}
                     segments={
                       Math.max(...Object.values(statsTipos), 0) < 5
                         ? Math.max(...Object.values(statsTipos), 1)
@@ -507,12 +537,12 @@ export default function EstadisticasScreen({ navigation }) {
               {chartView === 'pie' && (
                 <View style={styles.chartWrapper}>
                   <PieChart
-                    data={Object.entries(statsTipos).map(([tipo, count], idx) => {
-                      const colors = ['#e11d48', '#3b82f6', '#10b981', '#fbbf24', '#8b5cf6', '#a855f7'];
+                    data={Object.entries(statsTipos).map(([tipo, count]) => {
+                      const config = CATEGORIAS_CONFIG[tipo] || CATEGORIAS_CONFIG['OTROS'];
                       return {
-                        name: tipo.length > 12 ? tipo.substring(0, 10) + '..' : tipo,
+                        name: config.label,
                         population: count,
-                        color: colors[idx % colors.length],
+                        color: config.color,
                         legendFontColor: '#94a3b8',
                         legendFontSize: 10
                       };
@@ -532,13 +562,13 @@ export default function EstadisticasScreen({ navigation }) {
 
               {chartView === 'list' && (
                 <View style={styles.customChartContainer}>
-                  {Object.entries(statsTipos).map(([tipo, count], idx) => {
+                  {Object.entries(statsTipos).map(([tipo, count]) => {
                     const total = alerts.length;
                     const percentage = total > 0 ? (count / total) * 100 : 0;
 
-                    const colors = ['#e11d48', '#3b82f6', '#10b981', '#fbbf24', '#8b5cf6', '#a855f7'];
-                    const color = colors[idx % colors.length];
-                    const iconName = getTipoIcon(tipo);
+                    const config = CATEGORIAS_CONFIG[tipo] || CATEGORIAS_CONFIG['OTROS'];
+                    const color = config.color;
+                    const iconName = config.icon;
 
                     return (
                       <View key={tipo} style={styles.chartRow}>

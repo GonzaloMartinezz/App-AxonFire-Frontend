@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,36 +12,39 @@ import {
   Platform,
   TextInput,
   Modal,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { API_BASE_URL } from '../config/api';
-import { useAuth } from '../context/AuthContext';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { API_BASE_URL } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getIconoBolso(nombre = '') {
+function getIconoBolso(nombre = "") {
   const n = nombre.toLowerCase();
-  if (n.includes('trauma') || n.includes('medic') || n.includes('primero')) return 'medical-bag';
-  if (n.includes('cuerda') || n.includes('soga') || n.includes('rescate')) return 'rope';
-  if (n.includes('incendio') || n.includes('fuego')) return 'fire-extinguisher';
-  if (n.includes('herramienta') || n.includes('kit')) return 'toolbox-outline';
-  return 'bag-personal-outline';
+  if (n.includes("trauma") || n.includes("medic") || n.includes("primero"))
+    return "medical-bag";
+  if (n.includes("cuerda") || n.includes("soga") || n.includes("rescate"))
+    return "rope";
+  if (n.includes("incendio") || n.includes("fuego")) return "fire-extinguisher";
+  if (n.includes("herramienta") || n.includes("kit")) return "toolbox-outline";
+  return "bag-personal-outline";
 }
 
-function getIconoHerramienta(nombre = '') {
+function getIconoHerramienta(nombre = "") {
   const n = nombre.toLowerCase();
-  if (n.includes('extintor')) return 'fire-extinguisher';
-  if (n.includes('venda') || n.includes('gasa')) return 'bandage';
-  if (n.includes('tijera')) return 'content-cut';
-  if (n.includes('guante')) return 'hand-back-left-outline';
-  if (n.includes('linterna') || n.includes('luz')) return 'flashlight';
-  if (n.includes('cuerda') || n.includes('soga')) return 'rope';
-  if (n.includes('mascarilla') || n.includes('oxig')) return 'air-filter';
-  if (n.includes('camilla')) return 'bed-outline';
-  if (n.includes('hacha')) return 'axe';
-  return 'package-variant-closed';
+  if (n.includes("extintor")) return "fire-extinguisher";
+  if (n.includes("venda") || n.includes("gasa")) return "bandage";
+  if (n.includes("tijera")) return "content-cut";
+  if (n.includes("guante")) return "hand-back-left-outline";
+  if (n.includes("linterna") || n.includes("luz")) return "flashlight";
+  if (n.includes("cuerda") || n.includes("soga")) return "rope";
+  if (n.includes("mascarilla") || n.includes("oxig")) return "air-filter";
+  if (n.includes("camilla")) return "bed-outline";
+  if (n.includes("hacha")) return "axe";
+  return "package-variant-closed";
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -49,15 +52,17 @@ function getIconoHerramienta(nombre = '') {
 export default function ChecklistBolsosScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
 
-  const camionNombre = route?.params?.camionNombre || 'Móvil';
+  const camionNombre = route?.params?.camionNombre || "Móvil";
   const { user, token: userToken } = useAuth();
-  const token = userToken ?? user?.token ?? '';
+  const token = userToken ?? user?.token ?? "";
+  const { addNotification } = useNotifications();
 
   // Si viene con un bolsoId fijo (desde el disparador de emergencia), lo usamos
   const bolsoIdParam = route?.params?.bolsoId || null;
+  const inventarioLocalParam = route?.params?.inventarioLocal || null;
 
   const headers = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
@@ -85,7 +90,7 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   // ── Estado de Modo Administrador ─────────────────────────────────────────────
   const [modoAdmin, setModoAdmin] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [nuevoNombreBolso, setNuevoNombreBolso] = useState('');
+  const [nuevoNombreBolso, setNuevoNombreBolso] = useState("");
   const [creando, setCreando] = useState(false);
 
   // ── Carga de bolsos ──────────────────────────────────────────────────────────
@@ -103,12 +108,14 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
 
       // Si vino un bolsoId por params, lo seleccionamos directamente (solo si está activo)
       if (bolsoIdParam) {
-        const encontrado = lista.find(b => b.id === bolsoIdParam && b.estado === 'ACTIVO');
+        const encontrado = lista.find(
+          (b) => b.id === bolsoIdParam && b.estado === "ACTIVO",
+        );
         if (encontrado) seleccionarBolso(encontrado, lista);
       }
     } catch (err) {
-      console.error('Error cargando bolsos:', err);
-      setError('No se pudieron cargar los bolsos.');
+      console.error("Error cargando bolsos:", err);
+      setError("No se pudieron cargar los bolsos.");
     } finally {
       setCargandoBolsos(false);
     }
@@ -118,89 +125,110 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
 
   async function crearBolso() {
     if (!nuevoNombreBolso.trim()) {
-      Alert.alert('Error', 'El nombre del bolso no puede estar vacío.');
+      Alert.alert("Error", "El nombre del bolso no puede estar vacío.");
       return;
     }
     setCreando(true);
     try {
       const res = await fetch(`${API_BASE_URL}/bolsos`, {
-        method: 'POST',
+        method: "POST",
         headers,
-        body: JSON.stringify({ nombre_bolso: nuevoNombreBolso.trim(), estado: 'ACTIVO' }),
+        body: JSON.stringify({
+          nombre_bolso: nuevoNombreBolso.trim(),
+          estado: "ACTIVO",
+        }),
       });
       if (res.ok) {
-        Alert.alert('✅ Listo', 'Bolso creado correctamente.');
-        setNuevoNombreBolso('');
+        Alert.alert("✅ Listo", "Bolso creado correctamente.");
+        setNuevoNombreBolso("");
         setModalVisible(false);
         cargarBolsos();
       } else {
         const errData = await res.json().catch(() => ({}));
-        Alert.alert('Error', errData.error || 'No se pudo crear el bolso.');
+        Alert.alert("Error", errData.error || "No se pudo crear el bolso.");
       }
     } catch (err) {
-      console.error('Error creando bolso:', err);
-      Alert.alert('Error', 'No se pudo conectar al servidor.');
+      console.error("Error creando bolso:", err);
+      Alert.alert("Error", "No se pudo conectar al servidor.");
     } finally {
       setCreando(false);
     }
   }
 
   async function toggleEstadoBolso(bolso) {
-    const nuevoEstado = bolso.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
-    
+    const nuevoEstado = bolso.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO";
+
     // Optimistic UI update
-    setBolsos(prev => prev.map(b => b.id === bolso.id ? { ...b, estado: nuevoEstado } : b));
-    
+    setBolsos((prev) =>
+      prev.map((b) => (b.id === bolso.id ? { ...b, estado: nuevoEstado } : b)),
+    );
+
     try {
       const res = await fetch(`${API_BASE_URL}/bolsos/${bolso.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers,
-        body: JSON.stringify({ nombre_bolso: bolso.nombre_bolso, estado: nuevoEstado }),
+        body: JSON.stringify({
+          nombre_bolso: bolso.nombre_bolso,
+          estado: nuevoEstado,
+        }),
       });
       if (!res.ok) {
         // Revert on error
-        setBolsos(prev => prev.map(b => b.id === bolso.id ? { ...b, estado: bolso.estado } : b));
-        Alert.alert('Error', 'No se pudo actualizar el estado del bolso.');
+        setBolsos((prev) =>
+          prev.map((b) =>
+            b.id === bolso.id ? { ...b, estado: bolso.estado } : b,
+          ),
+        );
+        Alert.alert("Error", "No se pudo actualizar el estado del bolso.");
       }
     } catch (err) {
-      console.error('Error actualizando bolso:', err);
+      console.error("Error actualizando bolso:", err);
       // Revert on error
-      setBolsos(prev => prev.map(b => b.id === bolso.id ? { ...b, estado: bolso.estado } : b));
-      Alert.alert('Error', 'No se pudo conectar al servidor.');
+      setBolsos((prev) =>
+        prev.map((b) =>
+          b.id === bolso.id ? { ...b, estado: bolso.estado } : b,
+        ),
+      );
+      Alert.alert("Error", "No se pudo conectar al servidor.");
     }
   }
 
   function eliminarBolso(bolso) {
     Alert.alert(
-      'Eliminar Bolso',
+      "Eliminar Bolso",
       `¿Estás seguro de eliminar "${bolso.nombre_bolso?.toUpperCase()}"? Esta acción es permanente.`,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Eliminar', style: 'destructive',
+          text: "Eliminar",
+          style: "destructive",
           onPress: async () => {
             try {
               const res = await fetch(`${API_BASE_URL}/bolsos/${bolso.id}`, {
-                method: 'DELETE',
+                method: "DELETE",
                 headers,
               });
               if (res.status === 204 || res.ok) {
-                Alert.alert('✅ Eliminado', 'El bolso fue eliminado correctamente.');
+                Alert.alert(
+                  "✅ Eliminado",
+                  "El bolso fue eliminado correctamente.",
+                );
                 cargarBolsos();
               } else {
                 const errData = await res.json().catch(() => ({}));
                 Alert.alert(
-                  '⚠️ No se pudo eliminar',
-                  errData.error || 'Este bolso tiene registros históricos. Desactivalo en su lugar.'
+                  "⚠️ No se pudo eliminar",
+                  errData.error ||
+                    "Este bolso tiene registros históricos. Desactivalo en su lugar.",
                 );
               }
             } catch (err) {
-              console.error('Error eliminando bolso:', err);
-              Alert.alert('Error', 'No se pudo conectar al servidor.');
+              console.error("Error eliminando bolso:", err);
+              Alert.alert("Error", "No se pudo conectar al servidor.");
             }
           },
         },
-      ]
+      ],
     );
   }
 
@@ -216,20 +244,33 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
     try {
       const res = await fetch(
         `${API_BASE_URL}/bolsos_inventario/bolso/${bolso.id}`,
-        { headers }
+        { headers },
       );
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-      const lista = Array.isArray(data) ? data : [];
+      let lista = [];
+      if (res.ok) {
+        const data = await res.json();
+        lista = Array.isArray(data) ? data : [];
+      }
+
+      // Combinamos con inventario local
+      if (inventarioLocalParam && inventarioLocalParam.length > 0) {
+        const map = new Map();
+        lista.forEach((item) => map.set(item.id, item));
+        inventarioLocalParam.forEach((item) => map.set(item.id, item));
+        lista = Array.from(map.values());
+      }
+
       setHerramientas(lista);
 
       // Inicializamos todos en null
       const estadoInicial = {};
-      lista.forEach(h => { estadoInicial[h.id] = null; });
+      lista.forEach((h) => {
+        estadoInicial[h.id] = null;
+      });
       setEstadoItems(estadoInicial);
     } catch (err) {
-      console.error('Error cargando inventario del bolso:', err);
-      Alert.alert('Error', 'No se pudo cargar el inventario del bolso.');
+      console.error("Error cargando inventario del bolso:", err);
+      Alert.alert("Error", "No se pudo cargar el inventario del bolso.");
     } finally {
       setCargandoInventario(false);
     }
@@ -249,9 +290,9 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   // ── Marcar items ──────────────────────────────────────────────────────────────
 
   function marcarItem(inventarioId, estado) {
-    setEstadoItems(prev => ({ ...prev, [inventarioId]: estado }));
-    if (estado !== 'FALTANTE') {
-      setObservaciones(prev => {
+    setEstadoItems((prev) => ({ ...prev, [inventarioId]: estado }));
+    if (estado !== "FALTANTE") {
+      setObservaciones((prev) => {
         const nuevo = { ...prev };
         delete nuevo[inventarioId];
         return nuevo;
@@ -262,55 +303,88 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   // ── Guardar checklist ─────────────────────────────────────────────────────────
 
   async function guardarChecklist() {
-    const sinMarcar = Object.values(estadoItems).filter(v => v === null).length;
+    const sinMarcar = Object.values(estadoItems).filter(
+      (v) => v === null,
+    ).length;
     if (sinMarcar > 0) {
-      Alert.alert('Items sin marcar', `Quedan ${sinMarcar} ítem(s) sin revisar.`);
+      Alert.alert(
+        "Items sin marcar",
+        `Quedan ${sinMarcar} ítem(s) sin revisar.`,
+      );
       return;
     }
 
-    const faltantesSinObs = Object.entries(estadoItems)
-      .filter(([id, v]) => v === 'FALTANTE' && !observaciones[id]?.trim());
+    const faltantesSinObs = Object.entries(estadoItems).filter(
+      ([id, v]) => v === "FALTANTE" && !observaciones[id]?.trim(),
+    );
     if (faltantesSinObs.length > 0) {
-      Alert.alert('Observación requerida', 'Los ítems FALTANTE necesitan una observación.');
+      Alert.alert(
+        "Observación requerida",
+        "Los ítems FALTANTE necesitan una observación.",
+      );
       return;
     }
 
     setGuardando(true);
     try {
-      const detalles = Object.entries(estadoItems).map(([inventarioId, controlado]) => ({
-        inventarioId,
-        controlado,
-        ...(controlado === 'FALTANTE' ? { observaciones: observaciones[inventarioId] } : {}),
-      }));
+      // Filtramos IDs temporales que romperían la BD porque no existen realmente
+      const detalles = Object.entries(estadoItems)
+        .filter(([inventarioId]) => !inventarioId.startsWith("temp-"))
+        .map(([inventarioId, controlado]) => ({
+          inventarioId,
+          controlado,
+          ...(controlado === "FALTANTE"
+            ? { observaciones: observaciones[inventarioId] }
+            : {}),
+        }));
 
-      const res = await fetch(`${API_BASE_URL}/checklist_bolsos/bolsos/guardar`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ bolsoId: bolsoActivo.id, detalles }),
-      });
+      const res = await fetch(
+        `${API_BASE_URL}/checklist_bolsos/bolsos/guardar`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ bolsoId: bolsoActivo.id, detalles }),
+        },
+      );
 
       if (!res.ok) throw new Error(`Error ${res.status}`);
 
-      const faltantes = Object.values(estadoItems).filter(v => v === 'FALTANTE').length;
+      const faltantes = Object.values(estadoItems).filter(
+        (v) => v === "FALTANTE",
+      ).length;
+
+      // RF-03: Emitir notificación para el panel del administrador
+      addNotification({
+        tipo: "CONTROL_BOLSO",
+        bomberoNombre: user?.bombero
+          ? `${user.bombero.nombre} ${user.bombero.apellido}`
+          : user?.nombre_usuario || "Bombero",
+        recursoNombre: bolsoActivo?.nombre_bolso || "Bolso de Emergencia",
+        tieneFaltantes: faltantes > 0,
+        cantidadFaltantes: faltantes,
+      });
 
       Alert.alert(
-        '✅ Checklist guardado',
+        "✅ Checklist guardado",
         faltantes > 0
           ? `Se registraron ${faltantes} ítem(s) faltante(s). Coordinar reposición.`
-          : 'Todo el bolso está completo y en condiciones.',
-        [{
-          text: 'OK', onPress: () => {
-            // Reseteamos para poder hacer otro bolso
-            setBolsoActivo(null);
-            setHerramientas([]);
-            setEstadoItems({});
-            setObservaciones({});
-          }
-        }]
+          : "Todo el bolso está completo y en condiciones.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Reseteamos para poder hacer otro bolso
+              setBolsoActivo(null);
+              setHerramientas([]);
+              setEstadoItems({});
+              setObservaciones({});
+            },
+          },
+        ],
       );
     } catch (err) {
-      console.error('Error guardando checklist de bolso:', err);
-      Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
+      console.error("Error guardando checklist de bolso:", err);
+      Alert.alert("Error", "No se pudo guardar. Intentá de nuevo.");
     } finally {
       setGuardando(false);
     }
@@ -319,8 +393,10 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   // ── Progreso ──────────────────────────────────────────────────────────────────
 
   const total = Object.keys(estadoItems).length;
-  const marcados = Object.values(estadoItems).filter(v => v !== null).length;
-  const faltantes = Object.values(estadoItems).filter(v => v === 'FALTANTE').length;
+  const marcados = Object.values(estadoItems).filter((v) => v !== null).length;
+  const faltantes = Object.values(estadoItems).filter(
+    (v) => v === "FALTANTE",
+  ).length;
   const progreso = total > 0 ? marcados / total : 0;
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -330,36 +406,55 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
       <StatusBar style="light" backgroundColor="#1a1c23" />
 
       {/* Header */}
-      <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
+      <View
+        style={[
+          styles.topBar,
+          { paddingTop: insets.top + (Platform.OS === "android" ? 20 : 10) },
+        ]}
+      >
         <View style={styles.topBarLeft}>
-          <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.iconBtn}>
+          <TouchableOpacity
+            onPress={() => navigation?.goBack()}
+            style={styles.iconBtn}
+          >
             <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
           </TouchableOpacity>
           <View>
             <Text style={styles.topBarTitle}>CHECKLIST DE BOLSOS</Text>
             {bolsoActivo && (
-              <Text style={styles.topBarSub}>{bolsoActivo.nombre_bolso?.toUpperCase()}</Text>
+              <Text style={styles.topBarSub}>
+                {bolsoActivo.nombre_bolso?.toUpperCase()}
+              </Text>
             )}
             {!bolsoActivo && modoAdmin && (
-              <Text style={[styles.topBarSub, { color: '#f59e0b' }]}>MODO ADMINISTRADOR</Text>
+              <Text style={[styles.topBarSub, { color: "#f59e0b" }]}>
+                MODO ADMINISTRADOR
+              </Text>
             )}
           </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8 }}>
           {bolsoActivo && (
-            <TouchableOpacity style={styles.iconBtn} onPress={() => setBolsoActivo(null)}>
-              <MaterialCommunityIcons name="swap-horizontal" size={20} color="#94a3b8" />
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => setBolsoActivo(null)}
+            >
+              <MaterialCommunityIcons
+                name="swap-horizontal"
+                size={20}
+                color="#94a3b8"
+              />
             </TouchableOpacity>
           )}
           {!bolsoActivo && (
             <TouchableOpacity
               style={[styles.iconBtn, modoAdmin && styles.iconBtnActive]}
-              onPress={() => setModoAdmin(v => !v)}
+              onPress={() => setModoAdmin((v) => !v)}
             >
               <MaterialCommunityIcons
-                name={modoAdmin ? 'cog' : 'cog-outline'}
+                name={modoAdmin ? "cog" : "cog-outline"}
                 size={20}
-                color={modoAdmin ? '#f59e0b' : '#94a3b8'}
+                color={modoAdmin ? "#f59e0b" : "#94a3b8"}
               />
             </TouchableOpacity>
           )}
@@ -370,8 +465,12 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 140 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refrescando} onRefresh={refrescar}
-            tintColor="#dc2626" colors={['#dc2626']} />
+          <RefreshControl
+            refreshing={refrescando}
+            onRefresh={refrescar}
+            tintColor="#dc2626"
+            colors={["#dc2626"]}
+          />
         }
       >
         {/* ── PASO 1: Selector / Administrador de bolso ──────────────────── */}
@@ -382,21 +481,38 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
               <>
                 {/* Encabezado modo admin */}
                 <View style={styles.adminHeaderBox}>
-                  <MaterialCommunityIcons name="shield-key-outline" size={28} color="#f59e0b" />
+                  <MaterialCommunityIcons
+                    name="shield-key-outline"
+                    size={28}
+                    color="#f59e0b"
+                  />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.adminHeaderTitulo}>GESTIÓN DE BOLSOS</Text>
-                    <Text style={styles.adminHeaderSub}>Creá, activá o desactivá los kits de emergencia</Text>
+                    <Text style={styles.adminHeaderTitulo}>
+                      GESTIÓN DE BOLSOS
+                    </Text>
+                    <Text style={styles.adminHeaderSub}>
+                      Creá, activá o desactivá los kits de emergencia
+                    </Text>
                   </View>
                 </View>
 
                 {/* Botón agregar nuevo bolso */}
                 <TouchableOpacity
                   style={styles.btnAgregarBolso}
-                  onPress={() => { setNuevoNombreBolso(''); setModalVisible(true); }}
+                  onPress={() => {
+                    setNuevoNombreBolso("");
+                    setModalVisible(true);
+                  }}
                   activeOpacity={0.8}
                 >
-                  <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#f59e0b" />
-                  <Text style={styles.btnAgregarBolsoText}>AGREGAR NUEVO BOLSO</Text>
+                  <MaterialCommunityIcons
+                    name="plus-circle-outline"
+                    size={20}
+                    color="#f59e0b"
+                  />
+                  <Text style={styles.btnAgregarBolsoText}>
+                    AGREGAR NUEVO BOLSO
+                  </Text>
                 </TouchableOpacity>
 
                 {cargandoBolsos && (
@@ -407,81 +523,147 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                 )}
 
                 {/* Listado completo para admin */}
-                {!cargandoBolsos && bolsos.map(bolso => {
-                  const activo = bolso.estado === 'ACTIVO';
-                  return (
-                    <View
-                      key={bolso.id}
-                      style={[
-                        styles.cardBolsoAdmin,
-                        { borderLeftColor: activo ? '#22c55e' : '#475569' },
-                      ]}
-                    >
-                      <View style={styles.cardBolsoAdminTop}>
-                        <View style={[
-                          styles.iconoBolsoBoxAdmin,
-                          { backgroundColor: activo ? '#172213' : '#1e2130' },
-                        ]}>
-                          <MaterialCommunityIcons
-                            name={getIconoBolso(bolso.nombre_bolso)}
-                            size={24}
-                            color={activo ? '#22c55e' : '#475569'}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.cardBolsoAdminNombre} numberOfLines={1}>
-                            {bolso.nombre_bolso?.toUpperCase()}
-                          </Text>
-                          <View style={styles.estadoBolsoAdminRow}>
-                            <View style={[styles.estadoPunto, { backgroundColor: activo ? '#22c55e' : '#475569' }]} />
-                            <Text style={[styles.estadoBolsoAdminText, { color: activo ? '#22c55e' : '#64748b' }]}>
-                              {activo ? 'OPERATIVO' : 'DESACTIVADO'}
+                {!cargandoBolsos &&
+                  bolsos.map((bolso) => {
+                    const activo = bolso.estado === "ACTIVO";
+                    return (
+                      <View
+                        key={bolso.id}
+                        style={[
+                          styles.cardBolsoAdmin,
+                          { borderLeftColor: activo ? "#22c55e" : "#475569" },
+                        ]}
+                      >
+                        <View style={styles.cardBolsoAdminTop}>
+                          <View
+                            style={[
+                              styles.iconoBolsoBoxAdmin,
+                              {
+                                backgroundColor: activo ? "#172213" : "#1e2130",
+                              },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              name={getIconoBolso(bolso.nombre_bolso)}
+                              size={24}
+                              color={activo ? "#22c55e" : "#475569"}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={styles.cardBolsoAdminNombre}
+                              numberOfLines={1}
+                            >
+                              {bolso.nombre_bolso?.toUpperCase()}
+                            </Text>
+                            <View style={styles.estadoBolsoAdminRow}>
+                              <View
+                                style={[
+                                  styles.estadoPunto,
+                                  {
+                                    backgroundColor: activo
+                                      ? "#22c55e"
+                                      : "#475569",
+                                  },
+                                ]}
+                              />
+                              <Text
+                                style={[
+                                  styles.estadoBolsoAdminText,
+                                  { color: activo ? "#22c55e" : "#64748b" },
+                                ]}
+                              >
+                                {activo ? "OPERATIVO" : "DESACTIVADO"}
+                              </Text>
+                            </View>
+                          </View>
+                          {/* Badge estado */}
+                          <View
+                            style={[
+                              styles.badgeEstadoAdmin,
+                              {
+                                backgroundColor: activo ? "#14532d" : "#1e293b",
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.badgeEstadoAdminText,
+                                { color: activo ? "#4ade80" : "#64748b" },
+                              ]}
+                            >
+                              {activo ? "ON" : "OFF"}
                             </Text>
                           </View>
                         </View>
-                        {/* Badge estado */}
-                        <View style={[styles.badgeEstadoAdmin, { backgroundColor: activo ? '#14532d' : '#1e293b' }]}>
-                          <Text style={[styles.badgeEstadoAdminText, { color: activo ? '#4ade80' : '#64748b' }]}>
-                            {activo ? 'ON' : 'OFF'}
-                          </Text>
+
+                        {/* Controles admin */}
+                        <View style={styles.controlesAdmin}>
+                          <TouchableOpacity
+                            style={[
+                              styles.btnAdminAccion,
+                              { borderColor: activo ? "#dc2626" : "#22c55e" },
+                            ]}
+                            onPress={() => toggleEstadoBolso(bolso)}
+                            activeOpacity={0.75}
+                          >
+                            <MaterialCommunityIcons
+                              name={
+                                activo
+                                  ? "toggle-switch-off-outline"
+                                  : "toggle-switch-outline"
+                              }
+                              size={14}
+                              color={activo ? "#f87171" : "#4ade80"}
+                            />
+                            <Text
+                              style={[
+                                styles.btnAdminAccionText,
+                                { color: activo ? "#f87171" : "#4ade80" },
+                              ]}
+                            >
+                              {activo ? "DESACTIVAR" : "ACTIVAR"}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.btnAdminAccion,
+                              { borderColor: "#7f1d1d" },
+                            ]}
+                            onPress={() => eliminarBolso(bolso)}
+                            activeOpacity={0.75}
+                          >
+                            <MaterialCommunityIcons
+                              name="trash-can-outline"
+                              size={14}
+                              color="#f87171"
+                            />
+                            <Text
+                              style={[
+                                styles.btnAdminAccionText,
+                                { color: "#f87171" },
+                              ]}
+                            >
+                              ELIMINAR
+                            </Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
-
-                      {/* Controles admin */}
-                      <View style={styles.controlesAdmin}>
-                        <TouchableOpacity
-                          style={[styles.btnAdminAccion, { borderColor: activo ? '#dc2626' : '#22c55e' }]}
-                          onPress={() => toggleEstadoBolso(bolso)}
-                          activeOpacity={0.75}
-                        >
-                          <MaterialCommunityIcons
-                            name={activo ? 'toggle-switch-off-outline' : 'toggle-switch-outline'}
-                            size={14}
-                            color={activo ? '#f87171' : '#4ade80'}
-                          />
-                          <Text style={[styles.btnAdminAccionText, { color: activo ? '#f87171' : '#4ade80' }]}>
-                            {activo ? 'DESACTIVAR' : 'ACTIVAR'}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.btnAdminAccion, { borderColor: '#7f1d1d' }]}
-                          onPress={() => eliminarBolso(bolso)}
-                          activeOpacity={0.75}
-                        >
-                          <MaterialCommunityIcons name="trash-can-outline" size={14} color="#f87171" />
-                          <Text style={[styles.btnAdminAccionText, { color: '#f87171' }]}>ELIMINAR</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })}
+                    );
+                  })}
               </>
             ) : (
               /* ── MODO NORMAL: selector de bolsos activos ────────────── */
               <>
                 <View style={styles.introBox}>
-                  <MaterialCommunityIcons name="bag-personal" size={32} color="#dc2626" />
-                  <Text style={styles.introTitulo}>¿Qué bolso vas a revisar?</Text>
+                  <MaterialCommunityIcons
+                    name="bag-personal"
+                    size={32}
+                    color="#dc2626"
+                  />
+                  <Text style={styles.introTitulo}>
+                    ¿Qué bolso vas a revisar?
+                  </Text>
                   <Text style={styles.introSub}>
                     Seleccioná el kit para registrar el control post-emergencia
                   </Text>
@@ -495,44 +677,63 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                 )}
 
                 {error && (
-                  <TouchableOpacity style={styles.errorCard} onPress={cargarBolsos}>
-                    <MaterialCommunityIcons name="wifi-off" size={16} color="#f87171" />
-                    <Text style={styles.errorText}>{error} Tocá para reintentar.</Text>
+                  <TouchableOpacity
+                    style={styles.errorCard}
+                    onPress={cargarBolsos}
+                  >
+                    <MaterialCommunityIcons
+                      name="wifi-off"
+                      size={16}
+                      color="#f87171"
+                    />
+                    <Text style={styles.errorText}>
+                      {error} Tocá para reintentar.
+                    </Text>
                   </TouchableOpacity>
                 )}
 
-                {!cargandoBolsos && !error && bolsos.filter(b => b.estado === 'ACTIVO').length === 0 && (
-                  <View style={styles.centrado}>
-                    <MaterialCommunityIcons name="bag-remove-outline" size={44} color="#334155" />
-                    <Text style={styles.textoEstado}>No hay bolsos activos registrados.</Text>
-                  </View>
-                )}
+                {!cargandoBolsos &&
+                  !error &&
+                  bolsos.filter((b) => b.estado === "ACTIVO").length === 0 && (
+                    <View style={styles.centrado}>
+                      <MaterialCommunityIcons
+                        name="bag-remove-outline"
+                        size={44}
+                        color="#334155"
+                      />
+                      <Text style={styles.textoEstado}>
+                        No hay bolsos activos registrados.
+                      </Text>
+                    </View>
+                  )}
 
                 {/* Grid de bolsos activos */}
                 <View style={styles.gridBolsos}>
-                  {bolsos.filter(b => b.estado === 'ACTIVO').map(bolso => (
-                    <TouchableOpacity
-                      key={bolso.id}
-                      style={styles.cardBolso}
-                      onPress={() => seleccionarBolso(bolso)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={styles.iconoBolsoBox}>
-                        <MaterialCommunityIcons
-                          name={getIconoBolso(bolso.nombre_bolso)}
-                          size={28}
-                          color="#dc2626"
-                        />
-                      </View>
-                      <Text style={styles.nombreBolso} numberOfLines={2}>
-                        {bolso.nombre_bolso?.toUpperCase()}
-                      </Text>
-                      <View style={styles.estadoBolsoRow}>
-                        <View style={styles.puntoverde} />
-                        <Text style={styles.estadoBolsoText}>ACTIVO</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  {bolsos
+                    .filter((b) => b.estado === "ACTIVO")
+                    .map((bolso) => (
+                      <TouchableOpacity
+                        key={bolso.id}
+                        style={styles.cardBolso}
+                        onPress={() => seleccionarBolso(bolso)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={styles.iconoBolsoBox}>
+                          <MaterialCommunityIcons
+                            name={getIconoBolso(bolso.nombre_bolso)}
+                            size={28}
+                            color="#dc2626"
+                          />
+                        </View>
+                        <Text style={styles.nombreBolso} numberOfLines={2}>
+                          {bolso.nombre_bolso?.toUpperCase()}
+                        </Text>
+                        <View style={styles.estadoBolsoRow}>
+                          <View style={styles.puntoverde} />
+                          <Text style={styles.estadoBolsoText}>ACTIVO</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
                 </View>
               </>
             )}
@@ -546,21 +747,27 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
             {total > 0 && (
               <View style={styles.progressBox}>
                 <View style={styles.progressRow}>
-                  <Text style={styles.progressLabel}>{marcados}/{total} revisados</Text>
+                  <Text style={styles.progressLabel}>
+                    {marcados}/{total} revisados
+                  </Text>
                   {faltantes > 0 && (
                     <View style={styles.badgeFaltantes}>
-                      <Text style={styles.badgeFaltantesText}>{faltantes} FALTANTE(S)</Text>
+                      <Text style={styles.badgeFaltantesText}>
+                        {faltantes} FALTANTE(S)
+                      </Text>
                     </View>
                   )}
                 </View>
                 <View style={styles.progressBar}>
-                  <View style={[
-                    styles.progressFill,
-                    {
-                      width: `${progreso * 100}%`,
-                      backgroundColor: faltantes > 0 ? '#f59e0b' : '#22c55e'
-                    }
-                  ]} />
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${progreso * 100}%`,
+                        backgroundColor: faltantes > 0 ? "#f59e0b" : "#22c55e",
+                      },
+                    ]}
+                  />
                 </View>
               </View>
             )}
@@ -574,21 +781,28 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
 
             {!cargandoInventario && herramientas.length === 0 && (
               <View style={styles.centrado}>
-                <MaterialCommunityIcons name="package-variant-remove" size={44} color="#334155" />
-                <Text style={styles.textoEstado}>Este bolso no tiene herramientas cargadas.</Text>
+                <MaterialCommunityIcons
+                  name="package-variant-remove"
+                  size={44}
+                  color="#334155"
+                />
+                <Text style={styles.textoEstado}>
+                  Este bolso no tiene herramientas cargadas.
+                </Text>
               </View>
             )}
 
             {/* Lista de herramientas */}
-            {herramientas.map(item => {
+            {herramientas.map((item) => {
               // El backend devuelve herramientaId como objeto con nombre_herramienta
-              const nombre = item.herramientaId?.nombre_herramienta
-                || item.herramienta
-                || 'Herramienta';
+              const nombre =
+                item.herramientaId?.nombre_herramienta ||
+                item.herramienta ||
+                "Herramienta";
               const cantidad = item.cantidad_herramienta ?? item.cantidad ?? 1;
               const estado = estadoItems[item.id] || null;
-              const esChequeado = estado === 'CHEQUEADO';
-              const esFaltante = estado === 'FALTANTE';
+              const esChequeado = estado === "CHEQUEADO";
+              const esFaltante = estado === "FALTANTE";
 
               return (
                 <View
@@ -604,14 +818,22 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                       <MaterialCommunityIcons
                         name={getIconoHerramienta(nombre)}
                         size={18}
-                        color={esFaltante ? '#fca5a5' : esChequeado ? '#86efac' : '#64748b'}
+                        color={
+                          esFaltante
+                            ? "#fca5a5"
+                            : esChequeado
+                              ? "#86efac"
+                              : "#64748b"
+                        }
                         style={{ marginRight: 10 }}
                       />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemNombre} numberOfLines={1}>
                           {nombre.toUpperCase()}
                         </Text>
-                        <Text style={styles.itemCantidad}>Cantidad: {cantidad}</Text>
+                        <Text style={styles.itemCantidad}>
+                          Cantidad: {cantidad}
+                        </Text>
                       </View>
                     </View>
 
@@ -621,8 +843,13 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                         style={styles.inputObservacion}
                         placeholder="¿Por qué falta? (requerido)"
                         placeholderTextColor="#6b2b2b"
-                        value={observaciones[item.id] || ''}
-                        onChangeText={t => setObservaciones(prev => ({ ...prev, [item.id]: t }))}
+                        value={observaciones[item.id] || ""}
+                        onChangeText={(t) =>
+                          setObservaciones((prev) => ({
+                            ...prev,
+                            [item.id]: t,
+                          }))
+                        }
                         multiline
                       />
                     )}
@@ -631,23 +858,33 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                   {/* Botones OK / FALTANTE */}
                   <View style={styles.botonesItem}>
                     <TouchableOpacity
-                      style={[styles.btnCheck, esChequeado && styles.btnCheckActivo]}
-                      onPress={() => marcarItem(item.id, esChequeado ? null : 'CHEQUEADO')}
+                      style={[
+                        styles.btnCheck,
+                        esChequeado && styles.btnCheckActivo,
+                      ]}
+                      onPress={() =>
+                        marcarItem(item.id, esChequeado ? null : "CHEQUEADO")
+                      }
                     >
                       <MaterialCommunityIcons
                         name="check"
                         size={18}
-                        color={esChequeado ? '#fff' : '#475569'}
+                        color={esChequeado ? "#fff" : "#475569"}
                       />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.btnFail, esFaltante && styles.btnFailActivo]}
-                      onPress={() => marcarItem(item.id, esFaltante ? null : 'FALTANTE')}
+                      style={[
+                        styles.btnFail,
+                        esFaltante && styles.btnFailActivo,
+                      ]}
+                      onPress={() =>
+                        marcarItem(item.id, esFaltante ? null : "FALTANTE")
+                      }
                     >
                       <MaterialCommunityIcons
                         name="close"
                         size={18}
-                        color={esFaltante ? '#fff' : '#475569'}
+                        color={esFaltante ? "#fff" : "#475569"}
                       />
                     </TouchableOpacity>
                   </View>
@@ -664,18 +901,23 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['#dc2626', '#991b1b']}
+                  colors={["#dc2626", "#991b1b"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.gradientGuardar}
                 >
-                  {guardando
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <>
-                      <MaterialCommunityIcons name="content-save-check" size={18} color="#fff" />
+                  {guardando ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons
+                        name="content-save-check"
+                        size={18}
+                        color="#fff"
+                      />
                       <Text style={styles.textoGuardar}>GUARDAR REVISIÓN</Text>
                     </>
-                  }
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -694,11 +936,16 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
           <View style={styles.modalContainer}>
             {/* Header del modal */}
             <View style={styles.modalHeader}>
-              <MaterialCommunityIcons name="bag-personal-outline" size={22} color="#f59e0b" />
+              <MaterialCommunityIcons
+                name="bag-personal-outline"
+                size={22}
+                color="#f59e0b"
+              />
               <Text style={styles.modalTitulo}>NUEVO BOLSO</Text>
             </View>
             <Text style={styles.modalSub}>
-              Ingresá el nombre del kit de emergencia. Quedará disponible de inmediato para los bomberos.
+              Ingresá el nombre del kit de emergencia. Quedará disponible de
+              inmediato para los bomberos.
             </Text>
 
             {/* Input nombre */}
@@ -727,13 +974,18 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
                 disabled={creando}
                 activeOpacity={0.8}
               >
-                {creando
-                  ? <ActivityIndicator size="small" color="#000" />
-                  : <>
-                    <MaterialCommunityIcons name="plus" size={16} color="#000" />
+                {creando ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons
+                      name="plus"
+                      size={16}
+                      color="#000"
+                    />
                     <Text style={styles.modalBtnCrearText}>CREAR BOLSO</Text>
                   </>
-                }
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -747,228 +999,413 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
 // Paleta oscura táctica, consistente con ChecklistScreen.js existente
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#16181d' },
+  container: { flex: 1, backgroundColor: "#16181d" },
 
   topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 16,
-    backgroundColor: '#1a1c23',
-    borderBottomWidth: 1, borderBottomColor: '#26282f',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: "#1a1c23",
+    borderBottomWidth: 1,
+    borderBottomColor: "#26282f",
   },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  topBarLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#334155",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  topBarTitle: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  topBarSub: { color: '#dc2626', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 1 },
+  topBarTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  topBarSub: {
+    color: "#dc2626",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1,
+    marginTop: 1,
+  },
 
   scrollContent: { padding: 20 },
 
   // Intro (selector de bolso)
   introBox: {
-    alignItems: 'center', paddingVertical: 28, gap: 8, marginBottom: 20,
+    alignItems: "center",
+    paddingVertical: 28,
+    gap: 8,
+    marginBottom: 20,
   },
   introTitulo: {
-    color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3,
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: -0.3,
   },
   introSub: {
-    color: '#64748b', fontSize: 12, fontWeight: '600',
-    textAlign: 'center', lineHeight: 18,
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+    lineHeight: 18,
   },
 
   // Grid de bolsos
-  gridBolsos: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gridBolsos: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   cardBolso: {
-    width: '47%', backgroundColor: '#1b1d24',
-    borderRadius: 8, padding: 16,
-    alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: '#26282f',
+    width: "47%",
+    backgroundColor: "#1b1d24",
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#26282f",
   },
   iconoBolsoBox: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: '#2d1515',
-    alignItems: 'center', justifyContent: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#2d1515",
+    alignItems: "center",
+    justifyContent: "center",
   },
   nombreBolso: {
-    color: '#e2e8f0', fontSize: 11, fontWeight: '800',
-    letterSpacing: 0.4, textAlign: 'center',
+    color: "#e2e8f0",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textAlign: "center",
   },
-  estadoBolsoRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  puntoverde: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' },
+  estadoBolsoRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  puntoverde: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22c55e",
+  },
   estadoBolsoText: {
-    color: '#22c55e', fontSize: 9, fontWeight: '800', letterSpacing: 0.6,
+    color: "#22c55e",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.6,
   },
 
   // Barra de progreso
   progressBox: { marginBottom: 20 },
   progressRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
   },
-  progressLabel: { color: '#64748b', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  progressLabel: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
   badgeFaltantes: {
-    backgroundColor: '#451a03', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4,
+    backgroundColor: "#451a03",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
   },
   badgeFaltantesText: {
-    color: '#fcd34d', fontSize: 9, fontWeight: '900', letterSpacing: 0.6,
+    color: "#fcd34d",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.6,
   },
   progressBar: {
-    height: 4, backgroundColor: '#26282f', borderRadius: 2, overflow: 'hidden',
+    height: 4,
+    backgroundColor: "#26282f",
+    borderRadius: 2,
+    overflow: "hidden",
   },
-  progressFill: { height: '100%', borderRadius: 2 },
+  progressFill: { height: "100%", borderRadius: 2 },
 
   // Cards de herramientas
   cardItem: {
-    backgroundColor: '#1b1d24', borderRadius: 4, padding: 14,
-    flexDirection: 'row', alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    backgroundColor: "#1b1d24",
+    borderRadius: 4,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     marginBottom: 10,
-    borderLeftWidth: 3, borderLeftColor: '#334155',
+    borderLeftWidth: 3,
+    borderLeftColor: "#334155",
   },
-  cardOk: { borderLeftColor: '#22c55e' },
-  cardFail: { borderLeftColor: '#dc2626', backgroundColor: '#1f1315' },
+  cardOk: { borderLeftColor: "#22c55e" },
+  cardFail: { borderLeftColor: "#dc2626", backgroundColor: "#1f1315" },
   cardItemLeft: { flex: 1, paddingRight: 10 },
-  itemIconRow: { flexDirection: 'row', alignItems: 'center' },
+  itemIconRow: { flexDirection: "row", alignItems: "center" },
   itemNombre: {
-    color: '#e2e8f0', fontSize: 12, fontWeight: '800',
-    letterSpacing: 0.4, marginBottom: 2,
+    color: "#e2e8f0",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    marginBottom: 2,
   },
-  itemCantidad: { color: '#475569', fontSize: 10, fontWeight: '600' },
+  itemCantidad: { color: "#475569", fontSize: 10, fontWeight: "600" },
 
   inputObservacion: {
     marginTop: 10,
-    backgroundColor: '#2d1515',
-    borderRadius: 4, padding: 10,
-    color: '#fca5a5', fontSize: 11, fontWeight: '600',
-    minHeight: 52, textAlignVertical: 'top',
+    backgroundColor: "#2d1515",
+    borderRadius: 4,
+    padding: 10,
+    color: "#fca5a5",
+    fontSize: 11,
+    fontWeight: "600",
+    minHeight: 52,
+    textAlignVertical: "top",
   },
 
-  botonesItem: { flexDirection: 'row', gap: 8 },
+  botonesItem: { flexDirection: "row", gap: 8 },
   btnCheck: {
-    width: 36, height: 36, borderRadius: 4,
-    backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 4,
+    backgroundColor: "#1e293b",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  btnCheckActivo: { backgroundColor: '#166534' },
+  btnCheckActivo: { backgroundColor: "#166534" },
   btnFail: {
-    width: 36, height: 36, borderRadius: 4,
-    backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 4,
+    backgroundColor: "#1e293b",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  btnFailActivo: { backgroundColor: '#dc2626' },
+  btnFailActivo: { backgroundColor: "#dc2626" },
 
   // Guardar
-  botonGuardar: { marginTop: 28, borderRadius: 4, overflow: 'hidden' },
+  botonGuardar: { marginTop: 28, borderRadius: 4, overflow: "hidden" },
   gradientGuardar: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 10, paddingVertical: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 18,
   },
   textoGuardar: {
-    color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 2,
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 2,
   },
 
   // Estados
-  centrado: { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  textoEstado: { color: '#475569', fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  errorCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#1f1315', borderRadius: 8, padding: 12,
-    borderLeftWidth: 3, borderLeftColor: '#dc2626', marginBottom: 12,
+  centrado: { alignItems: "center", paddingVertical: 40, gap: 10 },
+  textoEstado: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
-  errorText: { color: '#f87171', fontSize: 12, fontWeight: '600', flex: 1 },
+  errorCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#1f1315",
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "#dc2626",
+    marginBottom: 12,
+  },
+  errorText: { color: "#f87171", fontSize: 12, fontWeight: "600", flex: 1 },
 
   // ── Modo Admin ────────────────────────────────────────────────────────────────
-  iconBtnActive: { backgroundColor: '#451a03' },
+  iconBtnActive: { backgroundColor: "#451a03" },
 
   adminHeaderBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#1a1c23', borderRadius: 8, padding: 16,
-    borderWidth: 1, borderColor: '#451a03', marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#1a1c23",
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#451a03",
+    marginBottom: 14,
   },
   adminHeaderTitulo: {
-    color: '#f59e0b', fontSize: 12, fontWeight: '900', letterSpacing: 1.5,
+    color: "#f59e0b",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.5,
   },
   adminHeaderSub: {
-    color: '#78716c', fontSize: 10, fontWeight: '600', marginTop: 2,
+    color: "#78716c",
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2,
   },
 
   btnAgregarBolso: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, backgroundColor: '#1c1a10', borderRadius: 8,
-    borderWidth: 1, borderColor: '#78350f',
-    borderStyle: 'dashed', paddingVertical: 16, marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#1c1a10",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#78350f",
+    borderStyle: "dashed",
+    paddingVertical: 16,
+    marginBottom: 16,
   },
   btnAgregarBolsoText: {
-    color: '#f59e0b', fontSize: 12, fontWeight: '900', letterSpacing: 1.5,
+    color: "#f59e0b",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.5,
   },
 
   // Tarjeta admin
   cardBolsoAdmin: {
-    backgroundColor: '#1b1d24', borderRadius: 8, padding: 14,
-    borderLeftWidth: 3, marginBottom: 10,
+    backgroundColor: "#1b1d24",
+    borderRadius: 8,
+    padding: 14,
+    borderLeftWidth: 3,
+    marginBottom: 10,
   },
-  cardBolsoAdminTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  cardBolsoAdminTop: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconoBolsoBoxAdmin: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardBolsoAdminNombre: {
-    color: '#e2e8f0', fontSize: 12, fontWeight: '800', letterSpacing: 0.4,
+    color: "#e2e8f0",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.4,
   },
-  estadoBolsoAdminRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  estadoBolsoAdminRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
   estadoPunto: { width: 6, height: 6, borderRadius: 3 },
-  estadoBolsoAdminText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6 },
+  estadoBolsoAdminText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.6 },
   badgeEstadoAdmin: {
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  badgeEstadoAdminText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  badgeEstadoAdminText: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
 
   // Controles admin
   controlesAdmin: {
-    flexDirection: 'row', gap: 8, marginTop: 12,
-    paddingTop: 12, borderTopWidth: 1, borderTopColor: '#26282f',
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#26282f",
   },
   btnAdminAccion: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 8, borderRadius: 4,
-    borderWidth: 1, backgroundColor: '#0f1117',
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    backgroundColor: "#0f1117",
   },
-  btnAdminAccionText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  btnAdminAccionText: { fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
 
   // ── Modal crear bolso ─────────────────────────────────────────────────────────
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(10, 12, 18, 0.88)',
-    justifyContent: 'flex-end',
+    flex: 1,
+    backgroundColor: "rgba(10, 12, 18, 0.88)",
+    justifyContent: "flex-end",
   },
   modalContainer: {
-    backgroundColor: '#1a1c23', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: 24, paddingBottom: 40,
-    borderTopWidth: 1, borderColor: '#26282f',
+    backgroundColor: "#1a1c23",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+    borderTopWidth: 1,
+    borderColor: "#26282f",
   },
   modalHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
   },
   modalTitulo: {
-    color: '#f59e0b', fontSize: 14, fontWeight: '900', letterSpacing: 1.5,
+    color: "#f59e0b",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 1.5,
   },
   modalSub: {
-    color: '#64748b', fontSize: 12, fontWeight: '500', lineHeight: 18,
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
     marginBottom: 20,
   },
   modalInput: {
-    backgroundColor: '#12141a', borderRadius: 8, padding: 14,
-    color: '#e2e8f0', fontSize: 13, fontWeight: '600',
-    borderWidth: 1, borderColor: '#334155', marginBottom: 20,
+    backgroundColor: "#12141a",
+    borderRadius: 8,
+    padding: 14,
+    color: "#e2e8f0",
+    fontSize: 13,
+    fontWeight: "600",
+    borderWidth: 1,
+    borderColor: "#334155",
+    marginBottom: 20,
   },
-  modalBotones: { flexDirection: 'row', gap: 10 },
+  modalBotones: { flexDirection: "row", gap: 10 },
   modalBtnCancelar: {
-    flex: 1, paddingVertical: 14, borderRadius: 8,
-    borderWidth: 1, borderColor: '#334155', alignItems: 'center',
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#334155",
+    alignItems: "center",
   },
-  modalBtnCancelarText: { color: '#64748b', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  modalBtnCancelarText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
   modalBtnCrear: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14, borderRadius: 8,
-    backgroundColor: '#f59e0b',
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: "#f59e0b",
   },
-  modalBtnCrearText: { color: '#000', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  modalBtnCrearText: {
+    color: "#000",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
 });

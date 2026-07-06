@@ -14,13 +14,16 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
-  TextInput
+  TextInput,
+  KeyboardAvoidingView,
+  SafeAreaView
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import { styles } from '../styles/AlertDetailScreenStyles';
+import { sendSupplyRequestAlert } from '../services/notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -290,6 +293,7 @@ export default function AlertDetailScreen({ route, navigation }) {
   // Modal Solicitar Recursos
   const [modalVisible, setModalVisible] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [manualRequestText, setManualRequestText] = useState('');
 
   const fetchDetail = useCallback(async () => {
     if (!alertaId) {
@@ -646,8 +650,19 @@ export default function AlertDetailScreen({ route, navigation }) {
               // Always write local override
               await AsyncStorage.setItem(`finalized_alert_${alertaId}`, 'true');
 
-              Alert.alert("Éxito", "La emergencia ha sido finalizada.");
-              fetchDetail();
+              Alert.alert("Éxito", "La emergencia ha sido finalizada.", [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    // RF-02: Redirigir al dashboard tras finalizar emergencia
+                    if (rol === 'ADMIN') {
+                      navigation.navigate('AdminApp', { screen: 'Panel' });
+                    } else {
+                      fetchDetail();
+                    }
+                  }
+                }
+              ]);
             } catch (e) {
               Alert.alert("Error", e.message);
             } finally {
@@ -977,8 +992,10 @@ export default function AlertDetailScreen({ route, navigation }) {
 
       {/* Modal Solicitar Recursos */}
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' }}>
+            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>SOLICITAR RECURSOS</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -1018,9 +1035,37 @@ export default function AlertDetailScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
 
+            {/* Pedido Manual */}
+            <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: '#26282f', paddingTop: 16 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '700', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>Pedido Manual / Aclaraciones</Text>
+              <TextInput
+                style={{ backgroundColor: '#26282f', borderRadius: 8, padding: 12, color: '#fff', fontSize: 13, minHeight: 60, textAlignVertical: 'top', borderWidth: 1, borderColor: '#334155' }}
+                placeholder="Ingrese elementos no predefinidos..."
+                placeholderTextColor="#64748b"
+                multiline
+                value={manualRequestText}
+                onChangeText={setManualRequestText}
+              />
+              <TouchableOpacity
+                style={{ marginTop: 10, backgroundColor: '#dc2626', borderRadius: 8, paddingVertical: 12, alignItems: 'center', opacity: manualRequestText.trim() ? 1 : 0.6 }}
+                disabled={!manualRequestText.trim()}
+                onPress={() => {
+                  if (manualRequestText.trim()) {
+                    requestResource(`PEDIDO MANUAL: ${manualRequestText.trim()}`, 'SUMINISTROS');
+                    sendSupplyRequestAlert(manualRequestText.trim());
+                    setManualRequestText('');
+                  }
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>ENVIAR PEDIDO MANUAL</Text>
+              </TouchableOpacity>
+            </View>
+
             {requesting && <ActivityIndicator color="#e11d48" style={{ marginTop: 20 }} />}
           </View>
-        </View>
+            </ScrollView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
       </Modal>
 
     </View>

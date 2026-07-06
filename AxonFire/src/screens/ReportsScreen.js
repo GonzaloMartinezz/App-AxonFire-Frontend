@@ -95,7 +95,8 @@ export default function ReportsScreen({ navigation }) {
           headers,
           timeout: 5000
         });
-        alertsData = resAlerts.data?.alertas || [];
+        const data = resAlerts.data;
+        alertsData = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
       } catch (err) {
         console.log('Error loading range alerts for reports:', err?.message || err);
       }

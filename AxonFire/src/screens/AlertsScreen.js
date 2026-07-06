@@ -189,7 +189,13 @@ export default function AlertsScreen({ navigation, route }) {
           )}
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => navigation?.navigate('MainApp')}
+            onPress={() => {
+              if (isCurrentlyAdmin) {
+                navigation?.navigate('Panel');
+              } else {
+                navigation?.navigate('Mapa');
+              }
+            }}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="home" size={20} color="#94a3b8" />

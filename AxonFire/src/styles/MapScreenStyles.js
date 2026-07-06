@@ -310,9 +310,6 @@ export const styles = StyleSheet.create({
 
     // ── F1: Banner alertas ──────────────────────────────────────────────────────
     bannerAlertas: {
-        position: 'absolute',
-        left: 16,
-        right: 70,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
@@ -320,6 +317,7 @@ export const styles = StyleSheet.create({
         borderRadius: 14,
         paddingHorizontal: 14,
         paddingVertical: 9,
+        marginBottom: 8,
         zIndex: 20,
         ...Platform.select({
             ios: {
