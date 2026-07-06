@@ -1685,6 +1685,24 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             )}
           </>
         )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* TAB: FLUIDOS CAMIONES                                          */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'fluidos_camion' && (
+          <View style={{ flex: 1, minHeight: 600 }}>
+            <ControlFluidosScreen navigation={navigation} isEmbedded={true} />
+          </View>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* TAB: FLUIDOS HERRAMIENTAS                                      */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'fluidos_herr' && (
+          <View style={{ flex: 1, minHeight: 600 }}>
+            <MantenimientoHidraulicoScreen navigation={navigation} isEmbedded={true} />
+          </View>
+        )}
       </ScrollView>
 
       {/* Modal de Auditoría */}

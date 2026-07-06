@@ -22,7 +22,7 @@ import { styles } from '../styles/ControlFluidosScreenStyles';
 
 const FLUID_OPTIONS = ['OK', 'BAJO', 'CRITICO'];
 
-export default function ControlFluidosScreen({ navigation }) {
+export default function ControlFluidosScreen({ navigation, isEmbedded = false }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
 
@@ -137,28 +137,30 @@ export default function ControlFluidosScreen({ navigation }) {
     );
   };
 
+  const Container = isEmbedded ? View : SafeAreaView;
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#1a1c23" />
-
-      {/* Top Bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
-        <View style={styles.topBarLeft}>
-          <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.topBarTitle}>CONTROL DE FLUIDOS</Text>
-        </View>
-        <TouchableOpacity onPress={() => navigation?.goBack()}>
-          <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
-        </TouchableOpacity>
-      </View>
-
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+    <View style={{ flex: 1, backgroundColor: '#0f172a' }}>
+      <Container style={[styles.container, isEmbedded && { flex: 1, backgroundColor: 'transparent' }]}>
+        {!isEmbedded && <StatusBar style="light" />}
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
+          {/* Header */}
+          {!isEmbedded && (
+            <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
+              <View style={styles.topBarLeft}>
+                <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
+                  <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
+                </TouchableOpacity>
+                <Text style={styles.topBarTitle}>CONTROL DE FLUIDOS</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation?.goBack()}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {cargandoCamiones ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#dc2626" />
@@ -168,7 +170,7 @@ export default function ControlFluidosScreen({ navigation }) {
             </View>
           ) : (
             <ScrollView
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+              contentContainerStyle={[styles.scrollContent, { paddingBottom: isEmbedded ? 40 : insets.bottom + 40 }]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
@@ -340,7 +342,7 @@ export default function ControlFluidosScreen({ navigation }) {
             </ScrollView>
           )}
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </Container>
     </View>
   );
 }
