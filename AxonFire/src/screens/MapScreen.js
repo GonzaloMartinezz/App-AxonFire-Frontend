@@ -973,6 +973,20 @@ export default function MapScreen({ navigation, route }) {
           </View>
         </View>
 
+        {/* ── F1: Banner alertas activas ────────────────────────────────────── */}
+        {mapaListo && alertasActivas > 0 && (
+          <TouchableOpacity 
+            style={styles.bannerAlertas}
+            onPress={() => navigation.navigate('AdminAlerts')}
+            activeOpacity={0.8}
+          >
+            <Animated.View style={[styles.puntoPulso, { opacity: bannerPulseAnim }]} />
+            <Text style={styles.bannerTexto}>
+              {alertasActivas} {alertasActivas === 1 ? 'alerta activa' : 'alertas activas'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {incidente && (
           <View style={styles.missionCard}>
             <View style={styles.missionLeft}>
@@ -1115,15 +1129,7 @@ export default function MapScreen({ navigation, route }) {
         </TouchableOpacity>
       )}
 
-      {/* ── F1: Banner alertas activas ────────────────────────────────────── */}
-      {mapaListo && alertasActivas > 0 && (
-        <View style={[styles.bannerAlertas, { top: insets.top + 14 }]}>
-          <Animated.View style={[styles.puntoPulso, { opacity: bannerPulseAnim }]} />
-          <Text style={styles.bannerTexto}>
-            {alertasActivas} {alertasActivas === 1 ? 'alerta activa' : 'alertas activas'}
-          </Text>
-        </View>
-      )}
+
 
       {/* ── F1: Pantalla de Carga y Error (Bloqueante) ─────────────────────────── */}
       {(cargando || !mapaListo || error) && (

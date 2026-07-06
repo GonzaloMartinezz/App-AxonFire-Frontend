@@ -589,36 +589,6 @@ export default function PanelControlScreen({ navigation }) {
                 <Text style={styles.gridItemTitle}>Pedidos Suministro</Text>
                 <Text style={styles.gridItemSub}>Solicitud de insumos</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('ControlFluidos')}
-                style={[styles.gridItem, actionCardStyle]}
-              >
-                <View style={styles.gridItemHeader}>
-                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(56, 189, 248, 0.12)' }]}>
-                    <MaterialCommunityIcons name="water-pump" size={18} color="#38bdf8" />
-                  </View>
-                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
-                </View>
-                <Text style={styles.gridItemTitle}>Control de Fluidos</Text>
-                <Text style={styles.gridItemSub}>Niveles de vehículos</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('MantenimientoHidraulico')}
-                style={[styles.gridItem, actionCardStyle]}
-              >
-                <View style={styles.gridItemHeader}>
-                  <View style={[styles.gridIconBg, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
-                    <MaterialCommunityIcons name="wrench-clock" size={18} color="#ef4444" />
-                  </View>
-                  <MaterialCommunityIcons name="chevron-right" size={16} color="#475569" />
-                </View>
-                <Text style={styles.gridItemTitle}>Mantenimiento Hidráulico</Text>
-                <Text style={styles.gridItemSub}>Control de herramientas</Text>
-              </TouchableOpacity>
                 </View>
 
                 <Text style={styles.gridSectionTitle}>Informes y Estadísticas</Text>
@@ -661,8 +631,6 @@ export default function PanelControlScreen({ navigation }) {
                 </View>
               ) : null}
             </View>
-
-            {!isDesktopWeb ? renderRecentActivity() : null}
 
             {/* ── Administración secundaria ────────────────────────────── */}
             {/* RF-04: Solo visible para usuarios ADMIN */}
@@ -708,6 +676,8 @@ export default function PanelControlScreen({ navigation }) {
                 </TouchableOpacity>
               </>
             )}
+
+            {!isDesktopWeb ? renderRecentActivity() : null}
           </>
         )}
       </ScrollView>
@@ -765,10 +735,12 @@ export default function PanelControlScreen({ navigation }) {
                   const tipoLabel =
                     n.tipo === 'CONTROL_DIARIO' ? 'Control Diario' :
                     n.tipo === 'CONTROL_BOLSO' ? 'Control Post-Emergencia' :
+                    n.tipo === 'PEDIDO_SUMINISTRO' ? 'Pedido de Suministro' :
                     n.tipo === 'CONTROL_CUARTEL' ? 'Inventario de Base' : 'Control';
                   const tipoIcon =
                     n.tipo === 'CONTROL_DIARIO' ? 'clipboard-check-outline' :
                     n.tipo === 'CONTROL_BOLSO' ? 'bag-personal-outline' :
+                    n.tipo === 'PEDIDO_SUMINISTRO' ? 'truck-delivery-outline' :
                     'package-variant-closed';
                   const fecha = n.fechaHora ? new Date(n.fechaHora) : new Date();
                   const horaText = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -806,7 +778,12 @@ export default function PanelControlScreen({ navigation }) {
                         {n.recursoNombre && (
                           <Text style={notifStyles.itemRecurso}>{n.recursoNombre}</Text>
                         )}
-                        {isFaltante && (
+                        {n.mensaje && (
+                          <Text style={[notifStyles.itemRecurso, { color: '#94a3b8', fontStyle: 'italic', marginTop: 2 }]} numberOfLines={3}>
+                            {n.mensaje}
+                          </Text>
+                        )}
+                        {isFaltante && n.cantidadFaltantes > 0 && (
                           <View style={notifStyles.faltanteBadge}>
                             <MaterialCommunityIcons name="alert" size={11} color="#fbbf24" />
                             <Text style={notifStyles.faltanteText}>
@@ -851,17 +828,21 @@ const notifStyles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-start',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   panel: {
     backgroundColor: '#16181d',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    maxHeight: '80%',
+    borderRadius: 18,
+    maxHeight: '70%',
     borderWidth: 1,
     borderColor: '#26282f',
-    borderBottomWidth: 0,
+    marginHorizontal: 16,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
+      android: { elevation: 15 },
+    }),
   },
   header: {
     flexDirection: 'row',

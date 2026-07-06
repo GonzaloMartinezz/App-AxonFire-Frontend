@@ -20,3 +20,14 @@ const handleEmergency = () => {
   sendEmergencyAlert();
 };
 */
+
+export async function sendSupplyRequestAlert(message) {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "PEDIDO DE SUMINISTRO",
+      body: message || "Se ha recibido un nuevo pedido de suministro.",
+      priority: Notifications.AndroidNotificationPriority.DEFAULT,
+    },
+    trigger: null,
+  });
+}

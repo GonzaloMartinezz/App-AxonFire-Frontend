@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -20,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import { styles } from '../styles/MantenimientoHidraulicoScreenStyles';
 
-export default function MantenimientoHidraulicoScreen({ navigation }) {
+export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded = false }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
 
@@ -36,6 +37,11 @@ export default function MantenimientoHidraulicoScreen({ navigation }) {
   const [estadoLimpieza, setEstadoLimpieza] = useState(null);
   const [observaciones, setObservaciones] = useState('');
   const [guardando, setGuardando] = useState(false);
+
+  // Estados ABM
+  const [abmModalVisible, setAbmModalVisible] = useState(false);
+  const [nuevaHerramientaNombre, setNuevaHerramientaNombre] = useState('');
+  const [guardandoABM, setGuardandoABM] = useState(false);
 
   useEffect(() => {
     cargarHerramientas();
@@ -69,6 +75,48 @@ export default function MantenimientoHidraulicoScreen({ navigation }) {
     } finally {
       setCargandoHerramientas(false);
     }
+  };
+
+  const handleGuardarNuevaHerramienta = async () => {
+    if (!nuevaHerramientaNombre.trim()) {
+      Alert.alert('Atención', 'Ingrese un nombre válido para la herramienta.');
+      return;
+    }
+    setGuardandoABM(true);
+    try {
+      await axios.post(`${API_BASE_URL}/herramientas`, {
+        nombre_herramienta: nuevaHerramientaNombre.trim(),
+        descripcion: 'Herramienta Hidráulica'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNuevaHerramientaNombre('');
+      Alert.alert('Éxito', 'Herramienta agregada correctamente.');
+      cargarHerramientas(); // recargar
+    } catch (err) {
+      console.error('Error agregando herramienta:', err);
+      Alert.alert('Error', 'No se pudo agregar la herramienta.');
+    } finally {
+      setGuardandoABM(false);
+    }
+  };
+
+  const handleEliminarHerramienta = (id) => {
+    Alert.alert('Eliminar Herramienta', '¿Estás seguro que deseas eliminar esta herramienta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: async () => {
+        try {
+          await axios.delete(`${API_BASE_URL}/herramientas/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (herramientaSeleccionada?.id === id) setHerramientaSeleccionada(null);
+          cargarHerramientas();
+        } catch (err) {
+          console.error('Error eliminando herramienta:', err);
+          Alert.alert('Error', 'No se pudo eliminar la herramienta.');
+        }
+      }}
+    ]);
   };
 
   const guardarMantenimiento = async () => {
@@ -132,24 +180,24 @@ export default function MantenimientoHidraulicoScreen({ navigation }) {
     );
   };
 
+  const Container = isEmbedded ? View : SafeAreaView;
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#1a1c23" />
-
-      {/* Top Bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
-        <View style={styles.topBarLeft}>
-          <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.topBarTitle}>MANTENIMIENTO HERRAMIENTAS</Text>
-        </View>
-        <TouchableOpacity onPress={() => navigation?.goBack()}>
-          <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
-        </TouchableOpacity>
-      </View>
-
-      <SafeAreaView style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#0f172a' }}>
+      <Container style={[styles.container, isEmbedded && { flex: 1, backgroundColor: 'transparent' }]}>
+        {!isEmbedded && <StatusBar style="light" />}
+        {!isEmbedded && (
+          <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
+            <View style={styles.topBarLeft}>
+              <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
+                <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.topBarTitle}>MANTENIMIENTO HERRAMIENTAS</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation?.goBack()}>
+              <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
+        )}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
@@ -163,14 +211,20 @@ export default function MantenimientoHidraulicoScreen({ navigation }) {
             </View>
           ) : (
             <ScrollView
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+              contentContainerStyle={[styles.scrollContent, { paddingBottom: isEmbedded ? 40 : insets.bottom + 40 }]}
               showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.formContainer}>
                 {/* Selector de Herramienta */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Herramienta Hidráulica</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.label}>Herramienta Hidráulica</Text>
+                    <TouchableOpacity onPress={() => setAbmModalVisible(true)}>
+                      <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700' }}>GESTIONAR</Text>
+                    </TouchableOpacity>
+                  </View>
                   <TouchableOpacity
                     style={styles.dropdownWrapper}
                     onPress={() => setShowPicker(!showPicker)}
@@ -296,10 +350,63 @@ export default function MantenimientoHidraulicoScreen({ navigation }) {
                   </View>
                 )}
               </View>
+
+              {/* Modal ABM */}
+              <Modal visible={abmModalVisible} transparent animationType="slide" onRequestClose={() => setAbmModalVisible(false)}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                  <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 }}>
+                    <View style={{ backgroundColor: '#1e293b', borderRadius: 12, padding: 20, borderWidth: 1, borderColor: '#334155' }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>GESTIONAR HERRAMIENTAS</Text>
+                        <TouchableOpacity onPress={() => setAbmModalVisible(false)}>
+                          <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+                        </TouchableOpacity>
+                      </View>
+                      
+                      <View style={{ marginBottom: 20 }}>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 8, fontWeight: '600' }}>AGREGAR NUEVA</Text>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <TextInput
+                            style={{ flex: 1, backgroundColor: '#0f172a', color: '#fff', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155' }}
+                            placeholder="Nombre de la herramienta..."
+                            placeholderTextColor="#64748b"
+                            value={nuevaHerramientaNombre}
+                            onChangeText={setNuevaHerramientaNombre}
+                          />
+                          <TouchableOpacity 
+                            style={{ backgroundColor: '#dc2626', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 8 }}
+                            onPress={handleGuardarNuevaHerramienta}
+                            disabled={guardandoABM}
+                          >
+                            {guardandoABM ? <ActivityIndicator size="small" color="#fff" /> : <MaterialCommunityIcons name="plus" size={24} color="#fff" />}
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      <Text style={{ color: '#94a3b8', fontSize: 12, marginBottom: 8, fontWeight: '600' }}>HERRAMIENTAS EXISTENTES</Text>
+                      <ScrollView style={{ maxHeight: 300 }}>
+                        {herramientas.length === 0 ? (
+                           <Text style={{ color: '#64748b', fontSize: 13, textAlign: 'center', marginTop: 20 }}>No hay herramientas.</Text>
+                        ) : (
+                          herramientas.map(herr => (
+                            <View key={herr.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#0f172a', borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#334155' }}>
+                              <Text style={{ color: '#e2e8f0', fontSize: 14, flex: 1 }}>{herr.nombre_herramienta}</Text>
+                              <TouchableOpacity onPress={() => handleEliminarHerramienta(herr.id)}>
+                                <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ef4444" />
+                              </TouchableOpacity>
+                            </View>
+                          ))
+                        )}
+                      </ScrollView>
+                    </View>
+                  </View>
+                </KeyboardAvoidingView>
+              </Modal>
+
             </ScrollView>
           )}
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </Container>
     </View>
   );
 }
