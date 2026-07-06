@@ -22,6 +22,8 @@ import { useAuth } from '../context/AuthContext';
 import SelectorBomberos from '../components/SelectorBomberos';
 import { useNotifications } from '../context/NotificationContext';
 import { styles } from '../styles/WeeklyChecklistScreenStyles';
+import ControlFluidosScreen from './ControlFluidosScreen';
+import MantenimientoHidraulicoScreen from './MantenimientoHidraulicoScreen';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -204,6 +206,9 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
   // Modal de auditoría del último chequeo
   const [ultimoCheckModalVisible, setUltimoCheckModalVisible] = useState(false);
   const [ultimoCheckSeleccionado, setUltimoCheckSeleccionado] = useState(null);
+
+  // Estado para colapsar/desplegar inventario base
+  const [baseInventoryExpanded, setBaseInventoryExpanded] = useState(false);
 
   // ── Load data on mount ──────────────────────────────────────────────────
 
@@ -901,20 +906,30 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Tab Switcher — 3 tabs */}
+        {/* Tab Switcher — 5 tabs en ScrollView */}
         <View style={styles.tabRow}>
-          <TouchableOpacity style={[styles.tab, activeTab === 'inventario' && styles.tabActive]} onPress={() => setActiveTab('inventario')}>
-            <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={activeTab === 'inventario' ? '#fff' : '#64748b'} />
-            <Text style={[styles.tabText, activeTab === 'inventario' && styles.tabTextActive]}>INVENTARIO</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, activeTab === 'mantenimiento' && styles.tabActive]} onPress={() => setActiveTab('mantenimiento')}>
-            <MaterialCommunityIcons name="wrench-clock" size={14} color={activeTab === 'mantenimiento' ? '#fff' : '#64748b'} />
-            <Text style={[styles.tabText, activeTab === 'mantenimiento' && styles.tabTextActive]}>MANTEN.</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, activeTab === 'diario' && styles.tabActive]} onPress={() => setActiveTab('diario')}>
-            <MaterialCommunityIcons name="fire-truck" size={14} color={activeTab === 'diario' ? '#fff' : '#64748b'} />
-            <Text style={[styles.tabText, activeTab === 'diario' && styles.tabTextActive]}>DIARIO</Text>
-          </TouchableOpacity>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4, gap: 4 }}>
+            <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'inventario' && styles.tabActive]} onPress={() => setActiveTab('inventario')}>
+              <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={activeTab === 'inventario' ? '#fff' : '#64748b'} />
+              <Text style={[styles.tabText, activeTab === 'inventario' && styles.tabTextActive]}>INVENTARIO</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'mantenimiento' && styles.tabActive]} onPress={() => setActiveTab('mantenimiento')}>
+              <MaterialCommunityIcons name="wrench-clock" size={14} color={activeTab === 'mantenimiento' ? '#fff' : '#64748b'} />
+              <Text style={[styles.tabText, activeTab === 'mantenimiento' && styles.tabTextActive]}>MANTEN.</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'diario' && styles.tabActive]} onPress={() => setActiveTab('diario')}>
+              <MaterialCommunityIcons name="fire-truck" size={14} color={activeTab === 'diario' ? '#fff' : '#64748b'} />
+              <Text style={[styles.tabText, activeTab === 'diario' && styles.tabTextActive]}>DIARIO</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'fluidos_camion' && styles.tabActive]} onPress={() => setActiveTab('fluidos_camion')}>
+              <MaterialCommunityIcons name="water-pump" size={14} color={activeTab === 'fluidos_camion' ? '#fff' : '#64748b'} />
+              <Text style={[styles.tabText, activeTab === 'fluidos_camion' && styles.tabTextActive]}>FL. CAMIONES</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'fluidos_herr' && styles.tabActive]} onPress={() => setActiveTab('fluidos_herr')}>
+              <MaterialCommunityIcons name="water-boiler" size={14} color={activeTab === 'fluidos_herr' ? '#fff' : '#64748b'} />
+              <Text style={[styles.tabText, activeTab === 'fluidos_herr' && styles.tabTextActive]}>FL. HERRAM.</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -1051,75 +1066,37 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             {/* Inventory Progress Bar & Tools List & Save Button (Hidden if controlled today and not forcing edit) */}
             {showBaseInventoryList && (
               <>
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressHeader}>
-                    <Text style={styles.progressLabel}>PROGRESO DE INVENTARIO</Text>
-                    <Text style={styles.progressValue}>{checkedInvItems}/{totalInvItems} ({progressPercent}%)</Text>
-                  </View>
-                  <View style={styles.progressBarBg}>
-                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-                  </View>
-                </View>
-
-                {/* Tools List */}
-                {herramientas.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                    <MaterialCommunityIcons name="package-variant" size={48} color="#334155" />
-                    <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, fontWeight: '600' }}>
-                      No hay herramientas registradas en el cuartel.
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setBaseInventoryExpanded(!baseInventoryExpanded)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: '#1b1d24',
+                    padding: 16,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#26282f',
+                    marginTop: 16,
+                    marginBottom: baseInventoryExpanded ? 16 : 0,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#dc2626" />
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
+                      REALIZAR CHECKEO DE INVENTARIO BASE
                     </Text>
                   </View>
-                ) : (
+                  <MaterialCommunityIcons
+                    name={baseInventoryExpanded ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color="#94a3b8"
+                  />
+                </TouchableOpacity>
+
+                {baseInventoryExpanded && (
                   <>
-                    <View style={styles.sectionHeader}>
-                      <MaterialCommunityIcons name="package-variant-closed" size={18} color="#dc2626" />
-                      <Text style={styles.sectionTitle}>EQUIPOS E INVENTARIO DE LA BASE</Text>
-                      <View style={styles.sectionLine} />
-                    </View>
-
-                    {herramientas.map((tool) => {
-                      const data = inventoryItems[tool.id] || { status: null, justification: '' };
-                      const iconName = getToolIcon(tool.nombre_herramienta);
-                      return (
-                        <View key={tool.id}>
-                          <View style={[
-                            styles.cardItem,
-                            data.status === 'ok' && { borderLeftColor: '#22c55e' },
-                            data.status === 'fail' && { borderLeftColor: '#dc2626' },
-                          ]}>
-                            <View style={styles.cardItemLeft}>
-                              <View style={styles.toolRow}>
-                                <View style={styles.toolIconCircle}>
-                                  <MaterialCommunityIcons name={iconName} size={16} color="#fca5a5" />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.itemTitle}>{(tool.nombre_herramienta || '').toUpperCase()}</Text>
-                                  <Text style={styles.itemSubtitle}>Stock disponible: {tool.cantidad_disponible ?? 0} uds</Text>
-                                </View>
-                              </View>
-                            </View>
-                            <View style={styles.actionButtons}>
-                              <TouchableOpacity
-                                style={[styles.iconButton, data.status === 'ok' && styles.iconButtonActive]}
-                                onPress={() => setInventoryStatus(tool.id, 'ok')}
-                              >
-                                <MaterialCommunityIcons name="check" size={18} color={data.status === 'ok' ? '#fff' : '#e2e8f0'} />
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={[styles.iconButton, data.status === 'fail' && styles.iconButtonFail]}
-                                onPress={() => setInventoryStatus(tool.id, 'fail')}
-                              >
-                                <MaterialCommunityIcons name="close" size={18} color={data.status === 'fail' ? '#fff' : '#e2e8f0'} />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-
-                          {/* Damage report field (mandatory justification) */}
-                          <DamageReportField
-                            visible={data.status === 'fail'}
-                            justification={data.justification}
-                            onJustificationChange={(text) => updateInventoryJustification(tool.id, text)}
-                            theme="dark"
                           />
                         </View>
                       );

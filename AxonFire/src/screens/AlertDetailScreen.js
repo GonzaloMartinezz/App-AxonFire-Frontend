@@ -15,7 +15,8 @@ import {
   Modal,
   Alert,
   TextInput,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  SafeAreaView
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -992,7 +993,8 @@ export default function AlertDetailScreen({ route, navigation }) {
       {/* Modal Solicitar Recursos */}
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={styles.modalOverlay}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' }}>
+            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>SOLICITAR RECURSOS</Text>
@@ -1061,7 +1063,8 @@ export default function AlertDetailScreen({ route, navigation }) {
 
             {requesting && <ActivityIndicator color="#e11d48" style={{ marginTop: 20 }} />}
           </View>
-        </View>
+            </ScrollView>
+          </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
 
