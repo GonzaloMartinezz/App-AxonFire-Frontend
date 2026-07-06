@@ -189,4 +189,64 @@ export const styles = StyleSheet.create({
         fontWeight: '900',
         letterSpacing: 0.8,
     },
+    // Historial
+    historyContainer: {
+        marginTop: 24,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#26282f',
+    },
+    historyTitle: {
+        color: '#f8fafc',
+        fontSize: 12,
+        fontWeight: '800',
+        marginBottom: 12,
+        letterSpacing: 0.5,
+    },
+    historyCard: {
+        backgroundColor: '#26282f',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#334155',
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    historyDate: {
+        color: '#94a3b8',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    historyBombero: {
+        color: '#e2e8f0',
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    historyRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
+    },
+    historyLabel: {
+        color: '#94a3b8',
+        fontSize: 10,
+        fontWeight: '600',
+    },
+    historyValue: {
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    historyOk: {
+        color: '#10b981',
+    },
+    historyBajo: {
+        color: '#f59e0b',
+    },
+    historyCritico: {
+        color: '#ef4444',
+    },
 });

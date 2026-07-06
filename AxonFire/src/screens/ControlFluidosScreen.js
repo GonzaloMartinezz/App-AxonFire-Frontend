@@ -30,6 +30,8 @@ export default function ControlFluidosScreen({ navigation }) {
   const [cargandoCamiones, setCargandoCamiones] = useState(true);
   const [camionSeleccionado, setCamionSeleccionado] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [historial, setHistorial] = useState([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
   // Estados del formulario
   const [aceiteMotor, setAceiteMotor] = useState(null);
@@ -55,6 +57,21 @@ export default function ControlFluidosScreen({ navigation }) {
       Alert.alert('Error', 'No se pudieron cargar los camiones de la flota.');
     } finally {
       setCargandoCamiones(false);
+    }
+  };
+
+  const cargarHistorial = async (camionId) => {
+    setCargandoHistorial(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/control_fluidos/historial/${camionId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setHistorial(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Error cargando historial:', err);
+      setHistorial([]);
+    } finally {
+      setCargandoHistorial(false);
     }
   };
 
@@ -185,6 +202,7 @@ export default function ControlFluidosScreen({ navigation }) {
                         onPress={() => {
                           setCamionSeleccionado(camion);
                           setShowPicker(false);
+                          cargarHistorial(camion.id);
                         }}
                       >
                         <MaterialCommunityIcons name="fire-truck" size={16} color="#e11d48" />
@@ -199,6 +217,44 @@ export default function ControlFluidosScreen({ navigation }) {
                 {/* Formulario de fluidos */}
                 {camionSeleccionado && (
                   <View style={{ marginTop: 10 }}>
+                    {/* Historial */}
+                    {cargandoHistorial ? (
+                      <ActivityIndicator size="small" color="#dc2626" style={{ marginVertical: 20 }} />
+                    ) : historial.length > 0 ? (
+                      <View style={styles.historyContainer}>
+                        <Text style={styles.historyTitle}>ÚLTIMO CONTROL REGISTRADO</Text>
+                        <View style={styles.historyCard}>
+                          <View style={styles.historyHeader}>
+                            <Text style={styles.historyDate}>{new Date(historial[0].fecha_hora || historial[0].fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
+                            <Text style={styles.historyBombero}>{historial[0].usuarioId?.bombero ? `${historial[0].usuarioId.bombero.nombre} ${historial[0].usuarioId.bombero.apellido}` : 'Bombero'}</Text>
+                          </View>
+                          
+                          <View style={styles.historyRow}>
+                            <Text style={styles.historyLabel}>Aceite de Motor</Text>
+                            <Text style={[styles.historyValue, historial[0].aceite_motor === 'OK' ? styles.historyOk : historial[0].aceite_motor === 'BAJO' ? styles.historyBajo : styles.historyCritico]}>{historial[0].aceite_motor}</Text>
+                          </View>
+                          <View style={styles.historyRow}>
+                            <Text style={styles.historyLabel}>Líquido Refrigerante</Text>
+                            <Text style={[styles.historyValue, historial[0].liquido_refrigerante === 'OK' ? styles.historyOk : historial[0].liquido_refrigerante === 'BAJO' ? styles.historyBajo : styles.historyCritico]}>{historial[0].liquido_refrigerante}</Text>
+                          </View>
+                          <View style={styles.historyRow}>
+                            <Text style={styles.historyLabel}>Líquido de Frenos</Text>
+                            <Text style={[styles.historyValue, historial[0].liquido_frenos === 'OK' ? styles.historyOk : historial[0].liquido_frenos === 'BAJO' ? styles.historyBajo : styles.historyCritico]}>{historial[0].liquido_frenos}</Text>
+                          </View>
+                          <View style={styles.historyRow}>
+                            <Text style={styles.historyLabel}>Líquido de Dirección</Text>
+                            <Text style={[styles.historyValue, historial[0].liquido_direccion === 'OK' ? styles.historyOk : historial[0].liquido_direccion === 'BAJO' ? styles.historyBajo : styles.historyCritico]}>{historial[0].liquido_direccion}</Text>
+                          </View>
+                          
+                          {historial[0].observaciones ? (
+                            <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#334155' }}>
+                              <Text style={[styles.historyLabel, { fontStyle: 'italic' }]}>"{historial[0].observaciones}"</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    ) : null}
+
                     {/* Aceite de Motor */}
                     <View style={styles.fluidSection}>
                       <Text style={styles.fluidLabel}>ACEITE DE MOTOR</Text>

@@ -765,10 +765,12 @@ export default function PanelControlScreen({ navigation }) {
                   const tipoLabel =
                     n.tipo === 'CONTROL_DIARIO' ? 'Control Diario' :
                     n.tipo === 'CONTROL_BOLSO' ? 'Control Post-Emergencia' :
+                    n.tipo === 'PEDIDO_SUMINISTRO' ? 'Pedido de Suministro' :
                     n.tipo === 'CONTROL_CUARTEL' ? 'Inventario de Base' : 'Control';
                   const tipoIcon =
                     n.tipo === 'CONTROL_DIARIO' ? 'clipboard-check-outline' :
                     n.tipo === 'CONTROL_BOLSO' ? 'bag-personal-outline' :
+                    n.tipo === 'PEDIDO_SUMINISTRO' ? 'truck-delivery-outline' :
                     'package-variant-closed';
                   const fecha = n.fechaHora ? new Date(n.fechaHora) : new Date();
                   const horaText = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -806,7 +808,12 @@ export default function PanelControlScreen({ navigation }) {
                         {n.recursoNombre && (
                           <Text style={notifStyles.itemRecurso}>{n.recursoNombre}</Text>
                         )}
-                        {isFaltante && (
+                        {n.mensaje && (
+                          <Text style={[notifStyles.itemRecurso, { color: '#94a3b8', fontStyle: 'italic', marginTop: 2 }]} numberOfLines={3}>
+                            {n.mensaje}
+                          </Text>
+                        )}
+                        {isFaltante && n.cantidadFaltantes > 0 && (
                           <View style={notifStyles.faltanteBadge}>
                             <MaterialCommunityIcons name="alert" size={11} color="#fbbf24" />
                             <Text style={notifStyles.faltanteText}>

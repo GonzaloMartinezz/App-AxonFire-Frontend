@@ -19,6 +19,7 @@ import TacticalCard from '../components/TacticalCard';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { styles } from '../styles/PedidosSuministroScreenStyles';
 
 const TIPOS_REFUERZO = [
@@ -41,6 +42,7 @@ function tiempoTranscurrido(fechaISO) {
 export default function PedidosSuministroScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
+  const { addNotification } = useNotifications();
   const usuarioId = user?.id || '';
 
   // ── Estado ────────────────────────────────────────────────────────────────
@@ -134,6 +136,16 @@ export default function PedidosSuministroScreen({ navigation }) {
 
       setModalVisible(false);
       Alert.alert('✅ Enviado', `Pedido de ${keyLabel.toLowerCase()} registrado con éxito.`);
+      
+      addNotification({
+        tipo: 'PEDIDO_SUMINISTRO',
+        bomberoNombre: user?.bombero ? `${user.bombero.nombre} ${user.bombero.apellido}` : 'SISTEMA',
+        recursoNombre: `Solicitud de ${keyLabel}`,
+        tieneFaltantes: true,
+        cantidadFaltantes: cantidad,
+        mensaje: detailMsg ? detailMsg.replace(':', '').trim() : ''
+      });
+
       cargarDatos();
     } catch (err) {
       console.error('Error enviando solicitud:', err);
@@ -170,6 +182,16 @@ export default function PedidosSuministroScreen({ navigation }) {
 
       setPedidoManual('');
       Alert.alert('✅ Enviado', 'Pedido manual registrado con éxito.');
+      
+      addNotification({
+        tipo: 'PEDIDO_SUMINISTRO',
+        bomberoNombre: user?.bombero ? `${user.bombero.nombre} ${user.bombero.apellido}` : 'SISTEMA',
+        recursoNombre: 'Pedido Manual',
+        tieneFaltantes: false,
+        cantidadFaltantes: 0,
+        mensaje: pedidoManual.trim()
+      });
+
       cargarDatos();
     } catch (err) {
       console.error('Error enviando pedido manual:', err);
@@ -322,7 +344,7 @@ export default function PedidosSuministroScreen({ navigation }) {
           solicitudes.map((sol, idx) => {
             const iconInfo = getSolicitudIcon(sol.mensaje);
             return (
-              <TacticalCard key={sol.id || idx}>
+              <TacticalCard key={sol.id || idx} style={{ backgroundColor: '#1b1d24', borderColor: '#26282f', borderWidth: 1 }}>
                 <View style={styles.filaSolicitud}>
                   <View style={[styles.iconoSolicitud, { backgroundColor: iconInfo.bg }]}>
                     <MaterialCommunityIcons
