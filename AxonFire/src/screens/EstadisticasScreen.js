@@ -267,7 +267,8 @@ export default function EstadisticasScreen({ navigation }) {
           params: { fecha_desde: desde, fecha_hasta: hasta },
           timeout: 5000
         });
-        alertsData = resAlerts.data?.alertas || [];
+        const data = resAlerts.data;
+        alertsData = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
       } catch (err) {
         console.log('Error loading range alerts:', err?.message || err);
       }
