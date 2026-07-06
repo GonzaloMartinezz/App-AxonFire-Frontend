@@ -28,6 +28,8 @@ import PanelControlScreen from '../screens/PanelControlScreen';
 import PedidosSuministroScreen from '../screens/PedidosSuministroScreen';
 import WeeklyChecklistScreen from '../screens/WeeklyChecklistScreen';
 import ChecklistBolsosScreen from '../screens/ChecklistBolsosScreen';
+import ControlFluidosScreen from '../screens/ControlFluidosScreen';
+import MantenimientoHidraulicoScreen from '../screens/MantenimientoHidraulicoScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
 import GestionPoisScreen from '../screens/GestionPoisScreen';
 
@@ -266,8 +268,10 @@ export default function AppNavigator() {
 
           {/* Pantallas nuevas */}
           <Stack.Screen name="PanelControl" component={PanelControlScreen} />
-          <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
+           <Stack.Screen name="PedidosSuministro" component={PedidosSuministroScreen} />
           <Stack.Screen name="WeeklyChecklist" component={WeeklyChecklistScreen} />
+          <Stack.Screen name="ControlFluidos" component={ControlFluidosScreen} />
+          <Stack.Screen name="MantenimientoHidraulico" component={MantenimientoHidraulicoScreen} />
           <Stack.Screen name="InformePostEmergencia" component={InformePostEmergenciaScreen} />
           <Stack.Screen name="ChecklistBolsos" component={ChecklistBolsosScreen} />
           <Stack.Screen name="Logistica" component={ResourcesScreen} />

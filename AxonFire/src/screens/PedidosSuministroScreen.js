@@ -53,6 +53,8 @@ export default function PedidosSuministroScreen({ navigation }) {
   const [selectedRefuerzo, setSelectedRefuerzo] = useState(null); // null = Personal, object = Cisterna, etc.
   const [cantidad, setCantidad] = useState(1);
   const [observaciones, setObservaciones] = useState('');
+  const [pedidoManual, setPedidoManual] = useState('');
+  const [enviandoManual, setEnviandoManual] = useState(false);
 
   // Alerta activa a la cual ligar el pedido
   const [alertaActiva, setAlertaActiva] = useState(null);
@@ -69,8 +71,7 @@ export default function PedidosSuministroScreen({ navigation }) {
         }, headers: { Authorization: `Bearer ${token}` }
       });
 
-      const data = resAlertas.data;
-      const lista = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
+      const lista = resAlertas.data?.alertas || [];
       const activas = lista.filter(a => a.estadoAlerta?.nombre_estado !== 'FINALIZADO');
       
       if (activas.length > 0) {
@@ -138,6 +139,42 @@ export default function PedidosSuministroScreen({ navigation }) {
       Alert.alert('Error', 'No se pudo registrar la solicitud en la bitácora táctica.');
     } finally {
       setEnviando(false);
+    }
+  }
+
+  // ── Enviar Pedido Manual ─────────────────────────────────────────────────
+  async function enviarPedidoManual() {
+    if (!alertaActiva) {
+      Alert.alert("Atención", "No hay ninguna emergencia activa en este momento para enviar solicitudes.");
+      return;
+    }
+    if (!pedidoManual.trim()) {
+      Alert.alert("Atención", "Por favor, ingrese el texto de su pedido.");
+      return;
+    }
+
+    setEnviandoManual(true);
+    try {
+      const body = {
+        alerta_id: alertaActiva.id,
+        usuario_id: usuarioId,
+        mensaje: `[PEDIDO MANUAL] ${pedidoManual.trim()}`,
+        tipo_comunicacion: 'SUMINISTROS',
+        fecha_hora: new Date().toISOString()
+      };
+
+      await axios.post(`${API_BASE_URL}/registros_comunicacion/crear`, body, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setPedidoManual('');
+      Alert.alert('✅ Enviado', 'Pedido manual registrado con éxito.');
+      cargarDatos();
+    } catch (err) {
+      console.error('Error enviando pedido manual:', err);
+      Alert.alert('Error', 'No se pudo registrar la solicitud en la bitácora táctica.');
+    } finally {
+      setEnviandoManual(false);
     }
   }
 
@@ -229,6 +266,44 @@ export default function PedidosSuministroScreen({ navigation }) {
             <Text style={styles.textoBotonPersonal}>SOLICITAR REFUERZO DE PERSONAL</Text>
           </LinearGradient>
         </TouchableOpacity>
+
+        {/* Campo de Entrada Manual */}
+        <Text style={[styles.labelSeccion, { marginTop: Spacing.xl }]}>
+          Pedido Manual / Aclaraciones
+        </Text>
+        <View style={styles.manualRequestCard}>
+          <TextInput
+            style={styles.inputManual}
+            placeholder="Ingrese elementos no predefinidos o aclaraciones adicionales..."
+            placeholderTextColor="#475569"
+            multiline
+            numberOfLines={4}
+            value={pedidoManual}
+            onChangeText={setPedidoManual}
+          />
+          <TouchableOpacity
+            style={[styles.botonManualEnviar, (!pedidoManual.trim() || enviandoManual) && { opacity: 0.6 }]}
+            onPress={enviarPedidoManual}
+            disabled={enviandoManual}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#dc2626', '#b91c1c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.gradientBotonManual}
+            >
+              {enviandoManual ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="send" size={16} color="#fff" />
+                  <Text style={styles.textoBotonManual}>ENVIAR PEDIDO MANUAL</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
         {/* Historial de solicitudes */}
         <Text style={[styles.labelSeccion, { marginTop: Spacing.xl }]}>

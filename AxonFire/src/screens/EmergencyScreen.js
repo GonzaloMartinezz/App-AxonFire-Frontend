@@ -439,46 +439,20 @@ export default function EmergencyScreen({ route, navigation }) {
         console.log('Error fetching real bomberos in fetchEmergencyData:', err);
       }
 
-      // 2. Si no hay alertaId, buscar la más reciente activa (Rango de 30 días para robustez en Web y Mobile)
+      // 2. Si no hay alertaId, buscar la más reciente activa (Rango de 24h)
       if (!activeAlertaId) {
         try {
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
             params: {
-              fecha_desde: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+              fecha_desde: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
               fecha_hasta: new Date().toISOString()
             }, headers
           });
           const data = resAlertas.data;
-          const alertas = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
-          
+          const alertas = data.alertas || [];
           if (alertas.length > 0) {
-            const activas = [];
-            for (const a of alertas) {
-              const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${a.id}`);
-              if (!isLocallyFinalized && a.estadoAlerta?.nombre_estado !== 'FINALIZADO') {
-                activas.push(a);
-              }
-            }
-            
-            if (activas.length > 0) {
-              // Buscar si hay alguna activa pendiente de respuesta localmente
-              const activasConResp = await Promise.all(activas.map(async (a) => {
-                const localResp = await AsyncStorage.getItem(`local_response_${a.id}`);
-                return { alert: a, localResp };
-              }));
-              
-              const pendientes = activasConResp.filter(x => !x.localResp || x.localResp === 'PENDIENTE');
-              
-              if (pendientes.length > 0) {
-                // Tomar la pendiente más reciente
-                const ultimaPendiente = pendientes.sort((a, b) => new Date(b.alert.fecha_hora) - new Date(a.alert.fecha_hora))[0];
-                activeAlertaId = ultimaPendiente.alert.id;
-              } else {
-                // Si no hay pendientes, tomar la respondida más reciente
-                const ultimaRespondida = activasConResp.sort((a, b) => new Date(b.alert.fecha_hora) - new Date(a.alert.fecha_hora))[0];
-                activeAlertaId = ultimaRespondida.alert.id;
-              }
-            }
+            const ultima = alertas.sort((a, b) => new Date(b.fecha_hora) - new Date(a.fecha_hora))[0];
+            activeAlertaId = ultima.id;
           }
         } catch (e) {
           console.log('Error fetching range alerts:', e);
