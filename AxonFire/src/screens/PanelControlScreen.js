@@ -858,17 +858,21 @@ const notifStyles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-start',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   panel: {
     backgroundColor: '#16181d',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    maxHeight: '80%',
+    borderRadius: 18,
+    maxHeight: '70%',
     borderWidth: 1,
     borderColor: '#26282f',
-    borderBottomWidth: 0,
+    marginHorizontal: 16,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
+      android: { elevation: 15 },
+    }),
   },
   header: {
     flexDirection: 'row',

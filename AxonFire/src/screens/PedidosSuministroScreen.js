@@ -21,6 +21,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { styles } from '../styles/PedidosSuministroScreenStyles';
+import { sendSupplyRequestAlert } from '../services/notifications';
 
 const TIPOS_REFUERZO = [
   { icono: 'water', nombre: 'CISTERNA', color: '#38bdf8', tipo: 'cisterna', subcat: '4' },
@@ -192,6 +193,8 @@ export default function PedidosSuministroScreen({ navigation }) {
         mensaje: pedidoManual.trim()
       });
 
+      sendSupplyRequestAlert(pedidoManual.trim());
+      
       cargarDatos();
     } catch (err) {
       console.error('Error enviando pedido manual:', err);
