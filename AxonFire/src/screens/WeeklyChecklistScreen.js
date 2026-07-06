@@ -1097,7 +1097,76 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
                 {baseInventoryExpanded && (
                   <>
-                          />
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressHeader}>
+                        <Text style={styles.progressLabel}>PROGRESO DE INVENTARIO</Text>
+                        <Text style={styles.progressValue}>{checkedInvItems}/{totalInvItems} ({progressPercent}%)</Text>
+                      </View>
+                      <View style={styles.progressBarBg}>
+                        <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+                      </View>
+                    </View>
+
+                    {/* Tools List */}
+                    {herramientas.length === 0 ? (
+                      <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                        <MaterialCommunityIcons name="package-variant" size={48} color="#334155" />
+                        <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 13, fontWeight: '600' }}>
+                          No hay herramientas registradas en el cuartel.
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.sectionHeader}>
+                          <MaterialCommunityIcons name="package-variant-closed" size={18} color="#dc2626" />
+                          <Text style={styles.sectionTitle}>EQUIPOS E INVENTARIO DE LA BASE</Text>
+                          <View style={styles.sectionLine} />
+                        </View>
+
+                        {herramientas.map((tool) => {
+                          const data = inventoryItems[tool.id] || { status: null, justification: '' };
+                          const iconName = getToolIcon(tool.nombre_herramienta);
+                          return (
+                            <View key={tool.id}>
+                              <View style={[
+                                styles.cardItem,
+                                data.status === 'ok' && { borderLeftColor: '#22c55e' },
+                                data.status === 'fail' && { borderLeftColor: '#dc2626' },
+                              ]}>
+                                <View style={styles.cardItemLeft}>
+                                  <View style={styles.toolRow}>
+                                    <View style={styles.toolIconCircle}>
+                                      <MaterialCommunityIcons name={iconName} size={16} color="#fca5a5" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.itemTitle}>{(tool.nombre_herramienta || '').toUpperCase()}</Text>
+                                      <Text style={styles.itemSubtitle}>Stock disponible: {tool.cantidad_disponible ?? 0} uds</Text>
+                                    </View>
+                                  </View>
+                                </View>
+                                <View style={styles.actionButtons}>
+                                  <TouchableOpacity
+                                    style={[styles.iconButton, data.status === 'ok' && styles.iconButtonActive]}
+                                    onPress={() => setInventoryStatus(tool.id, 'ok')}
+                                  >
+                                    <MaterialCommunityIcons name="check" size={18} color={data.status === 'ok' ? '#fff' : '#e2e8f0'} />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={[styles.iconButton, data.status === 'fail' && styles.iconButtonFail]}
+                                    onPress={() => setInventoryStatus(tool.id, 'fail')}
+                                  >
+                                    <MaterialCommunityIcons name="close" size={18} color={data.status === 'fail' ? '#fff' : '#e2e8f0'} />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+
+                              {/* Damage report field (mandatory justification) */}
+                              <DamageReportField
+                                visible={data.status === 'fail'}
+                                justification={data.justification}
+                                onJustificationChange={(text) => updateInventoryJustification(tool.id, text)}
+                                theme="dark"
+                                />
                         </View>
                       );
                     })}
@@ -1131,6 +1200,8 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             )}
           </>
         )}
+      </>
+    )}
 
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* TAB: MANTENIMIENTO                                             */}
