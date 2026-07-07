@@ -138,8 +138,9 @@ export default function ControlFluidosScreen({ navigation, isEmbedded = false })
   };
 
   const Container = isEmbedded ? View : SafeAreaView;
+  const ContentContainer = isEmbedded ? View : ScrollView;
   return (
-    <View style={{ flex: 1, backgroundColor: '#0f172a' }}>
+    <View style={{ flex: 1, backgroundColor: isEmbedded ? 'transparent' : '#0f172a' }}>
       <Container style={[styles.container, isEmbedded && { flex: 1, backgroundColor: 'transparent' }]}>
         {!isEmbedded && <StatusBar style="light" />}
         <KeyboardAvoidingView 
@@ -169,12 +170,16 @@ export default function ControlFluidosScreen({ navigation, isEmbedded = false })
               </Text>
             </View>
           ) : (
-            <ScrollView
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: isEmbedded ? 40 : insets.bottom + 40 }]}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+            <ContentContainer
+              {...(isEmbedded ? {
+                style: [styles.scrollContent, { paddingBottom: 40, padding: 0 }]
+              } : {
+                contentContainerStyle: [styles.scrollContent, { paddingBottom: insets.bottom + 40 }],
+                showsVerticalScrollIndicator: false,
+                keyboardShouldPersistTaps: "handled"
+              })}
             >
-              <View style={styles.formContainer}>
+              <View style={[styles.formContainer, isEmbedded && { marginTop: 0, paddingHorizontal: 0, backgroundColor: 'transparent', borderWidth: 0 }]}>
                 {/* Selector de Móvil */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Vehículo / Móvil</Text>
@@ -339,7 +344,7 @@ export default function ControlFluidosScreen({ navigation, isEmbedded = false })
                   </View>
                 )}
               </View>
-            </ScrollView>
+            </ContentContainer>
           )}
         </KeyboardAvoidingView>
       </Container>
