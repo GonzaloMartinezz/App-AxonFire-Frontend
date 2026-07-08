@@ -57,6 +57,7 @@ export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded =
       // Filtrar por herramientas hidráulicas/Holmatro/de rescate pesado
       const filtradas = data.filter(h => {
         const nombre = (h.nombre_herramienta || '').toLowerCase();
+        const desc = (h.descripcion || '').toLowerCase();
         return (
           nombre.includes('hidraul') ||
           nombre.includes('hidrául') ||
@@ -65,7 +66,9 @@ export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded =
           nombre.includes('separador') ||
           nombre.includes('expansor') ||
           nombre.includes('ram') ||
-          nombre.includes('bomba motriz')
+          nombre.includes('bomba motriz') ||
+          desc.includes('hidraul') ||
+          desc.includes('hidrául')
         );
       });
       setHerramientas(filtradas);
@@ -86,7 +89,8 @@ export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded =
     try {
       await axios.post(`${API_BASE_URL}/herramientas`, {
         nombre_herramienta: nuevaHerramientaNombre.trim(),
-        descripcion: 'Herramienta Hidráulica'
+        descripcion: 'Herramienta Hidráulica',
+        cantidad_disponible: 1
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -181,8 +185,9 @@ export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded =
   };
 
   const Container = isEmbedded ? View : SafeAreaView;
+  const ContentContainer = isEmbedded ? View : ScrollView;
   return (
-    <View style={{ flex: 1, backgroundColor: '#0f172a' }}>
+    <View style={{ flex: 1, backgroundColor: isEmbedded ? 'transparent' : '#0f172a' }}>
       <Container style={[styles.container, isEmbedded && { flex: 1, backgroundColor: 'transparent' }]}>
         {!isEmbedded && <StatusBar style="light" />}
         {!isEmbedded && (
@@ -210,13 +215,16 @@ export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded =
               </Text>
             </View>
           ) : (
-            <ScrollView
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: isEmbedded ? 40 : insets.bottom + 40 }]}
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled={true}
-              keyboardShouldPersistTaps="handled"
+            <ContentContainer
+              {...(isEmbedded ? {
+                style: [styles.scrollContent, { paddingBottom: 40, padding: 0 }]
+              } : {
+                contentContainerStyle: [styles.scrollContent, { paddingBottom: insets.bottom + 40 }],
+                showsVerticalScrollIndicator: false,
+                keyboardShouldPersistTaps: "handled"
+              })}
             >
-              <View style={styles.formContainer}>
+              <View style={[styles.formContainer, isEmbedded && { marginTop: 0, paddingHorizontal: 0, backgroundColor: 'transparent', borderWidth: 0 }]}>
                 {/* Selector de Herramienta */}
                 <View style={styles.inputGroup}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -403,7 +411,7 @@ export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded =
                 </KeyboardAvoidingView>
               </Modal>
 
-            </ScrollView>
+            </ContentContainer>
           )}
         </KeyboardAvoidingView>
       </Container>
