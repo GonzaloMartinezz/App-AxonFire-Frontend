@@ -58,7 +58,123 @@ function parseDateLocal(dateInput) {
 
 export default function ReportsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { user, token } = useAuth();
+  
+  // ── Print desde listado: abre informe en nueva pestaña ──
+  const imprimirDesdeListado = async (alerta) => {
+    if (Platform.OS !== 'web') return;
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+
+    // Fetch responses for this alert
+    let alertResponses = [];
+    try {
+      const res = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alerta.id}`, { headers, timeout: 5000 });
+      if (res.status === 200 && Array.isArray(res.data)) alertResponses = res.data;
+    } catch (err) {
+      console.log('Error loading responses for print:', err?.message);
+    }
+
+    const aceptados = alertResponses
+      .filter(r => r.estado_respuesta === 'ACEPTADO')
+      .map(r => {
+        const b = r.usuarioId?.bombero || r.bombero || {};
+        const name = b.nombre ? `${b.nombre} ${b.apellido || ''}` : 'BOMBERO';
+        return {
+          name: name.toUpperCase(),
+          role: b.rangoBombero?.nombre_rol || b.rango || 'BOMBERO',
+          hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
+        };
+      });
+
+    const fechaInicio = parseDateLocal(alerta.fecha_hora);
+    let fechaFin;
+    if (alerta.fecha_hora_finalizacion) {
+      fechaFin = parseDateLocal(alerta.fecha_hora_finalizacion);
+    } else {
+      fechaFin = new Date(fechaInicio.getTime() + 2 * 60 * 60 * 1000);
+    }
+
+    const formatFH = (d) => d.toLocaleString('es-AR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+
+    const tableRows = aceptados.map(r => `
+      <tr><td>${r.name}</td><td>${r.role}</td><td>${r.hora} HS</td></tr>
+    `).join('');
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Informe Legal - Siniestro #${alerta.id?.slice(0, 8).toUpperCase()}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; padding: 40px; line-height: 1.6; max-width: 900px; margin: 0 auto; }
+    .header { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 20px; margin-bottom: 30px; }
+    .header h1 { font-size: 22px; text-transform: uppercase; margin: 0; color: #7f1d1d; letter-spacing: 1px; }
+    .header h2 { font-size: 13px; margin: 5px 0 0; color: #475569; font-weight: normal; letter-spacing: 2px; }
+    .doc-title { text-align: center; text-transform: uppercase; font-size: 16px; font-weight: bold; margin: 20px 0; color: #0f172a; text-decoration: underline; }
+    .section { margin-bottom: 25px; }
+    .section-title { font-size: 13px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 12px; color: #7f1d1d; }
+    .grid { display: flex; flex-wrap: wrap; margin-bottom: 15px; }
+    .grid-item { width: 50%; margin-bottom: 8px; font-size: 13px; box-sizing: border-box; }
+    .grid-item span { font-weight: bold; color: #475569; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
+    th { background-color: #f1f5f9; color: #0f172a; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f8fafc; }
+    .stamp-box { margin-top: 40px; text-align: center; font-size: 11px; color: #64748b; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 6px; }
+    .footer-signature { margin-top: 60px; display: flex; justify-content: space-between; }
+    .signature-box { width: 45%; text-align: center; border-top: 1px solid #94a3b8; padding-top: 10px; font-size: 12px; color: #475569; }
+    @media print { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Cuerpo de Bomberos Voluntarios</h1>
+    <h2>DOCUMENTO DE CONSTANCIA OFICIAL</h2>
+  </div>
+  <div class="doc-title">Borrador de Informe Legal de Siniestro</div>
+  <div class="section">
+    <div class="section-title">Datos de la Emergencia</div>
+    <div class="grid">
+      <div class="grid-item"><span>ID Alerta:</span> ${alerta.id}</div>
+      <div class="grid-item"><span>Tipo de Siniestro:</span> ${alerta.subCategoriaAlerta?.nombre_sub_categoria || alerta.observaciones || 'Siniestro'}</div>
+      <div class="grid-item"><span>Fecha/Hora Inicio:</span> ${formatFH(fechaInicio)}</div>
+      <div class="grid-item"><span>Fecha/Hora Fin:</span> ${formatFH(fechaFin)}</div>
+      <div class="grid-item"><span>Ubicación:</span> ${alerta.ubicacion || 'No especificada'}</div>
+      <div class="grid-item"><span>Estado:</span> FINALIZADO</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Descripción y Observaciones</div>
+    <p style="font-size:13px;margin:5px 0;">${alerta.observaciones || 'No hay observaciones adicionales.'}</p>
+  </div>
+  <div class="section">
+    <div class="section-title">Personal de Asistencia</div>
+    ${tableRows ? `<table><thead><tr><th>Nombre y Apellido</th><th>Rango</th><th>Hora de Respuesta</th></tr></thead><tbody>${tableRows}</tbody></table>` : '<p style="font-size:13px;color:#64748b;">No se registraron asistencias oficiales.</p>'}
+  </div>
+  <div class="stamp-box">
+    <strong>Nota Importante:</strong> Este documento constituye un borrador generado por AxonFire. El informe definitivo con firma digital o sello debe solicitarse en la sede del Cuartel.
+  </div>
+  <div class="footer-signature">
+    <div class="signature-box">Firma y Aclaración<br>Oficial a Cargo del Siniestro</div>
+    <div class="signature-box">Firma y Sello<br>Jefe de Cuerpo / Administración</div>
+  </div>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      setTimeout(() => { printWindow.print(); }, 500);
+    }
+  };
 
   const [loading, setLoading] = useState(true);
   const [selectedMes, setSelectedMes] = useState(new Date().getMonth());
@@ -459,7 +575,7 @@ export default function ReportsScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor="#121417" />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
+      <View className="no-print" style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.headerLeft}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#e11d48" />
@@ -475,12 +591,12 @@ export default function ReportsScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
       >
         {/* Subtítulo informativo */}
-        <Text style={styles.screenDesc}>
+        <Text className="no-print" style={styles.screenDesc}>
           Historial de siniestros finalizados y emisión de constancias legales en PDF para aseguradoras.
         </Text>
 
         {/* Barra de Filtros */}
-        <View style={styles.filtersContainer}>
+        <View className="no-print" style={styles.filtersContainer}>
           <TouchableOpacity style={styles.filterSelector} onPress={() => setMesModalVisible(true)}>
             <MaterialCommunityIcons name="calendar-month" size={18} color="#cbd5e1" />
             <Text style={styles.filterText}>{currentMesLabel.toUpperCase()}</Text>
@@ -495,7 +611,7 @@ export default function ReportsScreen({ navigation }) {
         </View>
 
         {/* Buscador */}
-        <View style={styles.searchRow}>
+        <View className="no-print" style={styles.searchRow}>
           <MaterialCommunityIcons name="magnify" size={20} color="#94a3b8" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
@@ -521,6 +637,7 @@ export default function ReportsScreen({ navigation }) {
           filteredAlertsList.map((item) => (
             <TouchableOpacity
               key={item.id}
+              className="printable-card"
               style={styles.alertCard}
               activeOpacity={0.8}
               onPress={() => navigation.navigate('AlertDetail', { alerta_id: item.id })}
@@ -551,11 +668,8 @@ export default function ReportsScreen({ navigation }) {
               </View>
 
               <TouchableOpacity
-                style={[
-                  styles.pdfButton,
-                  generatingPdfId === item.id && styles.pdfButtonDisabled
-                ]}
-                onPress={() => generateLegalReportPDF(item)}
+                style={styles.pdfButton}
+                onPress={() => Platform.OS === 'web' ? imprimirDesdeListado(item) : generateLegalReportPDF(item)}
                 disabled={generatingPdfId !== null}
                 activeOpacity={0.8}
               >
@@ -563,8 +677,8 @@ export default function ReportsScreen({ navigation }) {
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="file-pdf-box" size={18} color="#fff" />
-                    <Text style={styles.pdfButtonText}>GENERAR BORRADOR LEGAL PDF</Text>
+                    <MaterialCommunityIcons name="file-document-outline" size={18} color="#fff" />
+                    <Text style={styles.pdfButtonText}>GENERAR BORRADOR LEGAL</Text>
                   </>
                 )}
               </TouchableOpacity>
