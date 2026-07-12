@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       await AsyncStorage.setItem('token', authToken);
-      console.log('\n\n=== TOKEN PARA POSTMAN ===\n' + authToken + '\n==========================\n\n');
+      //console.log('\n\n=== TOKEN PARA POSTMAN ===\n' + authToken + '\n==========================\n\n');
       setUser(userData);
       setToken(authToken);
     } catch (error) {
