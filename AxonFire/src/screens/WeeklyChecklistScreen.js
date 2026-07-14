@@ -214,10 +214,13 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
   useEffect(() => {
     loadData();
-  }, []);
+    const unsubscribe = navigation?.addListener('focus', () => {
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
-  const fetchHistorialCuartel = async (opts = {}) => {
-    const { preserveIfNewer = false } = opts;
+  const fetchHistorialCuartel = async () => {
     setCargandoHistorialCuartel(true);
     try {
       const res = await fetch(`${API_BASE_URL}/checklist_cuartel/?t=${Date.now()}`, { headers });
@@ -225,23 +228,37 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         const data = await res.json();
         if (Array.isArray(data)) {
           data.sort((a, b) => new Date(b.fecha_control) - new Date(a.fecha_control));
-          setHistorialCuartel(data);
-          if (data.length > 0) {
-            // Si preserveIfNewer=true, solo actualizar si el backend tiene una entrada
-            // más reciente que la que ya tenemos (para no pisar un update optimista)
-            if (preserveIfNewer) {
-              setUltimoCheckCuartel(prev => {
-                if (!prev) return data[0];
-                const prevDate = new Date(prev.fecha_control).getTime();
-                const backendDate = new Date(data[0].fecha_control).getTime();
-                return backendDate >= prevDate ? data[0] : prev;
-              });
-            } else {
-              setUltimoCheckCuartel(data[0]);
+          
+          setUltimoCheckCuartel(current => {
+            if (current && String(current.id).startsWith('temp-')) {
+              if (data.length > 0) {
+                const diffMs = new Date(current.fecha_control).getTime() - new Date(data[0].fecha_control).getTime();
+                if (diffMs > 10000) {
+                  console.log('Backend stale on fetchHistorialCuartel: keeping optimistic check');
+                  return current;
+                }
+              } else {
+                return current;
+              }
             }
-          } else if (!preserveIfNewer) {
-            setUltimoCheckCuartel(null);
-          }
+            return data.length > 0 ? data[0] : null;
+          });
+
+          setHistorialCuartel(currentHistory => {
+            const tempItem = currentHistory.find(item => item.id && String(item.id).startsWith('temp-'));
+            if (tempItem) {
+              if (data.length > 0) {
+                const diffMs = new Date(tempItem.fecha_control).getTime() - new Date(data[0].fecha_control).getTime();
+                if (diffMs > 10000) {
+                  const filteredData = data.filter(item => item.id !== tempItem.id);
+                  return [tempItem, ...filteredData];
+                }
+              } else {
+                return [tempItem];
+              }
+            }
+            return data;
+          });
         }
       }
     } catch (err) {
@@ -700,9 +717,9 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         controlado: data.status === 'ok' ? 'CHEQUEADO' : 'FALTANTE',
         ...(data.status === 'fail' && data.justification ? { observaciones: data.justification } : {}),
       }));
-
       // API Post attempt
       try {
+        const detallesValidos = detalles.filter(d => !String(d.herramientaId).startsWith('fixed_'));
         const res = await fetch(`${API_BASE_URL}/checklist_cuartel/`, {
           method: 'POST',
           headers: {
@@ -711,7 +728,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           },
           body: JSON.stringify({
             usuarioId: userId,
-            detalles,
+            detalles: detallesValidos,
           }),
         });
         if (!res.ok) {
@@ -732,6 +749,18 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       await AsyncStorage.setItem('weekly_checklist_history', JSON.stringify(history));
 
       // ── OPTIMISTIC UPDATE: actualizar "último control" inmediatamente ──
+      const detallesConHerramientas = detalles.map(d => {
+        const tool = herramientas.find(t => t.id === d.herramientaId);
+        return {
+          ...d,
+          id: `temp-det-${d.herramientaId}-${Date.now()}`,
+          herramienta: {
+            id: d.herramientaId,
+            nombre_herramienta: tool?.nombre_herramienta || 'Herramienta',
+          }
+        };
+      });
+
       const nuevoCheckCuartel = {
         id: `temp-${Date.now()}`,
         fecha_control: new Date().toISOString(),
@@ -740,7 +769,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           nombre_usuario: user?.nombre_usuario || 'Bombero',
           bombero: user?.bombero || null,
         },
-        detalles,
+        detalles: detallesConHerramientas,
       };
       setUltimoCheckCuartel(nuevoCheckCuartel);
       setHistorialCuartel(prev => [nuevoCheckCuartel, ...prev]);
@@ -753,11 +782,10 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
       setInventoryItems(resetInv);
       setForceShowBaseInventoryList(false);
 
-      // Refrescar desde backend en segundo plano (con delay para dar tiempo al backend)
-      // Usar preserveIfNewer=true para no pisar el update optimista con datos viejos
+      // Refrescar desde backend en segundo plano con un delay para evitar race condition
       setTimeout(() => {
-        fetchHistorialCuartel({ preserveIfNewer: true }).catch(err => console.log('Error refreshing cuartel history:', err));
-      }, 2000);
+        fetchHistorialCuartel().catch(err => console.log('Error refreshing cuartel history:', err));
+      }, 3000);
 
       // RF-03: Emitir notificación para el panel del administrador
       const numFaltantesCuartel = detalles.filter(d => d.controlado === 'FALTANTE').length;
@@ -920,33 +948,31 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             <Text style={styles.dateText}>CONTROL GENERAL DE ACTIVOS</Text>
           </View>
         </View>
-
-        {/* Tab Switcher — 5 tabs en ScrollView */}
+        {/* Tab Switcher — 5 tabs scrollable */}
         <View style={styles.tabRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4, gap: 4 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4 }}>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'inventario' && styles.tabActive]} onPress={() => setActiveTab('inventario')}>
-              <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={activeTab === 'inventario' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={activeTab === 'inventario' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'inventario' && styles.tabTextActive]}>INVENTARIO</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'mantenimiento' && styles.tabActive]} onPress={() => setActiveTab('mantenimiento')}>
-              <MaterialCommunityIcons name="wrench-clock" size={14} color={activeTab === 'mantenimiento' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="wrench-clock" size={14} color={activeTab === 'mantenimiento' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'mantenimiento' && styles.tabTextActive]}>MANTEN.</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'diario' && styles.tabActive]} onPress={() => setActiveTab('diario')}>
-              <MaterialCommunityIcons name="fire-truck" size={14} color={activeTab === 'diario' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="fire-truck" size={14} color={activeTab === 'diario' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'diario' && styles.tabTextActive]}>DIARIO</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'fluidos_camion' && styles.tabActive]} onPress={() => setActiveTab('fluidos_camion')}>
-              <MaterialCommunityIcons name="water-pump" size={14} color={activeTab === 'fluidos_camion' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="water-pump" size={14} color={activeTab === 'fluidos_camion' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'fluidos_camion' && styles.tabTextActive]}>FL. CAMIONES</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'fluidos_herr' && styles.tabActive]} onPress={() => setActiveTab('fluidos_herr')}>
-              <MaterialCommunityIcons name="water-boiler" size={14} color={activeTab === 'fluidos_herr' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="water-boiler" size={14} color={activeTab === 'fluidos_herr' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'fluidos_herr' && styles.tabTextActive]}>FL. HERRAM.</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
-
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* TAB: INVENTARIO BASE                                           */}
         {/* ════════════════════════════════════════════════════════════════ */}
@@ -1081,17 +1107,6 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             {/* Inventory Progress Bar & Tools List & Save Button (Hidden if controlled today and not forcing edit) */}
             {showBaseInventoryList && (
               <>
-                {/* Progress Bar */}
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressHeader}>
-                    <Text style={styles.progressLabel}>PROGRESO DE INVENTARIO</Text>
-                    <Text style={styles.progressValue}>{checkedInvItems}/{totalInvItems} ({progressPercent}%)</Text>
-                  </View>
-                  <View style={styles.progressBarBg}>
-                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-                  </View>
-                </View>
-
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setBaseInventoryExpanded(!baseInventoryExpanded)}
@@ -1123,7 +1138,6 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
                 {baseInventoryExpanded && (
                   <>
-<<<<<<< HEAD
                     <View style={styles.progressContainer}>
                       <View style={styles.progressHeader}>
                         <Text style={styles.progressLabel}>PROGRESO DE INVENTARIO</Text>
@@ -1135,8 +1149,6 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                     </View>
 
                     {/* Tools List */}
-=======
->>>>>>> 13d2eee3ea57ac2fdfacc0ddb012521420db5e13
                     {herramientas.length === 0 ? (
                       <View style={{ alignItems: 'center', paddingVertical: 40 }}>
                         <MaterialCommunityIcons name="package-variant" size={48} color="#334155" />
@@ -1146,7 +1158,6 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                       </View>
                     ) : (
                       <>
-<<<<<<< HEAD
                         <View style={styles.sectionHeader}>
                           <MaterialCommunityIcons name="package-variant-closed" size={18} color="#dc2626" />
                           <Text style={styles.sectionTitle}>EQUIPOS E INVENTARIO DE LA BASE</Text>
@@ -1197,63 +1208,9 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
                                 onJustificationChange={(text) => updateInventoryJustification(tool.id, text)}
                                 theme="dark"
                                 />
-=======
-                        <View style={[styles.sectionHeader, { marginTop: 16 }]}>
-                          <MaterialCommunityIcons name="package-variant-closed" size={18} color="#dc2626" />
-                          <Text style={styles.sectionTitle}>EQUIPOS E INVENTARIO DE LA BASE</Text>
-                          <View style={styles.sectionLine} />
->>>>>>> 13d2eee3ea57ac2fdfacc0ddb012521420db5e13
                         </View>
-
-                        {herramientas.map((tool) => {
-                          const data = inventoryItems[tool.id] || { status: null, justification: '' };
-                          const iconName = getToolIcon(tool.nombre_herramienta);
-                          return (
-                            <View key={tool.id}>
-                              <View style={[
-                                styles.cardItem,
-                                data.status === 'ok' && { borderLeftColor: '#22c55e' },
-                                data.status === 'fail' && { borderLeftColor: '#dc2626' },
-                              ]}>
-                                <View style={styles.cardItemLeft}>
-                                  <View style={styles.toolRow}>
-                                    <View style={styles.toolIconCircle}>
-                                      <MaterialCommunityIcons name={iconName} size={16} color="#fca5a5" />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                      <Text style={styles.itemTitle}>{(tool.nombre_herramienta || '').toUpperCase()}</Text>
-                                      <Text style={styles.itemSubtitle}>Stock disponible: {tool.cantidad_disponible ?? 0} uds</Text>
-                                    </View>
-                                  </View>
-                                </View>
-                                <View style={styles.actionButtons}>
-                                  <TouchableOpacity
-                                    style={[styles.iconButton, data.status === 'ok' && styles.iconButtonActive]}
-                                    onPress={() => setInventoryStatus(tool.id, 'ok')}
-                                  >
-                                    <MaterialCommunityIcons name="check" size={18} color={data.status === 'ok' ? '#fff' : '#e2e8f0'} />
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={[styles.iconButton, data.status === 'fail' && styles.iconButtonFail]}
-                                    onPress={() => setInventoryStatus(tool.id, 'fail')}
-                                  >
-                                    <MaterialCommunityIcons name="close" size={18} color={data.status === 'fail' ? '#fff' : '#e2e8f0'} />
-                                  </TouchableOpacity>
-                                </View>
-                              </View>
-
-                              {/* Damage report field (mandatory justification) */}
-                              <DamageReportField
-                                visible={data.status === 'fail'}
-                                justification={data.justification}
-                                onJustificationChange={(text) => updateInventoryJustification(tool.id, text)}
-                                theme="dark"
-                              />
-                            </View>
-                          );
-                        })}
-                      </>
-                    )}
+                      );
+                    })}
                   </>
                 )}
 
