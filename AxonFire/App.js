@@ -214,6 +214,32 @@ export default function App() {
 
   useEffect(() => {
     if (!isWeb) return;
+
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        input::-ms-reveal, input::-ms-clear {
+          display: none !important;
+        }
+        input::-webkit-credentials-auto-fill-button {
+          visibility: hidden !important;
+          display: none !important;
+          pointer-events: none !important;
+        }
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+          -webkit-box-shadow: 0 0 0 1000px #161a23 inset !important;
+          -webkit-text-fill-color: #ffffff !important;
+          transition: background-color 5000s ease-in-out 0s;
+        }
+      `;
+      document.head.appendChild(style);
+    } catch (e) {
+      console.warn('Failed to inject global web styles:', e);
+    }
+
     const handleError = (message, source, lineno, colno, error) => {
       setGlobalError({
         message: String(message),
