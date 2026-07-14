@@ -9,6 +9,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -57,13 +59,75 @@ function getMockTools() {
     },
   ];
 }
-
 export default function AdminEquipmentScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user, token } = useAuth();
 
   const [herramientas, setHerramientas] = useState([]);
   const [loadingBase, setLoadingBase] = useState(false);
+
+  // Form states for creating equipment
+  const [formVisible, setFormVisible] = useState(false);
+  const [formNombre, setFormNombre] = useState('');
+  const [formCantidad, setFormCantidad] = useState('');
+  const [formDescripcion, setFormDescripcion] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleAddEquipmentPress = () => {
+    if (user?.rol === 'ADMIN') {
+      setFormNombre('');
+      setFormCantidad('');
+      setFormDescripcion('');
+      setFormVisible(true);
+    } else {
+      Alert.alert(
+        "Información",
+        "Para agregar equipos contactá al administrador de base de datos."
+      );
+    }
+  };
+
+  const handleSubmitForm = async () => {
+    if (!formNombre.trim()) {
+      Alert.alert("Error", "Por favor ingresa el nombre del equipo.");
+      return;
+    }
+    const qty = parseInt(formCantidad, 10);
+    if (isNaN(qty) || qty < 0) {
+      Alert.alert("Error", "Por favor ingresa una cantidad válida.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/herramientas/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          nombre_herramienta: formNombre.trim(),
+          cantidad_disponible: qty,
+          descripcion: formDescripcion.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${res.status}`);
+      }
+
+      Alert.alert("Éxito", "Equipo registrado correctamente.");
+      setFormVisible(false);
+      fetchHerramientas(); // Refresh the list
+    } catch (err) {
+      console.error("Error creating equipment:", err);
+      Alert.alert("Error", err.message || "Error al registrar el equipo.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     fetchHerramientas();
@@ -158,10 +222,6 @@ export default function AdminEquipmentScreen({ navigation }) {
               color="#94a3b8"
             />
           </TouchableOpacity>
-          <Image
-            source={{ uri: "https://randomuser.me/api/portraits/men/41.jpg" }}
-            style={styles.avatarTop}
-          />
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
         <View style={styles.topBarRight}>
@@ -184,12 +244,7 @@ export default function AdminEquipmentScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={() =>
-            Alert.alert(
-              "Información",
-              "Para agregar herramientas contactá al administrador de base de datos.",
-            )
-          }
+          onPress={handleAddEquipmentPress}
         >
           <MaterialCommunityIcons name="plus-circle" size={20} color="#fff" />
           <Text style={styles.actionBtnText}>AGREGAR EQUIPO</Text>
@@ -268,6 +323,7 @@ export default function AdminEquipmentScreen({ navigation }) {
                   </View>
                 </View>
                 <Text style={styles.toolName}>{h.nombre_herramienta}</Text>
+                {h.descripcion ? <Text style={[styles.descText, { marginBottom: 0, marginTop: 4 }]}>{h.descripcion}</Text> : null}
                 <View
                   style={{
                     flexDirection: "row",
@@ -300,6 +356,75 @@ export default function AdminEquipmentScreen({ navigation }) {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Creation Modal for ADMINs */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={formVisible}
+        onRequestClose={() => setFormVisible(false)}
+      >
+        <View style={styles.modalCenteredView}>
+          <View style={styles.modalView}>
+            <View style={styles.modalHeader}>
+              <MaterialCommunityIcons name="plus-circle" size={24} color="#e11d48" />
+              <Text style={styles.modalTitle}>NUEVO EQUIPO</Text>
+            </View>
+            <Text style={styles.modalDesc}>
+              Completa los campos para registrar un nuevo equipo de respuesta táctica en el cuartel.
+            </Text>
+
+            <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 6, letterSpacing: 1 }}>NOMBRE DEL EQUIPO</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. Extintor Co2 5kg"
+              placeholderTextColor="#64748b"
+              value={formNombre}
+              onChangeText={setFormNombre}
+            />
+
+            <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 6, letterSpacing: 1 }}>CANTIDAD</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. 10"
+              placeholderTextColor="#64748b"
+              value={formCantidad}
+              onChangeText={text => setFormCantidad(text.replace(/[^0-9]/g, ''))}
+              keyboardType="numeric"
+            />
+
+            <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '800', marginBottom: 6, letterSpacing: 1 }}>DESCRIPCIÓN (OPCIONAL)</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Detalles adicionales del equipo..."
+              placeholderTextColor="#64748b"
+              value={formDescripcion}
+              onChangeText={setFormDescripcion}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setFormVisible(false)}
+                disabled={submitting}
+              >
+                <Text style={styles.modalBtnTextCancel}>CANCELAR</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm, submitting && { opacity: 0.6 }]}
+                onPress={handleSubmitForm}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalBtnTextConfirm}>REGISTRAR</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
