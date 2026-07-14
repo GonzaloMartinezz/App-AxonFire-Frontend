@@ -360,12 +360,12 @@ export default function App() {
     const isWideDesktop = windowWidth >= 1280;
     const isUltraWide = windowWidth >= 1600;
     const desktopFrameStyle = {
-      width: isUltraWide ? '94%' : '96%',
-      maxWidth: isUltraWide ? 1480 : (isWideDesktop ? 1320 : 1120),
-      height: windowHeight >= 850 ? '92%' : '94%',
-      maxHeight: isUltraWide ? 920 : 860,
-      borderWidth: isWideDesktop ? 8 : 10,
-      borderRadius: isWideDesktop ? 22 : 26,
+      width: '99%',
+      maxWidth: isUltraWide ? 1800 : (isWideDesktop ? 1580 : 1380),
+      height: '99%',
+      maxHeight: isUltraWide ? 1100 : 980,
+      borderWidth: 4,
+      borderRadius: 12,
     };
 
     return (

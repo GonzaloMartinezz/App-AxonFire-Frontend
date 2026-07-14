@@ -55,8 +55,8 @@ const NativeMap = React.forwardRef((props, ref) => {
     fitToCoordinates: () => {},
   }));
 
-  const initialLat = initialRegion?.latitude || -26.8118;
-  const initialLng = initialRegion?.longitude || -65.2975;
+  const initialLat = initialRegion?.latitude || -26.8083;
+  const initialLng = initialRegion?.longitude || -65.2176;
 
   const html = `
     <!DOCTYPE html>
@@ -70,22 +70,18 @@ const NativeMap = React.forwardRef((props, ref) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body, #map { width: 100%; height: 100%; background: #16181d; }
         .leaflet-tile-pane {
-          filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.2);
+          filter: grayscale(0.2) sepia(0.5) hue-rotate(80deg) saturate(0.65) brightness(0.82);
         }
       </style>
     </head>
     <body>
       <div id="map"></div>
       <script>
-        var map = L.map('map', { zoomControl: true }).setView([${initialLat}, ${initialLng}], 16);
-        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        var map = L.map('map', { zoomControl: false }).setView([${initialLat}, ${initialLng}], 15);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 20,
-          attribution: '&copy; Google'
+          attribution: '&copy; OpenStreetMap'
         }).addTo(map);
-
-        map.on('click', function(e) {
-          map.panTo(e.latlng);
-        });
 
         map.on('movestart', function() {
           window.parent.postMessage({ type: 'REGION_CHANGE' }, '*');
@@ -103,9 +99,9 @@ const NativeMap = React.forwardRef((props, ref) => {
         window.addEventListener('message', function(event) {
           var data = event.data;
           if (data.type === 'ANIMATE_TO_REGION') {
-            map.setView([data.latitude, data.longitude], 16, { animate: true, duration: 0.5 });
+            map.setView([data.latitude, data.longitude], 15, { animate: true, duration: 0.5 });
           } else if (data.type === 'ANIMATE_CAMERA') {
-            map.setView([data.center.latitude, data.center.longitude], 16, { animate: true, duration: 0.5 });
+            map.setView([data.center.latitude, data.center.longitude], 15, { animate: true, duration: 0.5 });
           }
         });
       </script>

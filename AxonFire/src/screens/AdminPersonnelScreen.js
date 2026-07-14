@@ -74,9 +74,23 @@ export default function AdminPersonnelScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Dropdown states
+  const [selectedRango, setSelectedRango] = useState('TODOS LOS RANGOS');
+  const [rangoDropdownOpen, setRangoDropdownOpen] = useState(false);
+  const [rangoOptions, setRangoOptions] = useState(['TODOS LOS RANGOS']);
+
   useEffect(() => {
     fetchPersonnel();
   }, []);
+
+  useEffect(() => {
+    if (personnel.length > 0) {
+      const uniqueRanks = [...new Set(personnel.map(p => p.rangoBombero?.nombre_rol?.toUpperCase()).filter(Boolean))];
+      setRangoOptions(['TODOS LOS RANGOS', ...uniqueRanks]);
+    } else {
+      setRangoOptions(['TODOS LOS RANGOS', 'CAPITÁN', 'SARGENTO', 'TENIENTE', 'BOMBERO', 'OFICIAL', 'CADETE']);
+    }
+  }, [personnel]);
 
   const fetchPersonnel = async () => {
     try {
@@ -125,7 +139,11 @@ export default function AdminPersonnelScreen({ navigation }) {
     const username = person.usuarioId?.nombre_usuario?.toLowerCase() || '';
     const rango = person.rangoBombero?.nombre_rol?.toLowerCase() || '';
     const query = searchQuery.toLowerCase();
-    return fullName.includes(query) || username.includes(query) || rango.includes(query);
+    
+    const matchesSearch = fullName.includes(query) || username.includes(query) || rango.includes(query);
+    const matchesRango = selectedRango === 'TODOS LOS RANGOS' || rango === selectedRango.toLowerCase();
+
+    return matchesSearch && matchesRango;
   });
 
   return (
@@ -134,7 +152,9 @@ export default function AdminPersonnelScreen({ navigation }) {
 
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
         <View style={styles.topBarLeft}>
-          <View style={styles.avatarTop} />
+          <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.iconBtn}>
+            <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
+          </TouchableOpacity>
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
         <View style={styles.topBarRight}>
@@ -178,14 +198,38 @@ export default function AdminPersonnelScreen({ navigation }) {
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity style={styles.dropdownRow}>
-            <Text style={styles.dropdownText}>TODOS LOS RANGOS</Text>
-            <MaterialCommunityIcons name="chevron-down" size={20} color="#64748b" />
+          
+          <TouchableOpacity 
+            style={styles.dropdownRow}
+            onPress={() => {
+              setRangoDropdownOpen(!rangoDropdownOpen);
+            }}
+          >
+            <Text style={styles.dropdownText}>{selectedRango}</Text>
+            <MaterialCommunityIcons name={rangoDropdownOpen ? "chevron-up" : "chevron-down"} size={20} color="#64748b" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dropdownRow}>
-            <Text style={styles.dropdownText}>TODAS LAS UNIDADES</Text>
-            <MaterialCommunityIcons name="chevron-down" size={20} color="#64748b" />
-          </TouchableOpacity>
+
+          {rangoDropdownOpen && (
+            <View style={styles.dropdownMenu}>
+              {rangoOptions.map((rango) => (
+                <TouchableOpacity
+                  key={rango}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setSelectedRango(rango);
+                    setRangoDropdownOpen(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.dropdownItemText,
+                    selectedRango === rango && styles.dropdownItemTextSelected
+                  ]}>
+                    {rango}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {isLoading ? (
@@ -267,5 +311,4 @@ export default function AdminPersonnelScreen({ navigation }) {
       </ScrollView>
     </View>
   );
-};
-
+}

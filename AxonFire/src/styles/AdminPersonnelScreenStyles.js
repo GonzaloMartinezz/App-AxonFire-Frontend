@@ -245,5 +245,27 @@ export const styles = StyleSheet.create({
         color: '#f8fafc',
         fontSize: 11,
         fontWeight: '700',
+    },
+    dropdownMenu: {
+        backgroundColor: '#26282f',
+        borderRadius: 4,
+        marginTop: -8,
+        marginBottom: 12,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderColor: '#374151',
+    },
+    dropdownItem: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+    },
+    dropdownItemText: {
+        color: '#cbd5e1',
+        fontSize: 11,
+        letterSpacing: 1,
+    },
+    dropdownItemTextSelected: {
+        color: '#e11d48',
+        fontWeight: 'bold',
     }
 });

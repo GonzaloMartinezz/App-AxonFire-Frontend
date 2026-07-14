@@ -12,8 +12,8 @@ import MapView from './NativeMap';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
-const DEFAULT_LAT = -26.8083;
-const DEFAULT_LNG = -65.2176;
+const DEFAULT_LAT = -26.8118;
+const DEFAULT_LNG = -65.2975;
 const SEARCH_DEBOUNCE = 600;
 
 const tacticalMapStyle = [
