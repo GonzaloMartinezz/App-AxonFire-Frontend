@@ -214,7 +214,11 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
 
   useEffect(() => {
     loadData();
-  }, []);
+    const unsubscribe = navigation?.addListener('focus', () => {
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const fetchHistorialCuartel = async () => {
     setCargandoHistorialCuartel(true);
@@ -713,9 +717,9 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
         controlado: data.status === 'ok' ? 'CHEQUEADO' : 'FALTANTE',
         ...(data.status === 'fail' && data.justification ? { observaciones: data.justification } : {}),
       }));
-
       // API Post attempt
       try {
+        const detallesValidos = detalles.filter(d => !String(d.herramientaId).startsWith('fixed_'));
         const res = await fetch(`${API_BASE_URL}/checklist_cuartel/`, {
           method: 'POST',
           headers: {
@@ -724,7 +728,7 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           },
           body: JSON.stringify({
             usuarioId: userId,
-            detalles,
+            detalles: detallesValidos,
           }),
         });
         if (!res.ok) {
@@ -944,33 +948,31 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
             <Text style={styles.dateText}>CONTROL GENERAL DE ACTIVOS</Text>
           </View>
         </View>
-
-        {/* Tab Switcher — 5 tabs en ScrollView */}
+        {/* Tab Switcher — 5 tabs scrollable */}
         <View style={styles.tabRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4, gap: 4 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4 }}>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'inventario' && styles.tabActive]} onPress={() => setActiveTab('inventario')}>
-              <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={activeTab === 'inventario' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="clipboard-list-outline" size={14} color={activeTab === 'inventario' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'inventario' && styles.tabTextActive]}>INVENTARIO</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'mantenimiento' && styles.tabActive]} onPress={() => setActiveTab('mantenimiento')}>
-              <MaterialCommunityIcons name="wrench-clock" size={14} color={activeTab === 'mantenimiento' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="wrench-clock" size={14} color={activeTab === 'mantenimiento' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'mantenimiento' && styles.tabTextActive]}>MANTEN.</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'diario' && styles.tabActive]} onPress={() => setActiveTab('diario')}>
-              <MaterialCommunityIcons name="fire-truck" size={14} color={activeTab === 'diario' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="fire-truck" size={14} color={activeTab === 'diario' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'diario' && styles.tabTextActive]}>DIARIO</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'fluidos_camion' && styles.tabActive]} onPress={() => setActiveTab('fluidos_camion')}>
-              <MaterialCommunityIcons name="water-pump" size={14} color={activeTab === 'fluidos_camion' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="water-pump" size={14} color={activeTab === 'fluidos_camion' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'fluidos_camion' && styles.tabTextActive]}>FL. CAMIONES</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, { paddingHorizontal: 12, flex: 0 }, activeTab === 'fluidos_herr' && styles.tabActive]} onPress={() => setActiveTab('fluidos_herr')}>
-              <MaterialCommunityIcons name="water-boiler" size={14} color={activeTab === 'fluidos_herr' ? '#fff' : '#64748b'} />
+              <MaterialCommunityIcons name="water-boiler" size={14} color={activeTab === 'fluidos_herr' ? '#fff' : '#64748b'} style={{ marginRight: 6 }} />
               <Text style={[styles.tabText, activeTab === 'fluidos_herr' && styles.tabTextActive]}>FL. HERRAM.</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
-
         {/* ════════════════════════════════════════════════════════════════ */}
         {/* TAB: INVENTARIO BASE                                           */}
         {/* ════════════════════════════════════════════════════════════════ */}
