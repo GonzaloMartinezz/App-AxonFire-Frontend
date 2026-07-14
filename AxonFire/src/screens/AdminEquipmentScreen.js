@@ -239,7 +239,7 @@ export default function AdminEquipmentScreen({ navigation }) {
         <Text style={styles.subtitle}>MANDO Y CONTROL</Text>
         <Text style={styles.mainTitle}>GESTIÓN DE{"\n"}EQUIPOS</Text>
         <Text style={styles.descText}>
-          Supervisión en tiempo real de los activos críticos del Sector 7G.
+          Supervisión en tiempo real de los activos críticos del Cuartel de Bomberos Yerba Buena.
         </Text>
 
         <TouchableOpacity

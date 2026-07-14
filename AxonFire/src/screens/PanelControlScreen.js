@@ -1101,7 +1101,7 @@ export default function PanelControlScreen({ navigation }) {
                     </View>
                     <View style={styles.logisticDetails}>
                       <Text style={styles.logisticCardTitle}>
-                        GESTIÓN DE SUMINISTROS
+                        GESTIÓN DE EQUIPOS
                       </Text>
                       <Text style={styles.logisticCardSub}>
                         Control maestro de equipamiento e inventario
