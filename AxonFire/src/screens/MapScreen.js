@@ -343,7 +343,7 @@ export default function MapScreen({ navigation, route }) {
   // ─── F1: Contador de alertas activas ────────────────────────────────────────
   async function cargarAlertasActivas() {
     try {
-      const hasta = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // +24h en el futuro para mitigar clock skew
+      const hasta = new Date().toISOString();
       const desde = new Date(Date.now() - 86400000).toISOString();
       const url = `${API_BASE_URL}/alerta/rango?fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}`;
       const res = await fetch(url, { method: 'GET', headers });
@@ -518,10 +518,6 @@ export default function MapScreen({ navigation, route }) {
   useFocusEffect(
     React.useCallback(() => {
       cargarAlertasActivas();
-      const intervalId = setInterval(() => {
-        cargarAlertasActivas();
-      }, 5000);
-      return () => clearInterval(intervalId);
     }, [token])
   );
 
@@ -981,7 +977,7 @@ export default function MapScreen({ navigation, route }) {
         {mapaListo && alertasActivas > 0 && (
           <TouchableOpacity 
             style={styles.bannerAlertas}
-            onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'Asistencia' : 'Emergencia')}
+            onPress={() => navigation.navigate('AdminAlerts')}
             activeOpacity={0.8}
           >
             <Animated.View style={[styles.puntoPulso, { opacity: bannerPulseAnim }]} />

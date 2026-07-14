@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Platform, View, ActivityIndicator, StyleSheet, Alert, Text, TouchableOpacity, ScrollView, useWindowDimensions } from 'react-native';
@@ -6,7 +6,6 @@ import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { API_BASE_URL } from './src/config/api';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -78,7 +77,6 @@ global.stopAppSiren = async function() {
 function AppContent() {
   const { isLoading, user, token } = useAuth();
   const lastNotificationResponse = Platform.OS === 'web' ? null : Notifications.useLastNotificationResponse();
-  const lastRedirectedAlertRef = useRef(null);
 
   useEffect(() => {
     if (user && token) {
@@ -97,92 +95,6 @@ function AppContent() {
       }
     }
   }, [lastNotificationResponse]);
-
-  // ── BUG01 FIX: Global active alert poller for BOMBERO users ──────────────
-  // Polls /alerta/rango every 5s. If there's an active alert the bombero
-  // hasn't responded to, auto-navigate to the Emergencia tab.
-  useEffect(() => {
-    if (!user || !token) return;
-    // Only poll for BOMBERO role — admins don't need auto-redirect
-    if (user.rol === 'ADMIN') return;
-
-    let isMounted = true;
-
-    const checkForActiveAlerts = async () => {
-      if (!navigationRef.isReady() || !isMounted) return;
-
-      try {
-        const headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        };
-
-        // Query alerts from last 24 hours + 24h future buffer for clock skew
-        const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const hasta = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-        const res = await fetch(
-          `${API_BASE_URL}/alerta/rango?fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}`,
-          { headers, signal: AbortSignal.timeout?.(4000) }
-        );
-
-        if (!res.ok || !isMounted) return;
-
-        const data = await res.json();
-        const alertas = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
-
-        // Find active (non-finalized) alerts
-        for (const alerta of alertas) {
-          if (!isMounted) return;
-
-          const estado = alerta.estadoAlerta?.nombre_estado || '';
-          if (estado === 'FINALIZADO') continue;
-
-          // Check local finalization override
-          const isLocallyFinalized = await AsyncStorage.getItem(`finalized_alert_${alerta.id}`);
-          if (isLocallyFinalized === 'true') continue;
-
-          // Check if this bombero already responded
-          const localResponse = await AsyncStorage.getItem(`local_response_${alerta.id}`);
-          if (localResponse && localResponse !== 'PENDIENTE') continue;
-
-          // We found an unresponded active alert!
-          // Don't redirect repeatedly to the same alert
-          if (lastRedirectedAlertRef.current === alerta.id) continue;
-
-          // Auto-navigate to Emergencia tab
-          lastRedirectedAlertRef.current = alerta.id;
-          console.log('[BUG01] Auto-redirecting bombero to Emergencia for alert:', alerta.id);
-
-          try {
-            navigationRef.navigate('MainApp', {
-              screen: 'Emergencia',
-              params: { alerta_id: alerta.id }
-            });
-          } catch (navErr) {
-            console.log('[BUG01] Navigation error:', navErr);
-          }
-          break; // Only redirect for the first unresponded alert
-        }
-      } catch (err) {
-        // Silently ignore network errors — will retry on next poll
-        if (err.name !== 'AbortError') {
-          console.log('[BUG01] Alert poll error:', err?.message);
-        }
-      }
-    };
-
-    // Initial check after a short delay (let navigation mount)
-    const initialTimeout = setTimeout(checkForActiveAlerts, 2000);
-    // Then poll every 5 seconds
-    const intervalId = setInterval(checkForActiveAlerts, 5000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(initialTimeout);
-      clearInterval(intervalId);
-    };
-  }, [user, token]);
 
   if (isLoading) {
     return (

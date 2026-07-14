@@ -445,7 +445,7 @@ export default function EmergencyScreen({ route, navigation }) {
           const resAlertas = await axios.get(`${API_BASE_URL}/alerta/rango`, {
             params: {
               fecha_desde: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-              fecha_hasta: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // +24h en el futuro para mitigar clock skew
+              fecha_hasta: new Date().toISOString()
             }, headers
           });
           const data = resAlertas.data;
@@ -619,17 +619,17 @@ export default function EmergencyScreen({ route, navigation }) {
 
       // Lista de los que aceptaron con resolución de nombres reales de la base de datos
       const aceptados = respuestas
-         .filter(r => r.estado_respuesta === 'ACEPTADO')
-         .map(r => {
-           const uid = r.usuario_id || r.usuarioId?.id || r.usuarioId;
-           const bReal = bomberosReal.find(b => b.usuario_id === uid || b.usuarioId?.id === uid);
-           return {
-             id: r.id,
-             nombre: bReal?.nombre || r.usuarioId?.bombero?.nombre || 'Bombero',
-             apellido: bReal?.apellido || r.usuarioId?.bombero?.apellido || '',
-             hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'
-           };
-         });
+        .filter(r => r.estado_respuesta === 'ACEPTADO')
+        .map(r => {
+          const uid = r.usuario_id || r.usuarioId?.id || r.usuarioId;
+          const bReal = bomberosReal.find(b => b.usuario_id === uid || b.usuarioId?.id === uid);
+          return {
+            id: r.id,
+            nombre: bReal?.nombre || r.usuarioId?.bombero?.nombre || 'Bombero',
+            apellido: bReal?.apellido || r.usuarioId?.bombero?.apellido || '',
+            hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'
+          };
+        });
       setResponders(aceptados);
     } catch (err) {
       console.error('Error al cargar datos de emergencia:', err);
@@ -642,15 +642,7 @@ export default function EmergencyScreen({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchEmergencyData();
-      
-      const intervalId = setInterval(() => {
-        fetchEmergencyData();
-      }, 5000);
-
-      return () => {
-        clearInterval(intervalId);
-        stopEmergencyAlert();
-      };
+      return () => stopEmergencyAlert();
     }, [fetchEmergencyData])
   );
 
