@@ -23,7 +23,17 @@ import { styles } from '../styles/MantenimientoHidraulicoScreenStyles';
 
 export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded = false }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const [herramientas, setHerramientas] = useState([]);
   const [cargandoHerramientas, setCargandoHerramientas] = useState(true);
@@ -198,9 +208,14 @@ export default function MantenimientoHidraulicoScreen({ navigation, isEmbedded =
               </TouchableOpacity>
               <Text style={styles.topBarTitle}>MANTENIMIENTO HERRAMIENTAS</Text>
             </View>
-            <TouchableOpacity onPress={() => navigation?.goBack()}>
-              <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => navigation?.goBack()}>
+                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleLogout}>
+                <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
         <KeyboardAvoidingView

@@ -227,7 +227,17 @@ function getTipoIcon(tipo) {
 
 export default function EstadisticasScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const [loading, setLoading] = useState(true);
   const [selectedMes, setSelectedMes] = useState(new Date().getMonth());
@@ -408,10 +418,25 @@ export default function EstadisticasScreen({ navigation }) {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>ESTADÍSTICAS RUBA</Text>
         </View>
-        <TouchableOpacity style={styles.exportBtn} onPress={exportarCSV}>
-          <MaterialCommunityIcons name="file-export" size={20} color="#fff" />
-          <Text style={styles.exportBtnText}>EXPORTAR</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity style={styles.exportBtn} onPress={exportarCSV}>
+            <MaterialCommunityIcons name="file-export" size={20} color="#fff" />
+            <Text style={styles.exportBtnText}>EXPORTAR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 8,
+              backgroundColor: '#1f2937',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            onPress={handleLogout}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentScroll} showsVerticalScrollIndicator={false}>

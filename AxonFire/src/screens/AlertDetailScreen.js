@@ -267,7 +267,17 @@ const inputStyles = StyleSheet.create({
 export default function AlertDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const alertaId = route?.params?.alerta_id ?? null;
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => logout(), style: 'destructive' },
+      ]
+    );
+  };
   const rol = user?.rol || 'BOMBERO';
 
   // ── Print: genera un documento HTML limpio y lo abre en nueva pestaña ──
@@ -978,6 +988,9 @@ export default function AlertDetailScreen({ route, navigation }) {
           </TouchableOpacity>
           <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('PerfilGlobal')}>
             <MaterialCommunityIcons name="account" size={20} color="#e2e8f0" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleLogout} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="logout" size={22} color="#e11d48" />
           </TouchableOpacity>
         </View>
       </View>

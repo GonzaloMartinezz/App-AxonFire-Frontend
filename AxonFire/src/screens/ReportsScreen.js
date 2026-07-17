@@ -58,7 +58,17 @@ function parseDateLocal(dateInput) {
 
 export default function ReportsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
   
   // ── Print desde listado: abre informe en nueva pestaña ──
   const imprimirDesdeListado = async (alerta) => {
@@ -582,6 +592,9 @@ export default function ReportsScreen({ navigation }) {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>REPORTES LEGALES</Text>
         </View>
+        <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+          <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView

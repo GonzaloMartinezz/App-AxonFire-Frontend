@@ -24,7 +24,17 @@ const FLUID_OPTIONS = ['OK', 'BAJO', 'CRITICO'];
 
 export default function ControlFluidosScreen({ navigation, isEmbedded = false }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const [camiones, setCamiones] = useState([]);
   const [cargandoCamiones, setCargandoCamiones] = useState(true);
@@ -156,9 +166,14 @@ export default function ControlFluidosScreen({ navigation, isEmbedded = false })
                 </TouchableOpacity>
                 <Text style={styles.topBarTitle}>CONTROL DE FLUIDOS</Text>
               </View>
-              <TouchableOpacity onPress={() => navigation?.goBack()}>
-                <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => navigation?.goBack()}>
+                  <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleLogout}>
+                  <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 

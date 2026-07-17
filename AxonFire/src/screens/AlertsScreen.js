@@ -13,7 +13,8 @@ import {
   StatusBar,
   Dimensions,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -101,7 +102,18 @@ export default function AlertsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
 
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => logout(), style: 'destructive' },
+      ]
+    );
+  };
 
   useEffect(() => {
     if (route?.params?.filtro) {
@@ -199,6 +211,13 @@ export default function AlertsScreen({ navigation, route }) {
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="home" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
           </TouchableOpacity>
         </View>
       </View>

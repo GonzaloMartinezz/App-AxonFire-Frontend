@@ -73,7 +73,18 @@ const NIVELES_SEVERIDAD = [
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function NewAlertScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => logout(), style: 'destructive' },
+      ]
+    );
+  };
 
   const [formData, setFormData] = useState({
     type: 'Incendio Estructural',
@@ -202,9 +213,14 @@ export default function NewAlertScreen({ navigation }) {
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>ALERTA</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation?.goBack()}>
-          <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation?.goBack()}>
+            <MaterialCommunityIcons name="close" size={24} color="#94a3b8" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <SafeAreaView style={{ flex: 1 }}>

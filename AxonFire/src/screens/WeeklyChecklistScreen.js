@@ -128,7 +128,17 @@ function groupDetailsBySector(detalles) {
 
 export default function WeeklyChecklistScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
   const userId = user?.id || '';
   const { addNotification } = useNotifications();
 
@@ -926,8 +936,13 @@ export default function WeeklyChecklistScreen({ navigation, route }) {
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>CHECKLIST GENERAL</Text>
         </View>
-        <View style={styles.avatarPlaceholder}>
-          <MaterialCommunityIcons name="clipboard-check" size={20} color="#fff" />
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <View style={styles.avatarPlaceholder}>
+            <MaterialCommunityIcons name="clipboard-check" size={20} color="#fff" />
+          </View>
+          <TouchableOpacity onPress={handleLogout} style={styles.avatarPlaceholder}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
         </View>
       </View>
 

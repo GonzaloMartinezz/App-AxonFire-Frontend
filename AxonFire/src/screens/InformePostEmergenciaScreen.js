@@ -42,6 +42,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import { styles } from '../styles/InformePostEmergenciaScreenStyles';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -237,6 +238,17 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
   const alertaId = route?.params?.alertaId || null;
   const token = route?.params?.token || '';
   const rol = route?.params?.rol || 'BOMBERO';
+  const { logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const headers = {
     'Content-Type': 'application/json',
@@ -395,9 +407,14 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
           <Text style={styles.headerTitulo}>INFORME POST-EMERGENCIA</Text>
           <Text style={styles.headerSub}>AX-16 · Solo oficiales y administradores</Text>
         </View>
-        {guardadoOk && (
-          <MaterialCommunityIcons name="check-circle" size={22} color="#22c55e" />
-        )}
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {guardadoOk && (
+            <MaterialCommunityIcons name="check-circle" size={22} color="#22c55e" />
+          )}
+          <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView

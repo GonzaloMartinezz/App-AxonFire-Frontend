@@ -19,7 +19,17 @@ import { styles } from "../styles/GestionBolsosScreenStyles";
 
 export default function GestionBolsosScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const [bolsos, setBolsos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -245,6 +255,12 @@ export default function GestionBolsosScreen({ navigation }) {
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={handleLogout}
+        >
+          <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView

@@ -151,7 +151,17 @@ function formatAlertTitle(tipo = "") {
 export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
   const { notifications, getUnreadCount, markAsRead, markAllAsRead, clearAll } =
     useNotifications();
   const [notifModalVisible, setNotifModalVisible] = useState(false);
@@ -483,6 +493,13 @@ export default function PanelControlScreen({ navigation }) {
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
           </TouchableOpacity>
         </View>
       </View>

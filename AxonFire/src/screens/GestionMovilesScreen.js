@@ -19,7 +19,17 @@ import { styles } from '../styles/GestionMovilesScreenStyles';
 
 export default function GestionMovilesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const [moviles, setMoviles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -258,6 +268,9 @@ export default function GestionMovilesScreen({ navigation }) {
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
+        <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
+          <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
