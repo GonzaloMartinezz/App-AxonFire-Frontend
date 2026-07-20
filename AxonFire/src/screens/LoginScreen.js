@@ -58,9 +58,9 @@ export default function LoginScreen({ navigation }) {
       await login({ id: data.id, rol: data.rol, nombre_usuario: data.nombre_usuario || username }, data.token);
 
       if (data.rol === 'ADMIN') {
-        Alert.alert('Acceso Administrador', 'Bienvenido al Panel de Control de Axon Fire');
+        Alert.alert('Acceso Administrador', 'Bienvenido a Axon Fire');
       } else {
-        Alert.alert('Acceso Autorizado', 'Bienvenido a la red táctica Axon Fire');
+        Alert.alert('Acceso Autorizado', 'Bienvenido a Axon Fire');
       }
     } catch (error) {
       Alert.alert('Error de Acceso', error.message || 'Credenciales no reconocidas por el sistema.');

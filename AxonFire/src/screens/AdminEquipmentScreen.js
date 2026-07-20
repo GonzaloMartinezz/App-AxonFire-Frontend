@@ -252,7 +252,7 @@ export default function AdminEquipmentScreen({ navigation }) {
 
         <View style={styles.baseHeader}>
           <MaterialCommunityIcons name="warehouse" size={20} color="#93c5fd" />
-          <Text style={styles.baseHeaderText}>STOCK MAESTRO DEL CUARTEL</Text>
+          <Text style={styles.baseHeaderText}>STOCK DEL CUARTEL</Text>
         </View>
 
         {loadingBase ? (

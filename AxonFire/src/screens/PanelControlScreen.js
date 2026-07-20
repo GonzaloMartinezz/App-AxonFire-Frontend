@@ -324,14 +324,16 @@ export default function PanelControlScreen({ navigation }) {
           <Text style={styles.activityKicker}>HISTORIAL</Text>
           <Text style={styles.activityTitle}>ÚLTIMAS ALERTAS</Text>
         </View>
-        <TouchableOpacity onPress={limpiarBaseDeDatos} style={styles.botonTest}>
-          <MaterialCommunityIcons
-            name="delete-sweep"
-            size={14}
-            color="#e11d48"
-          />
-          <Text style={styles.botonTestText}>LIMPIAR</Text>
-        </TouchableOpacity>
+        {user?.rol === "ADMIN" && (
+          <TouchableOpacity onPress={limpiarBaseDeDatos} style={styles.botonTest}>
+            <MaterialCommunityIcons
+              name="delete-sweep"
+              size={14}
+              color="#e11d48"
+            />
+            <Text style={styles.botonTestText}>LIMPIAR</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {ultimasAlertas.length === 0 ? (
@@ -544,8 +546,16 @@ export default function PanelControlScreen({ navigation }) {
               <View style={styles.titleLeftGroup}>
                 <View style={styles.redAccent} />
                 <View>
-                  <Text style={styles.headerLabel}>SISTEMA DE MONITOREO</Text>
-                  <Text style={styles.mainTitle}>PANEL DE{"\n"}CONTROL</Text>
+                  <Text style={styles.headerLabel}>
+                    {user?.rol === "ADMIN"
+                      ? "SISTEMA DE MONITOREO"
+                      : "SISTEMA OPERATIVO TÁCTICO"}
+                  </Text>
+                  <Text style={styles.mainTitle}>
+                    {user?.rol === "ADMIN"
+                      ? "PANEL DE\nCONTROL"
+                      : "PANEL TÁCTICO\nBOMBERO"}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -557,47 +567,86 @@ export default function PanelControlScreen({ navigation }) {
               );
               if (!alertaActiva) return null;
               return (
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() =>
-                    navigation.navigate("Asistencia", {
-                      alerta_id: alertaActiva.id,
-                    })
-                  }
-                  style={styles.activeEmergencyBanner}
-                >
-                  <View style={styles.emergencyBannerLeft}>
-                    <View style={styles.emergencyPulseIcon}>
+                <View style={{ marginBottom: 16 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() =>
+                      navigation.navigate("Asistencia", {
+                        alerta_id: alertaActiva.id,
+                      })
+                    }
+                    style={[styles.activeEmergencyBanner, { marginBottom: 0 }]}
+                  >
+                    <View style={styles.emergencyBannerLeft}>
+                      <View style={styles.emergencyPulseIcon}>
+                        <MaterialCommunityIcons
+                          name="alarm-light"
+                          size={20}
+                          color="#fff"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.emergencyBannerTitle}>
+                          EMERGENCIA EN CURSO
+                        </Text>
+                        <Text
+                          style={styles.emergencyBannerDesc}
+                          numberOfLines={1}
+                        >
+                          {alertaActiva.tipo.toUpperCase()} •{" "}
+                          {alertaActiva.ubicacion.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.emergencyBannerRight}>
+                      <Text style={styles.emergencyBannerBtnText}>
+                        VER ASISTENCIA
+                      </Text>
                       <MaterialCommunityIcons
-                        name="alarm-light"
-                        size={20}
+                        name="chevron-right"
+                        size={18}
                         color="#fff"
                       />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.emergencyBannerTitle}>
-                        EMERGENCIA EN CURSO
-                      </Text>
-                      <Text
-                        style={styles.emergencyBannerDesc}
-                        numberOfLines={1}
-                      >
-                        {alertaActiva.tipo.toUpperCase()} •{" "}
-                        {alertaActiva.ubicacion.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.emergencyBannerRight}>
-                    <Text style={styles.emergencyBannerBtnText}>
-                      VER ASISTENCIA
-                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Acceso rápido a Pedir Suministro durante la emergencia */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      navigation.navigate("PedidosSuministro", {
+                        alerta_id: alertaActiva.id,
+                      })
+                    }
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#ea580c",
+                      borderRadius: 10,
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      marginTop: 8,
+                      gap: 8,
+                    }}
+                  >
                     <MaterialCommunityIcons
-                      name="chevron-right"
+                      name="cart-plus"
                       size={18}
                       color="#fff"
                     />
-                  </View>
-                </TouchableOpacity>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 12,
+                        fontWeight: "900",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      SOLICITAR SUMINISTRO PARA LA EMERGENCIA
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               );
             })()}
 
@@ -1013,7 +1062,7 @@ export default function PanelControlScreen({ navigation }) {
                         color="#475569"
                       />
                     </View>
-                    <Text style={styles.gridItemTitle}>Métricas RUBA</Text>
+                    <Text style={styles.gridItemTitle}>Métricas</Text>
                     <Text style={styles.gridItemSub}>
                       Estadísticas generales
                     </Text>
@@ -1121,7 +1170,7 @@ export default function PanelControlScreen({ navigation }) {
                         GESTIÓN DE EQUIPOS
                       </Text>
                       <Text style={styles.logisticCardSub}>
-                        Control maestro de equipamiento e inventario
+                        Control de equipamiento e inventario
                       </Text>
                     </View>
                   </View>
