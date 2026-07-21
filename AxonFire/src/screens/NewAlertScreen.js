@@ -319,14 +319,6 @@ export default function NewAlertScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Bottom actions (igual que antes) */}
-            <View style={styles.bottomActions}>
-              <TouchableOpacity style={styles.actionBtn}>
-                <MaterialCommunityIcons name="radio-handheld" size={16} color="#e2e8f0" />
-                <Text style={styles.actionBtnText}>RADIO COMMS</Text>
-              </TouchableOpacity>
-            </View>
-
             <View style={{ height: 100 }} />
           </ScrollView>
         </KeyboardAvoidingView>

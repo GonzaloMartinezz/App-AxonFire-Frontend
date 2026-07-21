@@ -682,110 +682,6 @@ export default function PanelControlScreen({ navigation }) {
               </View>
             </View>
 
-            {/* ── Stats por estado interactivos ────────────────────────── */}
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionLine} />
-              <Text style={styles.sectionTitle}>ESTADOS DE EMERGENCIA</Text>
-            </View>
-
-            <View style={[styles.grilla, desktopGridStyle]}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() =>
-                  navigation.navigate("Alertas", { filtro: "Activas" })
-                }
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  { borderLeftColor: "#ef4444" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="alert-circle"
-                    size={20}
-                    color="#ef4444"
-                  />
-                  <Text style={styles.statNumero}>{cantActivas}</Text>
-                </View>
-                <Text style={styles.statLabel}>Activas</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate("NewAlert")}
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  styles.quickActionStat,
-                  { borderLeftColor: "#e11d48" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="alarm-plus"
-                    size={20}
-                    color="#e11d48"
-                  />
-                  <MaterialCommunityIcons
-                    name="chevron-right"
-                    size={20}
-                    color="#64748b"
-                  />
-                </View>
-                <Text style={styles.statActionTitle}>Cargar Emergencia</Text>
-                <Text style={styles.statLabel}>Alta rápida</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() =>
-                  navigation.navigate("Alertas", { filtro: "Resueltas" })
-                }
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  { borderLeftColor: "#10b981" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="check-circle"
-                    size={20}
-                    color="#10b981"
-                  />
-                  <Text style={styles.statNumero}>{cantResueltas}</Text>
-                </View>
-                <Text style={styles.statLabel}>Resueltas</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate("Mapa")}
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  styles.quickActionStat,
-                  { borderLeftColor: "#38bdf8" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="map-marker-radius"
-                    size={20}
-                    color="#38bdf8"
-                  />
-                  <MaterialCommunityIcons
-                    name="chevron-right"
-                    size={20}
-                    color="#64748b"
-                  />
-                </View>
-                <Text style={styles.statActionTitle}>Mapa Operativo</Text>
-                <Text style={styles.statLabel}>Vista territorial</Text>
-              </TouchableOpacity>
-            </View>
-
             <View style={isDesktopWeb ? styles.desktopBody : null}>
               <View style={isDesktopWeb ? styles.desktopMainColumn : null}>
                 {/* ── Acceso a Centro Logístico ───────────────────────────────── */}
@@ -830,36 +726,6 @@ export default function PanelControlScreen({ navigation }) {
                 <View style={styles.gridContainer}>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => navigation.navigate("NewAlert")}
-                    style={[styles.gridItem, actionCardStyle]}
-                  >
-                    <View style={styles.gridItemHeader}>
-                      <View
-                        style={[
-                          styles.gridIconBg,
-                          { backgroundColor: "rgba(239, 68, 68, 0.12)" },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="alarm-light"
-                          size={18}
-                          color="#ef4444"
-                        />
-                      </View>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={16}
-                        color="#475569"
-                      />
-                    </View>
-                    <Text style={styles.gridItemTitle}>Cargar Emergencia</Text>
-                    <Text style={styles.gridItemSub}>
-                      Iniciar reporte táctico
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
                     onPress={() => navigation.navigate("GestionPois")}
                     style={[styles.gridItem, actionCardStyle]}
                   >
@@ -884,36 +750,6 @@ export default function PanelControlScreen({ navigation }) {
                     </View>
                     <Text style={styles.gridItemTitle}>Gestión de POIs</Text>
                     <Text style={styles.gridItemSub}>Puntos de interés</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate("Asistencia")}
-                    style={[styles.gridItem, actionCardStyle]}
-                  >
-                    <View style={styles.gridItemHeader}>
-                      <View
-                        style={[
-                          styles.gridIconBg,
-                          { backgroundColor: "rgba(16, 185, 129, 0.12)" },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="clipboard-check"
-                          size={18}
-                          color="#10b981"
-                        />
-                      </View>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={16}
-                        color="#475569"
-                      />
-                    </View>
-                    <Text style={styles.gridItemTitle}>
-                      Planilla Asistencia
-                    </Text>
-                    <Text style={styles.gridItemSub}>Presencia en vivo</Text>
                   </TouchableOpacity>
                 </View>
 

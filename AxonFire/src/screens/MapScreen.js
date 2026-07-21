@@ -145,23 +145,12 @@ export default function MapScreen({ navigation, route }) {
 
   const [routeOrigin, setRouteOrigin] = useState('STATION'); // 'STATION' or 'USER'
 
-  const isCurrentlyAdmin = navigation.getState()?.routeNames?.includes('Panel');
-
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   // ─── Handlers de autenticación ──────────────────────────────────────────────
-  const handleAdminPress = () => {
-    if (user?.rol === 'ADMIN') {
-      navigation.navigate(isCurrentlyAdmin ? 'MainApp' : 'AdminApp');
-    } else {
-      if (Platform.OS === 'web') alert('Esta sección es exclusiva para administradores.');
-      else Alert.alert('Acceso Denegado', 'Esta sección es exclusiva para administradores.');
-    }
-  };
-
   const handleLogout = () => {
     Alert.alert('Cerrar Sesión', '¿Deseas cerrar sesión?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -962,15 +951,6 @@ export default function MapScreen({ navigation, route }) {
             <Text style={styles.headerTitle}>AXON FIRE</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            {user?.rol === 'ADMIN' && (
-              <TouchableOpacity style={styles.emergencyIcon} onPress={handleAdminPress}>
-                <MaterialCommunityIcons
-                  name={isCurrentlyAdmin ? 'account-hard-hat' : 'shield-account'}
-                  size={16}
-                  color={Colors.primary}
-                />
-              </TouchableOpacity>
-            )}
             <TouchableOpacity style={styles.emergencyIcon} onPress={handleLogout}>
               <MaterialCommunityIcons name="logout" size={16} color={Colors.primary} />
             </TouchableOpacity>
@@ -1108,23 +1088,12 @@ export default function MapScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* ── Admin FAB ────────────────────────────────────────────────────── */}
-      {user?.rol === 'ADMIN' && (
-        <TouchableOpacity
-          style={styles.floatingMapFab}
-          onPress={() => navigation.navigate('NewAlert')}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="alarm-light" size={24} color="#fff" />
-        </TouchableOpacity>
-      )}
-
       {/* ── Botón de navegación GPS ──────────────────────────────────────── */}
       {incidente && (
         <TouchableOpacity
           style={[
             styles.floatingMapFab,
-            { left: (user?.rol === 'ADMIN') ? Spacing.lg + 64 : Spacing.lg },
+            { left: Spacing.lg },
           ]}
           onPress={abrirNavegacionGPS}
           activeOpacity={0.8}
