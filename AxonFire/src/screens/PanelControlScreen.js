@@ -172,6 +172,14 @@ export default function PanelControlScreen({ navigation }) {
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState(null);
 
+  // Short polling para alertas del panel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      cargarDatos(true);
+    }, 10000); // Polling corto cada 10 segundos
+    return () => clearInterval(interval);
+  }, [token]);
+
   async function cargarDatos(esRefresh = false) {
     if (esRefresh) setRefrescando(true);
     else setCargando(true);

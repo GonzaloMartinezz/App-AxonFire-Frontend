@@ -42,14 +42,22 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Cargar notificaciones desde AsyncStorage al iniciar
+  // Cargar notificaciones desde AsyncStorage al iniciar y sincronizar (Short Polling)
   useEffect(() => {
     const loadNotifications = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          setNotifications(Array.isArray(parsed) ? parsed : []);
+          const parsedArray = Array.isArray(parsed) ? parsed : [];
+          
+          // Actualizamos el estado solo si hubo cambios reales para evitar re-renders
+          setNotifications((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(parsedArray)) {
+              return parsedArray;
+            }
+            return prev;
+          });
         }
       } catch (error) {
         console.error('Error loading notifications from storage:', error);
@@ -57,7 +65,16 @@ export const NotificationProvider = ({ children }) => {
         setLoaded(true);
       }
     };
+    
+    // Carga inicial
     loadNotifications();
+
+    // RF-03: Polling corto para actualizar las notificaciones en tiempo real sin F5
+    const intervalId = setInterval(() => {
+      loadNotifications();
+    }, 3000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // Persistir notificaciones en AsyncStorage cada vez que cambian
