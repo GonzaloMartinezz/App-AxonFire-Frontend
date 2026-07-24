@@ -125,6 +125,10 @@ function extraerTipoAlerta(alerta) {
 
   const text = normalizeText(rawText);
 
+  // Match directo contra nombres de subcategoría de la BD
+  if (rawText === 'INCENDIO ESTRUCTURAL') return 'INCENDIOS';
+  if (rawText === 'RESCATE AUTOMOVIL') return 'RESCATES';
+
   // 1. INCENDIOS
   if (
     text.includes('incendio') ||
