@@ -379,7 +379,7 @@ export default function EmergencyScreen({ route, navigation }) {
         staysActiveInBackground: true
       });
       const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/siren.wav'),
+        require('../../assets/siren.mp3'),
         { isLooping: true, volume: 1.0 }
       );
 
