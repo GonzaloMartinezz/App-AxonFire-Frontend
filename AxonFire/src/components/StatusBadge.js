@@ -4,10 +4,9 @@ import { Colors } from '../theme';
 
 /**
  * StatusBadge — Criticality badges used on alert cards.
- * @param {'critica' | 'alta' | 'media' | 'baja' | 'activa' | 'despachada' | 'progreso' | 'resuelta'} severity
+ * @param {'alta' | 'media' | 'baja' | 'activa' | 'despachada' | 'progreso' | 'resuelta'} severity
  */
 const BADGE_MAP = {
-  critica: { bg: Colors.primary, text: Colors.onPrimary, label: 'CRÍTICA' },
   alta: { bg: Colors.tertiary, text: Colors.onTertiary, label: 'ALTA' },
   media: { bg: Colors.warningOrange, text: '#fff', label: 'MEDIA' },
   baja: { bg: Colors.surfaceContainerHighest, text: Colors.onSurface, label: 'BAJA' },

@@ -379,7 +379,7 @@ export default function EmergencyScreen({ route, navigation }) {
         staysActiveInBackground: true
       });
       const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/siren.wav'),
+        require('../../assets/siren.mp3'),
         { isLooping: true, volume: 1.0 }
       );
 
@@ -1195,7 +1195,11 @@ export default function EmergencyScreen({ route, navigation }) {
 
               <View style={styles.card}>
                 <Text style={styles.label}>TIPO DE INCIDENTE</Text>
-                <Text style={styles.text}>{alertaData?.observaciones || 'Incendio Estructural - Edificio'}</Text>
+                <Text style={styles.text}>
+                  {alertaData?.subCategoriaAlerta?.nombre_sub_categoria
+                    || alertaData?.observaciones
+                    || 'Incidente'}
+                </Text>
                 <Text style={styles.text}>{alertaData?.ubicacion || 'Ubicación no disponible'}</Text>
                 <View style={styles.row}>
                   <View>
@@ -1208,7 +1212,14 @@ export default function EmergencyScreen({ route, navigation }) {
                   </View>
                   <View>
                     <Text style={styles.label}>PRIORIDAD</Text>
-                    <Text style={styles.critical}>CRÍTICA</Text>
+                    <Text style={[styles.critical, { color: (() => {
+                      const p = String(alertaData?.prioridad || '').toUpperCase();
+                      if (p === 'ALTA') return '#ef4444';
+                      if (p === 'MEDIA') return '#fbbf24';
+                      return '#38bdf8';
+                    })() }]}>
+                      {alertaData?.prioridad?.toUpperCase() || '—'}
+                    </Text>
                   </View>
                 </View>
                 <View style={styles.location}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -27,6 +27,10 @@ const GestionPoisMap = React.forwardRef(({
       initialRegion={initialRegion}
       onRegionChangeComplete={onRegionChangeComplete}
       onPress={onPress}
+      liteMode={Platform.OS === 'android'}
+      showsBuildings={Platform.OS !== 'android'}
+      showsTraffic={false}
+      showsIndoors={Platform.OS !== 'android'}
     >
       {(parseFloat(formLatitud) && parseFloat(formLongitud)) ? (
         <Marker
