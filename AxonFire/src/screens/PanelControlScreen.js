@@ -148,7 +148,7 @@ export default function PanelControlScreen({ navigation }) {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        timeout: 15000,
+        timeout: 45000,
       });
 
       const data = res.data;
@@ -180,9 +180,13 @@ export default function PanelControlScreen({ navigation }) {
       setAlertas(resolvedLista);
     } catch (err) {
       console.error("Error cargando datos del panel:", err);
+      if (err?.response?.status === 401 || err?.status === 401) {
+        logout();
+        return;
+      }
       setAlertas([]);
       setError(
-        "Servidor no disponible o sesión expirada. Desliza hacia abajo para reintentar.",
+        "Servidor no disponible. Desliza hacia abajo para reintentar.",
       );
     } finally {
       setCargando(false);
