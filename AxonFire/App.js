@@ -256,21 +256,33 @@ export default function App() {
         stack: event.reason && event.reason.stack ? String(event.reason.stack) : 'No stack available'
       });
     };
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleRejection);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('error', handleError);
+      window.addEventListener('unhandledrejection', handleRejection);
+    }
     return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleRejection);
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('error', handleError);
+        window.removeEventListener('unhandledrejection', handleRejection);
+      }
     };
   }, []);
 
   useEffect(() => {
     if (!isWeb) return;
     const handleResize = () => {
-      setUseDesktopLayout(window.innerWidth > 768);
+      if (typeof window !== 'undefined') {
+        setUseDesktopLayout(window.innerWidth > 768);
+      }
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('resize', handleResize);
+    }
+    return () => {
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('resize', handleResize);
+      }
+    };
   }, []);
 
   useEffect(() => {

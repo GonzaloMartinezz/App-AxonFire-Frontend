@@ -481,8 +481,14 @@ export default function MapScreen({ navigation, route }) {
       }
     };
 
-    window.addEventListener('message', handleIframeMessage);
-    return () => window.removeEventListener('message', handleIframeMessage);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('message', handleIframeMessage);
+      return () => {
+        if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+          window.removeEventListener('message', handleIframeMessage);
+        }
+      };
+    }
   }, [coords, poisVisibles, incidente, routeCoords]);
 
   useEffect(() => {

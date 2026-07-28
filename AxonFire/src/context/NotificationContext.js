@@ -47,7 +47,7 @@ export const NotificationProvider = ({ children }) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newNotifications));
       // Despachar evento para sincronización local si es necesario (misma pestaña u otras si se usa BroadcastChannel en el futuro)
-      if (typeof window !== 'undefined' && window.dispatchEvent) {
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof Event === 'function') {
         window.dispatchEvent(new Event('axonfire_local_storage_sync'));
       }
     } catch (error) {
@@ -92,14 +92,14 @@ export const NotificationProvider = ({ children }) => {
       }
     };
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('storage', handleStorageChange);
       window.addEventListener('axonfire_local_storage_sync', handleStorageChange);
     }
 
     return () => {
       clearInterval(intervalId);
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('storage', handleStorageChange);
         window.removeEventListener('axonfire_local_storage_sync', handleStorageChange);
       }

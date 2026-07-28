@@ -30,8 +30,14 @@ const NativeMap = React.forwardRef((props, ref) => {
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('message', handleMessage);
+      return () => {
+        if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+          window.removeEventListener('message', handleMessage);
+        }
+      };
+    }
   }, [onRegionChange, onRegionChangeComplete]);
 
   useImperativeHandle(ref, () => ({
