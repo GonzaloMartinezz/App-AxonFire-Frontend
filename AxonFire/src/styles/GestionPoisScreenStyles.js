@@ -329,10 +329,18 @@ export const styles = StyleSheet.create({
     },
     modalScroll: {
         width: '100%',
+        ...Platform.select({
+            web: {
+                maxHeight: '85vh',
+            },
+            default: {
+                maxHeight: '90%',
+            }
+        })
     },
     modalScrollContent: {
-        padding: 20,
-        justifyContent: 'center',
+        paddingVertical: 20,
+        paddingHorizontal: 10,
         alignItems: 'center',
         flexGrow: 1,
     },

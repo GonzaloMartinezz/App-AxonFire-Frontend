@@ -53,8 +53,18 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
 
   const camionNombre = route?.params?.camionNombre || "Móvil";
-  const { user, token: userToken } = useAuth();
+  const { user, token: userToken, logout } = useAuth();
   const token = userToken ?? user?.token ?? "";
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
   const { addNotification } = useNotifications();
 
   // Si viene con un bolsoId fijo (desde el disparador de emergencia), lo usamos
@@ -458,6 +468,12 @@ export default function ChecklistBolsosScreen({ navigation, route }) {
               />
             </TouchableOpacity>
           )}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleLogout}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
         </View>
       </View>
 

@@ -29,7 +29,17 @@ const REINFORCEMENTS = [
 
 export default function ResourcesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const headers = {
     'Content-Type': 'application/json',
@@ -271,17 +281,22 @@ export default function ResourcesScreen({ navigation }) {
           )}
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
-        <TouchableOpacity
-          style={styles.refreshBtn}
-          onPress={refrescarTodo}
-          disabled={refrescando}
-        >
-          <MaterialCommunityIcons
-            name="refresh"
-            size={18}
-            color={refrescando ? '#334155' : '#64748b'}
-          />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={refrescarTodo}
+            disabled={refrescando}
+          >
+            <MaterialCommunityIcons
+              name="refresh"
+              size={18}
+              color={refrescando ? '#334155' : '#64748b'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView

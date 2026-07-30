@@ -42,7 +42,17 @@ function tiempoTranscurrido(fechaISO) {
 
 export default function PedidosSuministroScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
   const { addNotification } = useNotifications();
   const usuarioId = user?.id || '';
 
@@ -225,9 +235,14 @@ export default function PedidosSuministroScreen({ navigation }) {
           <MaterialCommunityIcons name="arrow-left" size={20} color="#94a3b8" />
         </TouchableOpacity>
         <Text style={styles.tituloHeader}>PEDIDOS DE SUMINISTRO</Text>
-        <TouchableOpacity style={styles.botonRefresh} onPress={cargarDatos}>
-          <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity style={styles.botonRefresh} onPress={cargarDatos}>
+            <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.botonRefresh} onPress={handleLogout}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView

@@ -114,7 +114,18 @@ export default function AddFirefighterScreen({ navigation }) {
   const [isFetchingList, setIsFetchingList] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => logout(), style: 'destructive' },
+      ]
+    );
+  };
 
   const rangosDisponibles = [
     { id: 'CAD', nombre: 'CADETE' },
@@ -271,9 +282,14 @@ export default function AddFirefighterScreen({ navigation }) {
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>INDUCCIÓN DE PERSONAL</Text>
         </View>
-        <TouchableOpacity onPress={fetchFirefighters}>
-          <MaterialCommunityIcons name="refresh" size={24} color="#94a3b8" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={fetchFirefighters} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="refresh" size={24} color="#94a3b8" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <SafeAreaView style={{ flex: 1 }}>

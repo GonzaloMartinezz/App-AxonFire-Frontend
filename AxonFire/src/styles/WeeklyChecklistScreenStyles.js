@@ -85,9 +85,8 @@ export const styles = StyleSheet.create({
         fontSize: 10,
     },
 
-    // Tabs Row — 3 tabs
+    // Tabs Row — 5 tabs scrollable
     tabRow: {
-        flexDirection: 'row',
         marginBottom: 24,
         backgroundColor: '#1b1d24',
         borderRadius: 6,
@@ -96,13 +95,13 @@ export const styles = StyleSheet.create({
         borderColor: '#26282f',
     },
     tab: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 4,
-        gap: 6,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 6,
+        marginRight: 8,
     },
     tabActive: {
         backgroundColor: '#dc2626',
@@ -110,7 +109,7 @@ export const styles = StyleSheet.create({
     tabText: {
         color: '#94a3b8',
         fontWeight: '700',
-        fontSize: 10,
+        fontSize: 12,
         letterSpacing: 0.5,
     },
     tabTextActive: {
@@ -336,17 +335,20 @@ export const styles = StyleSheet.create({
     gridCamiones: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
+        justifyContent: 'space-between',
+        rowGap: 12,
     },
     cardCamion: {
-        width: '47%',
+        width: '48%',
         backgroundColor: '#1b1d24',
         borderRadius: 8,
-        padding: 16,
+        paddingVertical: 18,
+        paddingHorizontal: 12,
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
         borderWidth: 1,
         borderColor: '#26282f',
+        minHeight: 155,
     },
     iconoCamionBox: {
         width: 52,
@@ -358,10 +360,11 @@ export const styles = StyleSheet.create({
     },
     nombreCamion: {
         color: '#e2e8f0',
-        fontSize: 11,
+        fontSize: 13,
         fontWeight: '800',
         letterSpacing: 0.4,
         textAlign: 'center',
+        marginBottom: 6,
     },
     estadoCamionRow: {
         flexDirection: 'row',
@@ -529,19 +532,19 @@ export const styles = StyleSheet.create({
     },
     ultimoCheckLabel: {
         color: '#64748b',
-        fontSize: 8,
+        fontSize: 10,
         fontWeight: '800',
         letterSpacing: 0.5,
         marginBottom: 2,
     },
     ultimoCheckVal: {
         color: '#94a3b8',
-        fontSize: 9,
+        fontSize: 11,
         fontWeight: '700',
     },
     ultimoCheckAutor: {
         color: '#64748b',
-        fontSize: 8,
+        fontSize: 10,
         fontStyle: 'italic',
         marginTop: 2,
         textAlign: 'center',

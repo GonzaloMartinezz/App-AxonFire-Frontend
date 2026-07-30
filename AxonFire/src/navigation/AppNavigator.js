@@ -45,13 +45,14 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // ── Bombero Tab Bar ─────────────────────────────────────────────
-// 5 tabs: Mapa · Alertas · SOS (FAB) · Emergencia · Perfil
+// 5 tabs: Panel · Mapa · SOS (FAB) · Emergencia · Perfil
 // Logística y Asistencia siguen accesibles como Stack screens.
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
 
   // Icon pairs: [inactive (outline), active (filled)]
   const ICON_MAP = {
+    Panel: ["monitor-dashboard", "monitor-dashboard"],
     Mapa: ["map-outline", "map"],
     Alertas: ["bell-outline", "bell"],
     Emergencia: ["shield-alert-outline", "shield-alert"],
@@ -150,14 +151,14 @@ function MainTabNavigator() {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen
+        name="Panel"
+        component={PanelControlScreen}
+        options={{ title: "Panel" }}
+      />
+      <Tab.Screen
         name="Mapa"
         component={MapScreen}
         options={{ title: "Mapa" }}
-      />
-      <Tab.Screen
-        name="Alertas"
-        component={AlertsScreen}
-        options={{ title: "Alertas" }}
       />
       <Tab.Screen
         name="SOS"

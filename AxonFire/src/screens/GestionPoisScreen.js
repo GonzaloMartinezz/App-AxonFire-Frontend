@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
+  Alert,
   TextInput,
   Animated,
   RefreshControl,
@@ -184,7 +185,17 @@ const toastStyles = StyleSheet.create({
 // ── Main Screen ──────────────────────────────────────────────────────────────
 export default function GestionPoisScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   // ── State ────────────────────────────────────────────────────
   const [pois, setPois] = useState([]);
@@ -443,9 +454,14 @@ export default function GestionPoisScreen({ navigation }) {
           <MaterialCommunityIcons name="map-marker-radius" size={22} color="#e11d48" />
           <Text style={styles.topBarTitle}>AXON FIRE</Text>
         </View>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => fetchPois(true)} activeOpacity={0.7}>
-          <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => fetchPois(true)} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleLogout} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView

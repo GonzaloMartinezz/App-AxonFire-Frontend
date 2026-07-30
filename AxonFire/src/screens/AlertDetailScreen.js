@@ -267,239 +267,18 @@ const inputStyles = StyleSheet.create({
 export default function AlertDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const alertaId = route?.params?.alerta_id ?? null;
-  const { token, user } = useAuth();
-  const rol = user?.rol || 'BOMBERO';
-
-  // ── Print: genera un documento HTML limpio y lo abre en nueva pestaña ──
-  const imprimirInforme = () => {
-    if (Platform.OS !== 'web' || !alerta) return;
-
-    const fechaInicio = parseDateLocal(alerta.fecha_hora);
-    const formatFechaHora = (date) => date.toLocaleString('es-AR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
-
-    const badgeEst = obtenerBadgeEstado(alerta?.estadoAlerta?.nombre_estado || '');
-
-    const personalRows = responders.map(p => `
-      <tr>
-        <td>${p.name}</td>
-        <td>${p.role}</td>
-        <td>${p.status}</td>
-        <td>${p.hora || '—'}</td>
-      </tr>
-    `).join('');
-
-    const logisticsRows = logistics.map(l => {
-      const autor = l.usuarioId?.bombero
-        ? `${l.usuarioId.bombero.nombre} ${l.usuarioId.bombero.apellido}`
-        : 'Sistema';
-      const hora = new Date(l.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `<tr><td>${l.mensaje.replace(/[\[\]]/g, '')}</td><td>${autor}</td><td>${hora} HS</td></tr>`;
-    }).join('');
-
-    const htmlContent = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <title>Informe de Emergencia - ${alerta.id?.slice(0, 8).toUpperCase()}</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #1e293b;
-      padding: 40px;
-      line-height: 1.6;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    .header {
-      text-align: center;
-      border-bottom: 3px double #0f172a;
-      padding-bottom: 20px;
-      margin-bottom: 30px;
-    }
-    .header h1 {
-      font-size: 22px;
-      text-transform: uppercase;
-      margin: 0;
-      color: #7f1d1d;
-      letter-spacing: 1px;
-    }
-    .header h2 {
-      font-size: 13px;
-      margin: 5px 0 0;
-      color: #475569;
-      font-weight: normal;
-      letter-spacing: 2px;
-    }
-    .doc-title {
-      text-align: center;
-      text-transform: uppercase;
-      font-size: 16px;
-      font-weight: bold;
-      margin: 20px 0;
-      color: #0f172a;
-      text-decoration: underline;
-    }
-    .section {
-      margin-bottom: 25px;
-    }
-    .section-title {
-      font-size: 13px;
-      text-transform: uppercase;
-      font-weight: bold;
-      border-bottom: 1px solid #cbd5e1;
-      padding-bottom: 5px;
-      margin-bottom: 12px;
-      color: #7f1d1d;
-    }
-    .grid {
-      display: flex;
-      flex-wrap: wrap;
-      margin-bottom: 15px;
-    }
-    .grid-item {
-      width: 50%;
-      margin-bottom: 8px;
-      font-size: 13px;
-      box-sizing: border-box;
-    }
-    .grid-item span {
-      font-weight: bold;
-      color: #475569;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 13px;
-    }
-    th, td {
-      border: 1px solid #cbd5e1;
-      padding: 8px 10px;
-      text-align: left;
-    }
-    th {
-      background-color: #f1f5f9;
-      color: #0f172a;
-      font-weight: bold;
-    }
-    tr:nth-child(even) {
-      background-color: #f8fafc;
-    }
-    .tiempos-grid {
-      display: flex;
-      gap: 30px;
-      margin: 10px 0;
-    }
-    .tiempos-grid .item {
-      font-size: 13px;
-    }
-    .tiempos-grid .item strong {
-      color: #475569;
-    }
-    .stamp-box {
-      margin-top: 40px;
-      text-align: center;
-      font-size: 11px;
-      color: #64748b;
-      border: 1px dashed #cbd5e1;
-      padding: 15px;
-      border-radius: 6px;
-    }
-    .footer-signature {
-      margin-top: 60px;
-      display: flex;
-      justify-content: space-between;
-    }
-    .signature-box {
-      width: 45%;
-      text-align: center;
-      border-top: 1px solid #94a3b8;
-      padding-top: 10px;
-      font-size: 12px;
-      color: #475569;
-    }
-    @media print {
-      body { padding: 20px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>Cuerpo de Bomberos Voluntarios</h1>
-    <h2>INFORME DE EMERGENCIA</h2>
-  </div>
-
-  <div class="doc-title">Detalle del Siniestro #${alerta.id?.slice(0, 8).toUpperCase()}</div>
-
-  <div class="section">
-    <div class="section-title">Datos de la Emergencia</div>
-    <div class="grid">
-      <div class="grid-item"><span>ID Alerta:</span> ${alerta.id}</div>
-      <div class="grid-item"><span>Estado:</span> ${badgeEst.label}</div>
-      <div class="grid-item"><span>Descripción:</span> ${alerta.observaciones || 'Incidente'}</div>
-      <div class="grid-item"><span>Ubicación:</span> ${alerta.ubicacion || 'No especificada'}</div>
-      <div class="grid-item"><span>Fecha/Hora Inicio:</span> ${formatFechaHora(fechaInicio)}</div>
-      <div class="grid-item"><span>Tipo:</span> ${alerta.subCategoriaAlerta?.nombre_sub_categoria || alerta.observaciones || 'No especificado'}</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Tiempos Críticos</div>
-    <div class="tiempos-grid">
-      <div class="item"><strong>Llamado:</strong> ${horaLlamado || '—'} HS</div>
-      <div class="item"><strong>Salida:</strong> ${horaSalida || '—'} HS</div>
-      <div class="item"><strong>Regreso:</strong> ${horaRegreso || 'Pendiente'}</div>
-      <div class="item"><strong>Transcurrido:</strong> ${timerText}</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Personal en Respuesta (${responders.length})</div>
-    ${responders.length > 0 ? `
-    <table>
-      <thead>
-        <tr><th>Nombre</th><th>Rango</th><th>Estado</th><th>Hora</th></tr>
-      </thead>
-      <tbody>${personalRows}</tbody>
-    </table>` : '<p style="font-size:13px;color:#64748b;">No se registró personal en respuesta.</p>'}
-  </div>
-
-  <div class="section">
-    <div class="section-title">Logística y Suministros (${logistics.length})</div>
-    ${logistics.length > 0 ? `
-    <table>
-      <thead>
-        <tr><th>Detalle</th><th>Solicitado por</th><th>Hora</th></tr>
-      </thead>
-      <tbody>${logisticsRows}</tbody>
-    </table>` : '<p style="font-size:13px;color:#64748b;">No hay suministros solicitados para esta emergencia.</p>'}
-  </div>
-
-  <div class="stamp-box">
-    <strong>Nota:</strong> Este documento fue generado automáticamente por el sistema AxonFire.
-    Para constancias legales con firma y sello, solicitar en la sede del Cuartel de Bomberos Voluntarios.
-  </div>
-
-  <div class="footer-signature">
-    <div class="signature-box">Firma y Aclaración<br>Oficial a Cargo</div>
-    <div class="signature-box">Firma y Sello<br>Jefe de Cuerpo / Administración</div>
-  </div>
-</body>
-</html>`;
-
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      // Give the browser a moment to render before triggering print
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
-    }
+  const { token, user, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => logout(), style: 'destructive' },
+      ]
+    );
   };
+  const rol = user?.rol || 'BOMBERO';
 
   const abrirInforme = () => {
     navigation.navigate('InformePostEmergencia', {
@@ -723,6 +502,28 @@ export default function AlertDetailScreen({ route, navigation }) {
       setLoading(false);
     }
   }, [alertaId, token]);
+
+  const imprimirInforme = async () => {
+    if (Platform.OS !== 'web' || !alerta) return;
+    const win = window.open('', '_blank');
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const response = await fetch(`${API_BASE_URL}/informes/${alertaId}/pdf`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`Error ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      win.location.href = url;
+    } catch (err) {
+      win.close();
+      console.error('Error al obtener PDF del backend:', err);
+      Alert.alert('Error', 'No se pudo generar el informe PDF desde el servidor.');
+    }
+  };
 
   const requestResource = async (resourceName, type = 'SUMINISTROS') => {
     Alert.alert(
@@ -978,6 +779,9 @@ export default function AlertDetailScreen({ route, navigation }) {
           </TouchableOpacity>
           <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('PerfilGlobal')}>
             <MaterialCommunityIcons name="account" size={20} color="#e2e8f0" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleLogout} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="logout" size={22} color="#e11d48" />
           </TouchableOpacity>
         </View>
       </View>

@@ -37,8 +37,14 @@ const GestionPoisMap = React.forwardRef(({
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('message', handleMessage);
+      return () => {
+        if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+          window.removeEventListener('message', handleMessage);
+        }
+      };
+    }
   }, [onPress]);
 
   // Update marker inside iframe when coords or category changes

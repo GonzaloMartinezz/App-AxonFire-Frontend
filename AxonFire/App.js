@@ -22,7 +22,7 @@ if (Platform.OS !== 'web') {
   });
 }
 
-const sirenSound = require('./assets/siren.wav');
+const sirenSound = require('./assets/siren.mp3');
 
 let appSirenSound = null;
 
@@ -214,6 +214,32 @@ export default function App() {
 
   useEffect(() => {
     if (!isWeb) return;
+
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        input::-ms-reveal, input::-ms-clear {
+          display: none !important;
+        }
+        input::-webkit-credentials-auto-fill-button {
+          visibility: hidden !important;
+          display: none !important;
+          pointer-events: none !important;
+        }
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active {
+          -webkit-box-shadow: 0 0 0 1000px #161a23 inset !important;
+          -webkit-text-fill-color: #ffffff !important;
+          transition: background-color 5000s ease-in-out 0s;
+        }
+      `;
+      document.head.appendChild(style);
+    } catch (e) {
+      console.warn('Failed to inject global web styles:', e);
+    }
+
     const handleError = (message, source, lineno, colno, error) => {
       setGlobalError({
         message: String(message),
@@ -230,21 +256,33 @@ export default function App() {
         stack: event.reason && event.reason.stack ? String(event.reason.stack) : 'No stack available'
       });
     };
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleRejection);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('error', handleError);
+      window.addEventListener('unhandledrejection', handleRejection);
+    }
     return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleRejection);
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('error', handleError);
+        window.removeEventListener('unhandledrejection', handleRejection);
+      }
     };
   }, []);
 
   useEffect(() => {
     if (!isWeb) return;
     const handleResize = () => {
-      setUseDesktopLayout(window.innerWidth > 768);
+      if (typeof window !== 'undefined') {
+        setUseDesktopLayout(window.innerWidth > 768);
+      }
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('resize', handleResize);
+    }
+    return () => {
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('resize', handleResize);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -360,12 +398,12 @@ export default function App() {
     const isWideDesktop = windowWidth >= 1280;
     const isUltraWide = windowWidth >= 1600;
     const desktopFrameStyle = {
-      width: isUltraWide ? '94%' : '96%',
-      maxWidth: isUltraWide ? 1480 : (isWideDesktop ? 1320 : 1120),
-      height: windowHeight >= 850 ? '92%' : '94%',
-      maxHeight: isUltraWide ? 920 : 860,
-      borderWidth: isWideDesktop ? 8 : 10,
-      borderRadius: isWideDesktop ? 22 : 26,
+      width: '99%',
+      maxWidth: isUltraWide ? 1800 : (isWideDesktop ? 1580 : 1380),
+      height: '99%',
+      maxHeight: isUltraWide ? 1100 : 980,
+      borderWidth: 4,
+      borderRadius: 12,
     };
 
     return (

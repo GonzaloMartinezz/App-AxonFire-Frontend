@@ -42,36 +42,69 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Cargar notificaciones desde AsyncStorage al iniciar
+  // Guardar notificaciones explícitamente y notificar a otras pestañas
+  const saveNotifications = async (newNotifications) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newNotifications));
+      // Despachar evento para sincronización local si es necesario (misma pestaña u otras si se usa BroadcastChannel en el futuro)
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof Event === 'function') {
+        window.dispatchEvent(new Event('axonfire_local_storage_sync'));
+      }
+    } catch (error) {
+      console.error('Error saving notifications to storage:', error);
+    }
+  };
+
   useEffect(() => {
     const loadNotifications = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          setNotifications(Array.isArray(parsed) ? parsed : []);
+          const parsedArray = Array.isArray(parsed) ? parsed : [];
+          
+          setNotifications((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(parsedArray)) {
+              return parsedArray;
+            }
+            return prev;
+          });
         }
       } catch (error) {
         console.error('Error loading notifications from storage:', error);
       } finally {
-        setLoaded(true);
+        setLoaded((prev) => (prev ? prev : true));
       }
     };
+    
+    // Carga inicial
     loadNotifications();
-  }, []);
 
-  // Persistir notificaciones en AsyncStorage cada vez que cambian
-  useEffect(() => {
-    if (!loaded) return;
-    const saveNotifications = async () => {
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-      } catch (error) {
-        console.error('Error saving notifications to storage:', error);
+    // RF-03: Polling muy corto para asegurar la actualización rápida (fallback por si falla el evento storage)
+    const intervalId = setInterval(() => {
+      loadNotifications();
+    }, 1500);
+
+    // Event listener nativo de Web para localStorage (instantáneo entre pestañas)
+    const handleStorageChange = (e) => {
+      if (e.key === STORAGE_KEY || e.type === 'axonfire_local_storage_sync') {
+        loadNotifications();
       }
     };
-    saveNotifications();
-  }, [notifications, loaded]);
+
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('storage', handleStorageChange);
+      window.addEventListener('axonfire_local_storage_sync', handleStorageChange);
+    }
+
+    return () => {
+      clearInterval(intervalId);
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('axonfire_local_storage_sync', handleStorageChange);
+      }
+    };
+  }, []);
 
   /**
    * Agrega una nueva notificación al inicio de la lista.
@@ -85,9 +118,9 @@ export const NotificationProvider = ({ children }) => {
       ...notification,
     };
     setNotifications((prev) => {
-      const updated = [newNotification, ...prev];
-      // Limitar a MAX_NOTIFICATIONS
-      return updated.slice(0, MAX_NOTIFICATIONS);
+      const updated = [newNotification, ...prev].slice(0, MAX_NOTIFICATIONS);
+      saveNotifications(updated);
+      return updated;
     });
   }, []);
 
@@ -95,16 +128,22 @@ export const NotificationProvider = ({ children }) => {
    * Marca una notificación como leída.
    */
   const markAsRead = useCallback((id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, leida: true } : n))
-    );
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, leida: true } : n));
+      saveNotifications(updated);
+      return updated;
+    });
   }, []);
 
   /**
    * Marca todas las notificaciones como leídas.
    */
   const markAllAsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, leida: true })));
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, leida: true }));
+      saveNotifications(updated);
+      return updated;
+    });
   }, []);
 
   /**
@@ -112,6 +151,7 @@ export const NotificationProvider = ({ children }) => {
    */
   const clearAll = useCallback(() => {
     setNotifications([]);
+    saveNotifications([]);
   }, []);
 
   /**

@@ -298,7 +298,17 @@ const inputStyles = StyleSheet.create({
 export default function EmergencyScreen({ route, navigation }) {
   // Parámetros de navegación y contexto de autenticación unificados
   const alertaId = route?.params?.alerta_id ?? null;
-  const { user, token: userToken } = useAuth();
+  const { user, token: userToken, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => logout(), style: 'destructive' },
+      ]
+    );
+  };
   const { addNotification } = useNotifications();
   const usuarioId = user?.id ?? null;
   const token = userToken ?? user?.token ?? null;
@@ -369,7 +379,7 @@ export default function EmergencyScreen({ route, navigation }) {
         staysActiveInBackground: true
       });
       const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/siren.wav'),
+        require('../../assets/siren.mp3'),
         { isLooping: true, volume: 1.0 }
       );
 
@@ -856,33 +866,43 @@ export default function EmergencyScreen({ route, navigation }) {
     if (respuesta === 'FINALIZADA') {
       return (
         <View style={styles.container}>
-          <SafeAreaView style={styles.centeredFlex}>
-            <Animated.View
-              style={[
-                styles.confirmationCard,
-                { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
-                styles.confirmationCardFinalized,
-              ]}
-            >
-              <MaterialCommunityIcons name="flag-checkered" size={72} color="#94a3b8" />
-              <Text style={styles.confirmationTitle}>Emergencia Finalizada</Text>
-              <Text style={styles.confirmationSubtitle}>
-                El administrador ya ha dado por finalizada esta alerta.
-              </Text>
-            </Animated.View>
-            {/* CTA de acceso rápido a revisión de bolsos */}
-            <TouchableOpacity
-              style={[styles.changeButton, { marginTop: 12, backgroundColor: 'rgba(220, 38, 38, 0.1)', borderColor: 'rgba(220, 38, 38, 0.3)' }]}
-              onPress={() => navigation.navigate('ChecklistBolsos', { token })}
-            >
-              <MaterialCommunityIcons name="clipboard-check-outline" size={16} color="#dc2626" />
-              <Text style={[styles.changeButtonText, { color: '#fff', fontWeight: 'bold' }]}>CONTROLAR BOLSOS UTILIZADOS</Text>
-            </TouchableOpacity>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ padding: 4 }}>
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+                <MaterialCommunityIcons name="logout" size={24} color="#e11d48" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.centeredFlex}>
+              <Animated.View
+                style={[
+                  styles.confirmationCard,
+                  { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
+                  styles.confirmationCardFinalized,
+                ]}
+              >
+                <MaterialCommunityIcons name="flag-checkered" size={72} color="#94a3b8" />
+                <Text style={styles.confirmationTitle}>Emergencia Finalizada</Text>
+                <Text style={styles.confirmationSubtitle}>
+                  El administrador ya ha dado por finalizada esta alerta.
+                </Text>
+              </Animated.View>
+              {/* CTA de acceso rápido a revisión de bolsos */}
+              <TouchableOpacity
+                style={[styles.changeButton, { marginTop: 12, backgroundColor: 'rgba(220, 38, 38, 0.1)', borderColor: 'rgba(220, 38, 38, 0.3)' }]}
+                onPress={() => navigation.navigate('ChecklistBolsos', { token })}
+              >
+                <MaterialCommunityIcons name="clipboard-check-outline" size={16} color="#dc2626" />
+                <Text style={[styles.changeButtonText, { color: '#fff', fontWeight: 'bold' }]}>CONTROLAR BOLSOS UTILIZADOS</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
-              <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
-              <Text style={styles.changeButtonText}>Volver al panel principal</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
+                <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
+                <Text style={styles.changeButtonText}>Volver al panel principal</Text>
+              </TouchableOpacity>
+            </View>
           </SafeAreaView>
           <ModalRevisionBolsos estado={revisionBolsos} />
         </View>
@@ -894,6 +914,14 @@ export default function EmergencyScreen({ route, navigation }) {
     return (
       <View style={styles.container}>
         <SafeAreaView style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ padding: 4 }}>
+              <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+              <MaterialCommunityIcons name="logout" size={24} color="#e11d48" />
+            </TouchableOpacity>
+          </View>
           <ScrollView
             contentContainerStyle={styles.confirmScroll}
             showsVerticalScrollIndicator={false}
@@ -1067,9 +1095,14 @@ export default function EmergencyScreen({ route, navigation }) {
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
               </TouchableOpacity>
               <Text style={styles.time}>{currentTime}</Text>
-              <TouchableOpacity style={styles.refreshIcon} onPress={fetchEmergencyData}>
-                <MaterialCommunityIcons name="refresh" size={24} color="#90a4ae" />
-              </TouchableOpacity>
+              <View style={[styles.refreshIcon, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+                <TouchableOpacity onPress={fetchEmergencyData} style={{ padding: 4 }}>
+                  <MaterialCommunityIcons name="refresh" size={24} color="#90a4ae" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+                  <MaterialCommunityIcons name="logout" size={24} color="#e11d48" />
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={styles.date}>{currentDate}</Text>
           </View>
@@ -1162,7 +1195,11 @@ export default function EmergencyScreen({ route, navigation }) {
 
               <View style={styles.card}>
                 <Text style={styles.label}>TIPO DE INCIDENTE</Text>
-                <Text style={styles.text}>{alertaData?.observaciones || 'Incendio Estructural - Edificio'}</Text>
+                <Text style={styles.text}>
+                  {alertaData?.subCategoriaAlerta?.nombre_sub_categoria
+                    || alertaData?.observaciones
+                    || 'Incidente'}
+                </Text>
                 <Text style={styles.text}>{alertaData?.ubicacion || 'Ubicación no disponible'}</Text>
                 <View style={styles.row}>
                   <View>
@@ -1175,7 +1212,14 @@ export default function EmergencyScreen({ route, navigation }) {
                   </View>
                   <View>
                     <Text style={styles.label}>PRIORIDAD</Text>
-                    <Text style={styles.critical}>CRÍTICA</Text>
+                    <Text style={[styles.critical, { color: (() => {
+                      const p = String(alertaData?.prioridad || '').toUpperCase();
+                      if (p === 'ALTA') return '#ef4444';
+                      if (p === 'MEDIA') return '#fbbf24';
+                      return '#38bdf8';
+                    })() }]}>
+                      {alertaData?.prioridad?.toUpperCase() || '—'}
+                    </Text>
                   </View>
                 </View>
                 <View style={styles.location}>

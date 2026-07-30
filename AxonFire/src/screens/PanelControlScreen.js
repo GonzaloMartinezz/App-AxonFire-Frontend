@@ -24,6 +24,7 @@ import { API_BASE_URL } from "../config/api";
 import axios from "axios";
 import { useNotifications } from "../context/NotificationContext";
 import { styles } from "../styles/PanelControlScreenStyles";
+import { getPrioridadConfig, getAlertIcon, getTipoAlerta, getPriorityColor } from "../utils/alertHelpers";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,15 +73,6 @@ function getStatusBadgeStyles(estado = "") {
   }
 }
 
-function clasificarPrioridad(prioridad = "") {
-  const p = String(prioridad).toLowerCase();
-  if (p === "1" || p.includes("critica") || p.includes("crítica"))
-    return "critica";
-  if (p === "2" || p.includes("alta")) return "alta";
-  if (p === "3" || p.includes("media")) return "media";
-  return "baja";
-}
-
 function tiempoTranscurrido(fechaISO) {
   if (!fechaISO) return "";
   const min = Math.floor((Date.now() - new Date(fechaISO).getTime()) / 60000);
@@ -89,47 +81,6 @@ function tiempoTranscurrido(fechaISO) {
   const hs = Math.floor(min / 60);
   if (hs < 24) return `Hace ${hs} hs`;
   return `Hace ${Math.floor(hs / 24)} días`;
-}
-
-function getAlertIcon(tipo = "") {
-  const t = tipo.toLowerCase();
-  if (t.includes("incendio") || t.includes("fuego"))
-    return { icon: "fire", color: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" };
-  if (
-    t.includes("rescate") ||
-    t.includes("accidente") ||
-    t.includes("vehicular")
-  )
-    return {
-      icon: "car-wrench",
-      color: "#fbbf24",
-      bg: "rgba(251, 191, 36, 0.12)",
-    };
-  if (t.includes("gas") || t.includes("quimico") || t.includes("hazmat"))
-    return {
-      icon: "biohazard",
-      color: "#fca5a5",
-      bg: "rgba(252, 165, 165, 0.12)",
-    };
-  if (t.includes("medic") || t.includes("ambulancia"))
-    return {
-      icon: "ambulance",
-      color: "#38bdf8",
-      bg: "rgba(56, 189, 248, 0.12)",
-    };
-  return {
-    icon: "alert-circle",
-    color: "#94a3b8",
-    bg: "rgba(148, 163, 184, 0.12)",
-  };
-}
-
-function getPriorityColor(prioridad = "") {
-  const p = String(prioridad).toLowerCase();
-  if (p === "critica" || p.includes("1")) return "#ef4444";
-  if (p === "alta" || p.includes("2")) return "#fbbf24";
-  if (p === "media" || p.includes("3")) return "#38bdf8";
-  return "#6ee7b7";
 }
 
 function formatAlertTitle(tipo = "") {
@@ -151,7 +102,17 @@ function formatAlertTitle(tipo = "") {
 export default function PanelControlScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
   const { notifications, getUnreadCount, markAsRead, markAllAsRead, clearAll } =
     useNotifications();
   const [notifModalVisible, setNotifModalVisible] = useState(false);
@@ -161,6 +122,14 @@ export default function PanelControlScreen({ navigation }) {
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
   const [error, setError] = useState(null);
+
+  // Short polling para alertas del panel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      cargarDatos(true);
+    }, 10000); // Polling corto cada 10 segundos
+    return () => clearInterval(interval);
+  }, [token]);
 
   async function cargarDatos(esRefresh = false) {
     if (esRefresh) setRefrescando(true);
@@ -179,7 +148,7 @@ export default function PanelControlScreen({ navigation }) {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        timeout: 15000,
+        timeout: 45000,
       });
 
       const data = res.data;
@@ -211,9 +180,13 @@ export default function PanelControlScreen({ navigation }) {
       setAlertas(resolvedLista);
     } catch (err) {
       console.error("Error cargando datos del panel:", err);
+      if (err?.response?.status === 401 || err?.status === 401) {
+        logout();
+        return;
+      }
       setAlertas([]);
       setError(
-        "Servidor no disponible o sesión expirada. Desliza hacia abajo para reintentar.",
+        "Servidor no disponible. Desliza hacia abajo para reintentar.",
       );
     } finally {
       setCargando(false);
@@ -259,9 +232,7 @@ export default function PanelControlScreen({ navigation }) {
     estado: clasificarEstado(
       a.estadoAlerta?.nombre_estado || a.estadoAlerta?.nombre || a.estado || "",
     ),
-    prioridad: clasificarPrioridad(
-      a.prioridad || a.subCategoriaAlerta?.prioridad || "",
-    ),
+    prioridad: String(a.prioridad || '').toLowerCase(),
     tipo:
       a.subCategoriaAlerta?.nombre_sub_categoria ||
       a.subCategoriaAlerta?.nombre ||
@@ -314,14 +285,16 @@ export default function PanelControlScreen({ navigation }) {
           <Text style={styles.activityKicker}>HISTORIAL</Text>
           <Text style={styles.activityTitle}>ÚLTIMAS ALERTAS</Text>
         </View>
-        <TouchableOpacity onPress={limpiarBaseDeDatos} style={styles.botonTest}>
-          <MaterialCommunityIcons
-            name="delete-sweep"
-            size={14}
-            color="#e11d48"
-          />
-          <Text style={styles.botonTestText}>LIMPIAR</Text>
-        </TouchableOpacity>
+        {user?.rol === "ADMIN" && (
+          <TouchableOpacity onPress={limpiarBaseDeDatos} style={styles.botonTest}>
+            <MaterialCommunityIcons
+              name="delete-sweep"
+              size={14}
+              color="#e11d48"
+            />
+            <Text style={styles.botonTestText}>LIMPIAR</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {ultimasAlertas.length === 0 ? (
@@ -484,6 +457,13 @@ export default function PanelControlScreen({ navigation }) {
           >
             <MaterialCommunityIcons name="refresh" size={20} color="#94a3b8" />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -527,8 +507,16 @@ export default function PanelControlScreen({ navigation }) {
               <View style={styles.titleLeftGroup}>
                 <View style={styles.redAccent} />
                 <View>
-                  <Text style={styles.headerLabel}>SISTEMA DE MONITOREO</Text>
-                  <Text style={styles.mainTitle}>PANEL DE{"\n"}CONTROL</Text>
+                  <Text style={styles.headerLabel}>
+                    {user?.rol === "ADMIN"
+                      ? "SISTEMA DE MONITOREO"
+                      : "SISTEMA OPERATIVO TÁCTICO"}
+                  </Text>
+                  <Text style={styles.mainTitle}>
+                    {user?.rol === "ADMIN"
+                      ? "PANEL DE\nCONTROL"
+                      : "PANEL TÁCTICO\nBOMBERO"}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -540,47 +528,86 @@ export default function PanelControlScreen({ navigation }) {
               );
               if (!alertaActiva) return null;
               return (
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() =>
-                    navigation.navigate("Asistencia", {
-                      alerta_id: alertaActiva.id,
-                    })
-                  }
-                  style={styles.activeEmergencyBanner}
-                >
-                  <View style={styles.emergencyBannerLeft}>
-                    <View style={styles.emergencyPulseIcon}>
+                <View style={{ marginBottom: 16 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() =>
+                      navigation.navigate("Asistencia", {
+                        alerta_id: alertaActiva.id,
+                      })
+                    }
+                    style={[styles.activeEmergencyBanner, { marginBottom: 0 }]}
+                  >
+                    <View style={styles.emergencyBannerLeft}>
+                      <View style={styles.emergencyPulseIcon}>
+                        <MaterialCommunityIcons
+                          name="alarm-light"
+                          size={20}
+                          color="#fff"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.emergencyBannerTitle}>
+                          EMERGENCIA EN CURSO
+                        </Text>
+                        <Text
+                          style={styles.emergencyBannerDesc}
+                          numberOfLines={1}
+                        >
+                          {alertaActiva.tipo.toUpperCase()} •{" "}
+                          {alertaActiva.ubicacion.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.emergencyBannerRight}>
+                      <Text style={styles.emergencyBannerBtnText}>
+                        VER ASISTENCIA
+                      </Text>
                       <MaterialCommunityIcons
-                        name="alarm-light"
-                        size={20}
+                        name="chevron-right"
+                        size={18}
                         color="#fff"
                       />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.emergencyBannerTitle}>
-                        EMERGENCIA EN CURSO
-                      </Text>
-                      <Text
-                        style={styles.emergencyBannerDesc}
-                        numberOfLines={1}
-                      >
-                        {alertaActiva.tipo.toUpperCase()} •{" "}
-                        {alertaActiva.ubicacion.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.emergencyBannerRight}>
-                    <Text style={styles.emergencyBannerBtnText}>
-                      VER ASISTENCIA
-                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Acceso rápido a Pedir Suministro durante la emergencia */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      navigation.navigate("PedidosSuministro", {
+                        alerta_id: alertaActiva.id,
+                      })
+                    }
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#ea580c",
+                      borderRadius: 10,
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      marginTop: 8,
+                      gap: 8,
+                    }}
+                  >
                     <MaterialCommunityIcons
-                      name="chevron-right"
+                      name="cart-plus"
                       size={18}
                       color="#fff"
                     />
-                  </View>
-                </TouchableOpacity>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 12,
+                        fontWeight: "900",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      SOLICITAR SUMINISTRO PARA LA EMERGENCIA
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               );
             })()}
 
@@ -614,110 +641,6 @@ export default function PanelControlScreen({ navigation }) {
                   />
                 </View>
               </View>
-            </View>
-
-            {/* ── Stats por estado interactivos ────────────────────────── */}
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionLine} />
-              <Text style={styles.sectionTitle}>ESTADOS DE EMERGENCIA</Text>
-            </View>
-
-            <View style={[styles.grilla, desktopGridStyle]}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() =>
-                  navigation.navigate("Alertas", { filtro: "Activas" })
-                }
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  { borderLeftColor: "#ef4444" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="alert-circle"
-                    size={20}
-                    color="#ef4444"
-                  />
-                  <Text style={styles.statNumero}>{cantActivas}</Text>
-                </View>
-                <Text style={styles.statLabel}>Activas</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate("NewAlert")}
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  styles.quickActionStat,
-                  { borderLeftColor: "#e11d48" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="alarm-plus"
-                    size={20}
-                    color="#e11d48"
-                  />
-                  <MaterialCommunityIcons
-                    name="chevron-right"
-                    size={20}
-                    color="#64748b"
-                  />
-                </View>
-                <Text style={styles.statActionTitle}>Cargar Emergencia</Text>
-                <Text style={styles.statLabel}>Alta rápida</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() =>
-                  navigation.navigate("Alertas", { filtro: "Resueltas" })
-                }
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  { borderLeftColor: "#10b981" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="check-circle"
-                    size={20}
-                    color="#10b981"
-                  />
-                  <Text style={styles.statNumero}>{cantResueltas}</Text>
-                </View>
-                <Text style={styles.statLabel}>Resueltas</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate("Mapa")}
-                style={[
-                  styles.cardStat,
-                  statCardStyle,
-                  styles.quickActionStat,
-                  { borderLeftColor: "#38bdf8" },
-                ]}
-              >
-                <View style={styles.cardStatHeader}>
-                  <MaterialCommunityIcons
-                    name="map-marker-radius"
-                    size={20}
-                    color="#38bdf8"
-                  />
-                  <MaterialCommunityIcons
-                    name="chevron-right"
-                    size={20}
-                    color="#64748b"
-                  />
-                </View>
-                <Text style={styles.statActionTitle}>Mapa Operativo</Text>
-                <Text style={styles.statLabel}>Vista territorial</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={isDesktopWeb ? styles.desktopBody : null}>
@@ -764,36 +687,6 @@ export default function PanelControlScreen({ navigation }) {
                 <View style={styles.gridContainer}>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => navigation.navigate("NewAlert")}
-                    style={[styles.gridItem, actionCardStyle]}
-                  >
-                    <View style={styles.gridItemHeader}>
-                      <View
-                        style={[
-                          styles.gridIconBg,
-                          { backgroundColor: "rgba(239, 68, 68, 0.12)" },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="alarm-light"
-                          size={18}
-                          color="#ef4444"
-                        />
-                      </View>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={16}
-                        color="#475569"
-                      />
-                    </View>
-                    <Text style={styles.gridItemTitle}>Cargar Emergencia</Text>
-                    <Text style={styles.gridItemSub}>
-                      Iniciar reporte táctico
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
                     onPress={() => navigation.navigate("GestionPois")}
                     style={[styles.gridItem, actionCardStyle]}
                   >
@@ -818,36 +711,6 @@ export default function PanelControlScreen({ navigation }) {
                     </View>
                     <Text style={styles.gridItemTitle}>Gestión de POIs</Text>
                     <Text style={styles.gridItemSub}>Puntos de interés</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate("Asistencia")}
-                    style={[styles.gridItem, actionCardStyle]}
-                  >
-                    <View style={styles.gridItemHeader}>
-                      <View
-                        style={[
-                          styles.gridIconBg,
-                          { backgroundColor: "rgba(16, 185, 129, 0.12)" },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="clipboard-check"
-                          size={18}
-                          color="#10b981"
-                        />
-                      </View>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={16}
-                        color="#475569"
-                      />
-                    </View>
-                    <Text style={styles.gridItemTitle}>
-                      Planilla Asistencia
-                    </Text>
-                    <Text style={styles.gridItemSub}>Presencia en vivo</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -996,7 +859,7 @@ export default function PanelControlScreen({ navigation }) {
                         color="#475569"
                       />
                     </View>
-                    <Text style={styles.gridItemTitle}>Métricas RUBA</Text>
+                    <Text style={styles.gridItemTitle}>Métricas</Text>
                     <Text style={styles.gridItemSub}>
                       Estadísticas generales
                     </Text>
@@ -1101,10 +964,10 @@ export default function PanelControlScreen({ navigation }) {
                     </View>
                     <View style={styles.logisticDetails}>
                       <Text style={styles.logisticCardTitle}>
-                        GESTIÓN DE SUMINISTROS
+                        GESTIÓN DE EQUIPOS
                       </Text>
                       <Text style={styles.logisticCardSub}>
-                        Control maestro de equipamiento e inventario
+                        Control de equipamiento e inventario
                       </Text>
                     </View>
                   </View>

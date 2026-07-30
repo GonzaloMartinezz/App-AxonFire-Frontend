@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import axios from 'axios';
 
@@ -58,121 +58,40 @@ function parseDateLocal(dateInput) {
 
 export default function ReportsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
   
-  // ── Print desde listado: abre informe en nueva pestaña ──
+  // ── Abrir PDF del backend en nueva pestaña (web) ──
   const imprimirDesdeListado = async (alerta) => {
     if (Platform.OS !== 'web') return;
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-
-    // Fetch responses for this alert
-    let alertResponses = [];
+    setGeneratingPdfId(alerta.id);
+    const win = window.open('', '_blank');
     try {
-      const res = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alerta.id}`, { headers, timeout: 5000 });
-      if (res.status === 200 && Array.isArray(res.data)) alertResponses = res.data;
-    } catch (err) {
-      console.log('Error loading responses for print:', err?.message);
-    }
-
-    const aceptados = alertResponses
-      .filter(r => r.estado_respuesta === 'ACEPTADO')
-      .map(r => {
-        const b = r.usuarioId?.bombero || r.bombero || {};
-        const name = b.nombre ? `${b.nombre} ${b.apellido || ''}` : 'BOMBERO';
-        return {
-          name: name.toUpperCase(),
-          role: b.rangoBombero?.nombre_rol || b.rango || 'BOMBERO',
-          hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
-        };
+      const headers = {
+        'Authorization': `Bearer ${token}`
+      };
+      const response = await axios.get(`${API_BASE_URL}/informes/${alerta.id}/pdf`, {
+        headers,
+        responseType: 'blob',
+        timeout: 60000
       });
-
-    const fechaInicio = parseDateLocal(alerta.fecha_hora);
-    let fechaFin;
-    if (alerta.fecha_hora_finalizacion) {
-      fechaFin = parseDateLocal(alerta.fecha_hora_finalizacion);
-    } else {
-      fechaFin = new Date(fechaInicio.getTime() + 2 * 60 * 60 * 1000);
-    }
-
-    const formatFH = (d) => d.toLocaleString('es-AR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
-
-    const tableRows = aceptados.map(r => `
-      <tr><td>${r.name}</td><td>${r.role}</td><td>${r.hora} HS</td></tr>
-    `).join('');
-
-    const htmlContent = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <title>Informe Legal - Siniestro #${alerta.id?.slice(0, 8).toUpperCase()}</title>
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; padding: 40px; line-height: 1.6; max-width: 900px; margin: 0 auto; }
-    .header { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 20px; margin-bottom: 30px; }
-    .header h1 { font-size: 22px; text-transform: uppercase; margin: 0; color: #7f1d1d; letter-spacing: 1px; }
-    .header h2 { font-size: 13px; margin: 5px 0 0; color: #475569; font-weight: normal; letter-spacing: 2px; }
-    .doc-title { text-align: center; text-transform: uppercase; font-size: 16px; font-weight: bold; margin: 20px 0; color: #0f172a; text-decoration: underline; }
-    .section { margin-bottom: 25px; }
-    .section-title { font-size: 13px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 12px; color: #7f1d1d; }
-    .grid { display: flex; flex-wrap: wrap; margin-bottom: 15px; }
-    .grid-item { width: 50%; margin-bottom: 8px; font-size: 13px; box-sizing: border-box; }
-    .grid-item span { font-weight: bold; color: #475569; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-    th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
-    th { background-color: #f1f5f9; color: #0f172a; font-weight: bold; }
-    tr:nth-child(even) { background-color: #f8fafc; }
-    .stamp-box { margin-top: 40px; text-align: center; font-size: 11px; color: #64748b; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 6px; }
-    .footer-signature { margin-top: 60px; display: flex; justify-content: space-between; }
-    .signature-box { width: 45%; text-align: center; border-top: 1px solid #94a3b8; padding-top: 10px; font-size: 12px; color: #475569; }
-    @media print { body { padding: 20px; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>Cuerpo de Bomberos Voluntarios</h1>
-    <h2>DOCUMENTO DE CONSTANCIA OFICIAL</h2>
-  </div>
-  <div class="doc-title">Borrador de Informe Legal de Siniestro</div>
-  <div class="section">
-    <div class="section-title">Datos de la Emergencia</div>
-    <div class="grid">
-      <div class="grid-item"><span>ID Alerta:</span> ${alerta.id}</div>
-      <div class="grid-item"><span>Tipo de Siniestro:</span> ${alerta.subCategoriaAlerta?.nombre_sub_categoria || alerta.observaciones || 'Siniestro'}</div>
-      <div class="grid-item"><span>Fecha/Hora Inicio:</span> ${formatFH(fechaInicio)}</div>
-      <div class="grid-item"><span>Fecha/Hora Fin:</span> ${formatFH(fechaFin)}</div>
-      <div class="grid-item"><span>Ubicación:</span> ${alerta.ubicacion || 'No especificada'}</div>
-      <div class="grid-item"><span>Estado:</span> FINALIZADO</div>
-    </div>
-  </div>
-  <div class="section">
-    <div class="section-title">Descripción y Observaciones</div>
-    <p style="font-size:13px;margin:5px 0;">${alerta.observaciones || 'No hay observaciones adicionales.'}</p>
-  </div>
-  <div class="section">
-    <div class="section-title">Personal de Asistencia</div>
-    ${tableRows ? `<table><thead><tr><th>Nombre y Apellido</th><th>Rango</th><th>Hora de Respuesta</th></tr></thead><tbody>${tableRows}</tbody></table>` : '<p style="font-size:13px;color:#64748b;">No se registraron asistencias oficiales.</p>'}
-  </div>
-  <div class="stamp-box">
-    <strong>Nota Importante:</strong> Este documento constituye un borrador generado por AxonFire. El informe definitivo con firma digital o sello debe solicitarse en la sede del Cuartel.
-  </div>
-  <div class="footer-signature">
-    <div class="signature-box">Firma y Aclaración<br>Oficial a Cargo del Siniestro</div>
-    <div class="signature-box">Firma y Sello<br>Jefe de Cuerpo / Administración</div>
-  </div>
-</body>
-</html>`;
-
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      setTimeout(() => { printWindow.print(); }, 500);
+      const url = URL.createObjectURL(response.data);
+      win.location.href = url;
+    } catch (err) {
+      win.close();
+      console.log('Error al obtener PDF del backend:', err?.message);
+      Alert.alert('Error', 'No se pudo generar el informe PDF desde el servidor.');
+    } finally {
+      setGeneratingPdfId(null);
     }
   };
 
@@ -259,300 +178,31 @@ export default function ReportsScreen({ navigation }) {
   );
 
   // Generación de PDF Legal
+  // Descargar PDF del backend y compartir
   const generateLegalReportPDF = async (alerta) => {
     setGeneratingPdfId(alerta.id);
     try {
       const headers = {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       };
-
-      // 1. Obtener las respuestas de esta alerta específica para poder cruzar los bomberos aceptados
-      let alertResponses = [];
-      try {
-        const resResp = await axios.get(`${API_BASE_URL}/respuestas_alertas/${alerta.id}`, {
-          headers,
-          timeout: 5000
-        });
-        if (resResp.status === 200 && Array.isArray(resResp.data)) {
-          alertResponses = resResp.data;
-        }
-      } catch (err) {
-        console.log('Error loading responses for alert, trying backup endpoint:', err?.message || err);
-        try {
-          const resRespBackup = await axios.get(`${API_BASE_URL}/respuestas_alertas`, {
-            headers,
-            timeout: 5000
-          });
-          if (resRespBackup.status === 200 && Array.isArray(resRespBackup.data)) {
-            alertResponses = resRespBackup.data.filter(
-              r => r.alerta_id === alerta.id || r.alertaId === alerta.id || r.alertaId?.id === alerta.id
-            );
-          }
-        } catch (backupErr) {
-          console.log('Backup responses fetch failed:', backupErr?.message || backupErr);
-        }
-      }
-
-      // 2. Combinar con respuestas locales de AsyncStorage si las hubiera
-      try {
-        const localSaved = await AsyncStorage.getItem(`responses_${alerta.id}`);
-        if (localSaved) {
-          const parsed = JSON.parse(localSaved);
-          const combined = [...alertResponses];
-          parsed.forEach(fl => {
-            const uId = fl.usuario_id || fl.usuarioId?.id;
-            if (uId && !combined.some(c => (c.usuario_id || c.usuarioId?.id) === uId)) {
-              combined.push(fl);
-            }
-          });
-          alertResponses = combined;
-        }
-      } catch (e) {
-        console.log('Error reading local responses:', e);
-      }
-
-      // 3. Fallback adicional por si acaso (para mantener compatibilidad heredada)
-      try {
-        const storedResponses = await AsyncStorage.getItem('local_alert_responses');
-        if (storedResponses) {
-          const parsed = JSON.parse(storedResponses);
-          const filteredLocal = parsed.filter(r => r.alerta_id === alerta.id || r.alertaId?.id === alerta.id);
-          const combined = [...alertResponses];
-          filteredLocal.forEach(fl => {
-            const uId = fl.usuario_id || fl.usuarioId?.id;
-            if (uId && !combined.some(c => (c.usuario_id || c.usuarioId?.id) === uId)) {
-              combined.push(fl);
-            }
-          });
-          alertResponses = combined;
-        }
-      } catch (e) {
-        console.log('Error reading fallback local responses:', e);
-      }
-
-      const aceptados = alertResponses
-        .filter(r => r.estado_respuesta === 'ACEPTADO')
-        .map((r, i) => {
-          const b = r.usuarioId?.bombero || r.bombero || {};
-          const nombreUsuario = r.usuarioId?.nombre_usuario || r.usuarioId?.nombre || '';
-          const name = b.nombre ? `${b.nombre} ${b.apellido || ''}` : nombreUsuario;
-          return {
-            name: (name || 'BOMBERO').toUpperCase(),
-            role: b.rangoBombero?.nombre_rol || b.rango || 'BOMBERO',
-            hora: r.fecha_hora ? new Date(r.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
-          };
-        });
-
-      const fechaInicio = parseDateLocal(alerta.fecha_hora);
-      let fechaFin;
-      if (alerta.fecha_hora_finalizacion) {
-        fechaFin = parseDateLocal(alerta.fecha_hora_finalizacion);
-      } else if (alerta.duracion_total_alerta) {
-        // Si duracion_total_alerta > 1000, asumimos que está en milisegundos y lo usamos directamente;
-        // de lo contrario, lo tratamos como horas y lo convertimos a milisegundos.
-        const duracionMs = alerta.duracion_total_alerta > 1000
-          ? alerta.duracion_total_alerta
-          : alerta.duracion_total_alerta * 60 * 60 * 1000;
-        fechaFin = new Date(fechaInicio.getTime() + duracionMs);
-      } else {
-        // Estimar 2 horas por defecto
-        fechaFin = new Date(fechaInicio.getTime() + 2 * 60 * 60 * 1000);
-      }
-
-      const formatFechaHora = (date) => {
-        return date.toLocaleString('es-AR', {
-          day: '2-digit', month: '2-digit', year: 'numeric',
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
-        });
-      };
-
-      const tableRows = aceptados.map(r => `
-        <tr>
-          <td>${r.name}</td>
-          <td>${r.role}</td>
-          <td>${r.hora} HS</td>
-        </tr>
-      `).join('');
-
-      const htmlContent = `
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body {
-                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                color: #1e293b;
-                padding: 40px;
-                line-height: 1.6;
-              }
-              .header {
-                text-align: center;
-                border-bottom: 3px double #0f172a;
-                padding-bottom: 20px;
-                margin-bottom: 30px;
-              }
-              .header h1 {
-                font-size: 24px;
-                text-transform: uppercase;
-                margin: 0;
-                color: #7f1d1d;
-                letter-spacing: 1px;
-              }
-              .header h2 {
-                font-size: 14px;
-                margin: 5px 0 0 0;
-                color: #475569;
-                font-weight: normal;
-                letter-spacing: 2px;
-              }
-              .doc-title {
-                text-align: center;
-                text-transform: uppercase;
-                font-size: 18px;
-                font-weight: bold;
-                margin: 20px 0;
-                color: #0f172a;
-                text-decoration: underline;
-              }
-              .section {
-                margin-bottom: 25px;
-              }
-              .section-title {
-                font-size: 14px;
-                text-transform: uppercase;
-                font-weight: bold;
-                border-bottom: 1px solid #cbd5e1;
-                padding-bottom: 5px;
-                margin-bottom: 12px;
-                color: #7f1d1d;
-              }
-              .grid {
-                display: flex;
-                flex-wrap: wrap;
-                margin-bottom: 15px;
-              }
-              .grid-item {
-                width: 50%;
-                margin-bottom: 8px;
-                font-size: 13px;
-              }
-              .grid-item span {
-                font-weight: bold;
-                color: #475569;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 10px;
-                font-size: 13px;
-              }
-              th, td {
-                border: 1px solid #cbd5e1;
-                padding: 10px;
-                text-align: left;
-              }
-              th {
-                background-color: #f1f5f9;
-                color: #0f172a;
-                font-weight: bold;
-              }
-              tr:nth-child(even) {
-                background-color: #f8fafc;
-              }
-              .footer-signature {
-                margin-top: 60px;
-                display: flex;
-                justify-content: space-between;
-              }
-              .signature-box {
-                width: 45%;
-                text-align: center;
-                border-top: 1px solid #94a3b8;
-                padding-top: 10px;
-                font-size: 12px;
-                color: #475569;
-              }
-              .stamp-box {
-                margin-top: 40px;
-                text-align: center;
-                font-size: 11px;
-                color: #64748b;
-                border: 1px dashed #cbd5e1;
-                padding: 15px;
-                border-radius: 6px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Cuerpo de Bomberos Voluntarios</h1>
-              <h2>DOCUMENTO DE CONSTANCIA OFICIAL</h2>
-            </div>
-            
-            <div class="doc-title">Borrador de Informe Legal de Siniestro</div>
-            
-            <div class="section">
-              <div class="section-title">Datos de la Emergencia</div>
-              <div class="grid">
-                <div class="grid-item"><span>ID Alerta:</span> ${alerta.id}</div>
-                <div class="grid-item"><span>Tipo de Siniestro:</span> ${alerta.subCategoriaAlerta?.nombre_sub_categoria || alerta.observaciones || 'Siniestro'}</div>
-                <div class="grid-item"><span>Fecha/Hora Inicio:</span> ${formatFechaHora(fechaInicio)}</div>
-                <div class="grid-item"><span>Fecha/Hora Fin (Est.):</span> ${formatFechaHora(fechaFin)}</div>
-                <div class="grid-item"><span>Ubicación:</span> ${alerta.ubicacion || 'No especificada'}</div>
-                <div class="grid-item"><span>Estado:</span> FINALIZADO</div>
-              </div>
-            </div>
-
-            <div class="section">
-              <div class="section-title">Descripción y Observaciones</div>
-              <p style="font-size: 13px; margin: 5px 0;">${alerta.observaciones || 'No hay observaciones adicionales registradas para este siniestro.'}</p>
-            </div>
-
-            <div class="section">
-              <div class="section-title">Personal de Asistencia</div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nombre y Apellido</th>
-                    <th>Rango</th>
-                    <th>Hora de Respuesta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${tableRows || '<tr><td colspan="3" style="text-align:center;">No se registraron asistencias oficiales.</td></tr>'}
-                </tbody>
-              </table>
-            </div>
-
-            <div class="stamp-box">
-              <strong>Nota Importante para la Aseguradora / Desarrollo Social:</strong><br>
-              El presente documento constituye un borrador de informe de intervención de emergencia expedido por el sistema digital AxonFire. El informe definitivo con firma digital o sello holográfico del Jefe de Cuerpo debe solicitarse en la sede central del Cuartel de Bomberos Voluntarios correspondiente.
-            </div>
-
-            <div class="footer-signature">
-              <div class="signature-box">
-                Firma y Aclaración<br>
-                Oficial a Cargo del Siniestro
-              </div>
-              <div class="signature-box">
-                Firma y Sello<br>
-                Jefe de Cuerpo / Administración
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      await Sharing.shareAsync(uri, {
+      const fileUri = FileSystem.documentDirectory + `informe_${alerta.id}.pdf`;
+      const downloadPromise = FileSystem.downloadAsync(
+        `${API_BASE_URL}/informes/${alerta.id}/pdf`,
+        fileUri,
+        { headers }
+      );
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 60000)
+      );
+      const downloadResult = await Promise.race([downloadPromise, timeoutPromise]);
+      await Sharing.shareAsync(downloadResult.uri, {
         mimeType: 'application/pdf',
         dialogTitle: `Informe_Legal_${alerta.id}.pdf`,
         UTI: 'com.adobe.pdf'
       });
     } catch (err) {
-      console.log('Error generating PDF:', err);
-      Alert.alert('Error', 'No se pudo generar el borrador legal en PDF.');
+      console.log('Error downloading PDF from backend:', err);
+      Alert.alert('Error', 'No se pudo generar el informe PDF desde el servidor.');
     } finally {
       setGeneratingPdfId(null);
     }
@@ -582,6 +232,9 @@ export default function ReportsScreen({ navigation }) {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>REPORTES LEGALES</Text>
         </View>
+        <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+          <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -635,37 +288,40 @@ export default function ReportsScreen({ navigation }) {
           </View>
         ) : filteredAlertsList.length > 0 ? (
           filteredAlertsList.map((item) => (
-            <TouchableOpacity
+            <View
               key={item.id}
               className="printable-card"
               style={styles.alertCard}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('AlertDetail', { alerta_id: item.id })}
             >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardId}>SINIESTRO #{item.id.slice(0, 8).toUpperCase()}</Text>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>FINALIZADO</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('AlertDetail', { alerta_id: item.id })}
+              >
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardId}>SINIESTRO #{item.id.slice(0, 8).toUpperCase()}</Text>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusText}>FINALIZADO</Text>
+                  </View>
                 </View>
-              </View>
 
-              <Text style={styles.cardTitle}>
-                {item.subCategoriaAlerta?.nombre_sub_categoria || item.observaciones || 'Incidente'}
-              </Text>
-
-              <View style={styles.metaRow}>
-                <MaterialCommunityIcons name="map-marker-outline" size={15} color="#94a3b8" />
-                <Text style={styles.metaText} numberOfLines={1}>
-                  {item.ubicacion || 'Ubicación no especificada'}
+                <Text style={styles.cardTitle}>
+                  {item.subCategoriaAlerta?.nombre_sub_categoria || item.observaciones || 'Incidente'}
                 </Text>
-              </View>
 
-              <View style={styles.metaRow}>
-                <MaterialCommunityIcons name="clock-outline" size={15} color="#94a3b8" />
-                <Text style={styles.metaText}>
-                  {parseDateLocal(item.fecha_hora).toLocaleDateString('es-AR')} • {parseDateLocal(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
-                </Text>
-              </View>
+                <View style={styles.metaRow}>
+                  <MaterialCommunityIcons name="map-marker-outline" size={15} color="#94a3b8" />
+                  <Text style={styles.metaText} numberOfLines={1}>
+                    {item.ubicacion || 'Ubicación no especificada'}
+                  </Text>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={15} color="#94a3b8" />
+                  <Text style={styles.metaText}>
+                    {parseDateLocal(item.fecha_hora).toLocaleDateString('es-AR')} • {parseDateLocal(item.fecha_hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} HS
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.pdfButton}
@@ -677,12 +333,12 @@ export default function ReportsScreen({ navigation }) {
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="file-document-outline" size={18} color="#fff" />
-                    <Text style={styles.pdfButtonText}>GENERAR BORRADOR LEGAL</Text>
+                    <MaterialCommunityIcons name="printer" size={18} color="#fff" />
+                    <Text style={styles.pdfButtonText}>IMPRIMIR REPORTE LEGAL</Text>
                   </>
                 )}
               </TouchableOpacity>
-            </TouchableOpacity>
+            </View>
           ))
         ) : (
           <View style={styles.emptyContainer}>

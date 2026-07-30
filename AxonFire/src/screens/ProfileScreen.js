@@ -124,36 +124,29 @@ export default function ProfileScreen({ navigation }) {
       Alert.alert('Error', 'El campo no puede estar vacío.');
       return;
     }
-    if (editField === 'password') {
-      if (editValue !== editConfirm) {
-        Alert.alert('Error', 'Las contraseñas no coinciden.');
-        return;
-      }
-      if (editValue.length < 6) {
-        Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres.');
-        return;
-      }
+    if (editValue !== editConfirm) {
+      Alert.alert('Error', 'Las contraseñas no coinciden.');
+      return;
+    }
+    if (editValue.length < 6) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres.');
+      return;
     }
     setIsSaving(true);
     try {
-      let body = {};
-      if (editField === 'password') body = { password: editValue };
-      else if (editField === 'nombre') body = { bombero: { nombre: editValue.trim().toUpperCase() } };
-      else if (editField === 'apellido') body = { bombero: { apellido: editValue.trim().toUpperCase() } };
-
       const res = await fetch(`${API_BASE_URL}/usuarios/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ password: editValue }),
       });
 
       if (res.ok) {
-        Alert.alert('✅ Guardado', 'Tu perfil fue actualizado.');
+        Alert.alert('✅ Guardado', 'Tu contraseña fue actualizada.');
         setEditVisible(false);
         fetchProfile(true);
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Sin soporte aún', err.message || 'La edición de perfil no está disponible. Contactá al administrador.');
+        Alert.alert('Error', err.message || 'No se pudo actualizar la contraseña.');
         setEditVisible(false);
       }
     } catch {
@@ -165,11 +158,9 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const editConfig = {
-    nombre: { title: 'EDITAR NOMBRE', icon: 'account-edit', isPassword: false },
-    apellido: { title: 'EDITAR APELLIDO', icon: 'account-edit', isPassword: false },
     password: { title: 'CAMBIAR CONTRASEÑA', icon: 'lock-reset', isPassword: true },
   };
-  const cfg = editConfig[editField] || {};
+  const cfg = editConfig[editField] || editConfig.password;
 
   return (
     <View style={styles.container}>
@@ -280,40 +271,10 @@ export default function ProfileScreen({ navigation }) {
           />
         </View>
 
-        {/* ── Operaciones ─────────────────────────────────── */}
-        <Text style={styles.sectionTitle}>OPERACIONES</Text>
-        <View style={styles.card}>
-          <ActionRow
-            icon="truck-delivery"
-            iconBg="#2d1515"
-            iconColor="#dc2626"
-            title="Centro Logístico"
-            sub="Acceso a móviles y recursos"
-            onPress={() => navigation.navigate('Logistica')}
-            noBorder
-          />
-        </View>
-
         {/* ── Acciones ─────────────────────────────────── */}
         <Text style={styles.sectionTitle}>ACCIONES DE CUENTA</Text>
 
         <View style={styles.card}>
-          <ActionRow
-            icon="account-edit"
-            iconBg="#1e3a5f"
-            iconColor="#60a5fa"
-            title="Editar Nombre"
-            sub="Cambiar nombre en el sistema"
-            onPress={() => openEdit('nombre')}
-          />
-          <ActionRow
-            icon="account-edit-outline"
-            iconBg="#1e3a5f"
-            iconColor="#60a5fa"
-            title="Editar Apellido"
-            sub="Actualizar apellido"
-            onPress={() => openEdit('apellido')}
-          />
           <ActionRow
             icon="lock-reset"
             iconBg="#0a2518"
@@ -368,7 +329,7 @@ export default function ProfileScreen({ navigation }) {
 
             <View style={styles.modalHeader}>
               <View style={styles.modalIconBox}>
-                <MaterialCommunityIcons name={cfg.icon || 'pencil'} size={20} color="#e11d48" />
+                <MaterialCommunityIcons name={cfg.icon || 'lock-reset'} size={20} color="#e11d48" />
               </View>
               <Text style={styles.modalTitle}>{cfg.title}</Text>
               <TouchableOpacity
@@ -381,59 +342,38 @@ export default function ProfileScreen({ navigation }) {
 
             <View style={styles.modalDivider} />
 
-            {cfg.isPassword ? (
-              <>
-                <Text style={styles.modalLabel}>NUEVA CONTRASEÑA</Text>
-                <View style={styles.modalInputWrap}>
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="Mínimo 6 caracteres..."
-                    placeholderTextColor="#334155"
-                    value={editValue}
-                    onChangeText={setEditValue}
-                    secureTextEntry={!showEditPw}
-                    autoCapitalize="none"
-                    editable={!isSaving}
-                  />
-                  <TouchableOpacity onPress={() => setShowEditPw(v => !v)} style={styles.pwToggle}>
-                    <MaterialCommunityIcons name={showEditPw ? 'eye-off' : 'eye'} size={18} color="#475569" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={[styles.modalLabel, { marginTop: 14 }]}>CONFIRMAR CONTRASEÑA</Text>
-                <View style={styles.modalInputWrap}>
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="Repetir contraseña..."
-                    placeholderTextColor="#334155"
-                    value={editConfirm}
-                    onChangeText={setEditConfirm}
-                    secureTextEntry={!showConfirmPw}
-                    autoCapitalize="none"
-                    editable={!isSaving}
-                  />
-                  <TouchableOpacity onPress={() => setShowConfirmPw(v => !v)} style={styles.pwToggle}>
-                    <MaterialCommunityIcons name={showConfirmPw ? 'eye-off' : 'eye'} size={18} color="#475569" />
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.modalLabel}>
-                  {editField === 'nombre' ? 'NUEVO NOMBRE' : 'NUEVO APELLIDO'}
-                </Text>
-                <View style={styles.modalInputWrap}>
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder={editField === 'nombre' ? 'Nuevo nombre...' : 'Nuevo apellido...'}
-                    placeholderTextColor="#334155"
-                    value={editValue}
-                    onChangeText={setEditValue}
-                    autoCapitalize="words"
-                    editable={!isSaving}
-                  />
-                </View>
-              </>
-            )}
+            <Text style={styles.modalLabel}>NUEVA CONTRASEÑA</Text>
+            <View style={styles.modalInputWrap}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Mínimo 6 caracteres..."
+                placeholderTextColor="#334155"
+                value={editValue}
+                onChangeText={setEditValue}
+                secureTextEntry={!showEditPw}
+                autoCapitalize="none"
+                editable={!isSaving}
+              />
+              <TouchableOpacity onPress={() => setShowEditPw(v => !v)} style={styles.pwToggle}>
+                <MaterialCommunityIcons name={showEditPw ? 'eye-off' : 'eye'} size={18} color="#475569" />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.modalLabel, { marginTop: 14 }]}>CONFIRMAR CONTRASEÑA</Text>
+            <View style={styles.modalInputWrap}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Repetir contraseña..."
+                placeholderTextColor="#334155"
+                value={editConfirm}
+                onChangeText={setEditConfirm}
+                secureTextEntry={!showConfirmPw}
+                autoCapitalize="none"
+                editable={!isSaving}
+              />
+              <TouchableOpacity onPress={() => setShowConfirmPw(v => !v)} style={styles.pwToggle}>
+                <MaterialCommunityIcons name={showConfirmPw ? 'eye-off' : 'eye'} size={18} color="#475569" />
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity

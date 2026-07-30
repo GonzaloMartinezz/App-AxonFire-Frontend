@@ -125,6 +125,10 @@ function extraerTipoAlerta(alerta) {
 
   const text = normalizeText(rawText);
 
+  // Match directo contra nombres de subcategoría de la BD
+  if (rawText === 'INCENDIO ESTRUCTURAL') return 'INCENDIOS';
+  if (rawText === 'RESCATE AUTOMOVIL') return 'RESCATES';
+
   // 1. INCENDIOS
   if (
     text.includes('incendio') ||
@@ -227,7 +231,17 @@ function getTipoIcon(tipo) {
 
 export default function EstadisticasScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const [loading, setLoading] = useState(true);
   const [selectedMes, setSelectedMes] = useState(new Date().getMonth());
@@ -341,14 +355,14 @@ export default function EstadisticasScreen({ navigation }) {
       });
 
       const nombreMes = MESES.find(m => m.value === selectedMes)?.label || 'Mes';
-      const filename = `RUBA_Participacion_${nombreMes}_${selectedAnio}.csv`;
+      const filename = `Participacion_${nombreMes}_${selectedAnio}.csv`;
       const filePath = `${FileSystem.documentDirectory}${filename}`;
 
       await FileSystem.writeAsStringAsync(filePath, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
 
       await Sharing.shareAsync(filePath, {
         mimeType: 'text/csv',
-        dialogTitle: `Exportar Estadísticas RUBA`,
+        dialogTitle: `Exportar Estadísticas`,
         UTI: 'public.comma-separated-values-text'
       });
     } catch (err) {
@@ -389,7 +403,7 @@ export default function EstadisticasScreen({ navigation }) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#e11d48" />
-        <Text style={styles.loadingText}>Cargando estadísticas RUBA...</Text>
+        <Text style={styles.loadingText}>Cargando estadísticas...</Text>
       </View>
     );
   }
@@ -406,12 +420,27 @@ export default function EstadisticasScreen({ navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#e11d48" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>ESTADÍSTICAS RUBA</Text>
+          <Text style={styles.headerTitle}>ESTADÍSTICAS</Text>
         </View>
-        <TouchableOpacity style={styles.exportBtn} onPress={exportarCSV}>
-          <MaterialCommunityIcons name="file-export" size={20} color="#fff" />
-          <Text style={styles.exportBtnText}>EXPORTAR</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity style={styles.exportBtn} onPress={exportarCSV}>
+            <MaterialCommunityIcons name="file-export" size={20} color="#fff" />
+            <Text style={styles.exportBtnText}>EXPORTAR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 8,
+              backgroundColor: '#1f2937',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            onPress={handleLogout}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentScroll} showsVerticalScrollIndicator={false}>

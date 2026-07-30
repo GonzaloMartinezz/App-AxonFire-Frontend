@@ -21,10 +21,10 @@ import axios from 'axios';
  * @param {string} fecha_desde - ISO date string
  * @param {string} fecha_hasta - ISO date string  
  * @param {object} headers - Headers including Authorization
- * @param {number} timeout - Timeout in ms (default 8000)
+ * @param {number} timeout - Timeout in ms (default 45000)
  * @returns {Array} - Array of alertas
  */
-export async function fetchAlertasPorRango(baseUrl, fecha_desde, fecha_hasta, headers = {}, timeout = 8000) {
+export async function fetchAlertasPorRango(baseUrl, fecha_desde, fecha_hasta, headers = {}, timeout = 45000) {
   const body = JSON.stringify({ fecha_desde, fecha_hasta });
 
   if (Platform.OS === 'web') {

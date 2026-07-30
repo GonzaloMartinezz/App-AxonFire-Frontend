@@ -1,28 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // InformePostEmergenciaScreen.js — NUEVO
 //
-// AX-16: Edición de plantilla de informe post-emergencia
-//
-// USER STORY: Como jefe de dotación, quiero abrir el borrador del informe
-//   generado para agregar observaciones cualitativas, detalles de la vivienda
-//   afectada o el local, antes de proceder a la impresión definitiva.
-//
-// PRECONDICIÓN: El usuario debe tener rol de administrador u oficial.
-//
-// TAREA: Implementar un editor de texto enriquecido (WYSIWYG) ligero para que
-//   el oficial añada observaciones (ej. "local denominado...", detalles del
-//   siniestro).
+// AX-16: Edición de informe post-emergencia (observaciones_admin)
 //
 // ENDPOINT CONSUMIDO:
-//   GET  /alerta/:id_alerta                  → datos de la alerta
-//   GET  /registros_comunicacion/alerta/:id  → historial de observaciones previas
-//   POST /registros_comunicacion/crear       → guarda el informe/observaciones
-//     Body: { alerta_id, mensaje, tipo_comunicacion: "INFORMACION", fecha_hora }
+//   GET   /alerta/:id_alerta           → datos de la alerta
+//   GET   /informes/:alertaId/datos    → datos del informe existente
+//   PATCH /informes/:alertaId/guardar  → guarda o actualiza el informe
+//     Body: { observaciones_admin }
 //
 // PARÁMETROS DE NAVEGACIÓN (route.params):
 //   - alertaId    : UUID de la alerta asociada al informe
 //   - token       : Bearer JWT
-//   - rol         : rol del usuario ("ADMIN" | "BOMBERO") — para controlar acceso
+//   - rol         : rol del usuario ("ADMIN" | "BOMBERO")
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -42,16 +32,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import { styles } from '../styles/InformePostEmergenciaScreenStyles';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseDateLocal(dateInput) {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
   if (typeof dateInput !== 'string') return new Date(dateInput);
-
-  // Strip 'Z' at the end or '+00:00' timezone offset to parse it as local time
   const cleaned = dateInput.replace(/Z$/, '').replace(/\+00:?00$/, '');
   return new Date(cleaned);
 }
@@ -64,29 +51,13 @@ function formatFecha(iso) {
   });
 }
 
-// ── Toolbar WYSIWYG liviano ───────────────────────────────────────────────────
-// React Native no tiene WebView en el core; implementamos un editor con
-// TextInput + estado de formato aplicado como marcadores de texto
-// (negrita con **texto**, cursiva con _texto_, etc.) — liviano y sin deps extra.
-// El texto se guarda como string plano enriquecido con marcadores simples.
-
 const ACCIONES_FORMATO = [
   { id: 'negrita', icono: 'format-bold', marcador: '**', label: 'Negrita' },
-  { icono: 'format-italic', marcador: '_', id: 'cursiva', label: 'Cursiva' },
+  { id: 'cursiva', icono: 'format-italic', marcador: '_', label: 'Cursiva' },
   { id: 'subrayado', icono: 'format-underline', marcador: '__', label: 'Subrayado' },
   { id: 'lista', icono: 'format-list-bulleted', marcador: '• ', label: 'Lista' },
   { id: 'separador', icono: 'minus', marcador: '\n─────────────────\n', label: 'Separador' },
 ];
-
-// Secciones predefinidas de la plantilla del informe
-const SECCIONES_PLANTILLA = [
-  { id: 'local', titulo: 'Descripción del local / vivienda', placeholder: 'Local denominado... ubicado en... con características...' },
-  { id: 'siniestro', titulo: 'Detalles del siniestro', placeholder: 'Se constató... El origen del incendio... Extensión del daño...' },
-  { id: 'intervenciones', titulo: 'Intervenciones realizadas', placeholder: 'Se procedió a... Se utilizaron... El personal actuante...' },
-  { id: 'estado_final', titulo: 'Estado final y observaciones', placeholder: 'Al momento del retiro... Se recomienda... Observaciones adicionales...' },
-];
-
-// ── Componente ToolbarWYSIWYG ─────────────────────────────────────────────────
 
 function ToolbarWYSIWYG({ onAccion }) {
   return (
@@ -123,141 +94,38 @@ const toolbarStyles = StyleSheet.create({
   },
 });
 
-// ── Componente: Editor de sección ─────────────────────────────────────────────
-
-function EditorSeccion({ seccion, value, onChange }) {
-  const inputRef = useRef(null);
-  const [seleccion, setSeleccion] = useState({ start: 0, end: 0 });
-
-  function aplicarFormato(accion) {
-    if (accion.id === 'lista') {
-      // Agrega bullet al inicio de la línea actual
-      const antes = value.slice(0, seleccion.start);
-      const despues = value.slice(seleccion.end);
-      const lineaInicio = antes.lastIndexOf('\n') + 1;
-      const lineaTexto = antes.slice(lineaInicio);
-      const nuevoTexto = antes.slice(0, lineaInicio) + '• ' + lineaTexto + despues;
-      onChange(nuevoTexto);
-      return;
-    }
-    if (accion.id === 'separador') {
-      const nuevoTexto = value.slice(0, seleccion.start) + accion.marcador + value.slice(seleccion.end);
-      onChange(nuevoTexto);
-      return;
-    }
-
-    // Para negrita, cursiva, subrayado: envuelve el texto seleccionado
-    const textoSeleccionado = value.slice(seleccion.start, seleccion.end);
-    if (textoSeleccionado.length === 0) {
-      // Sin selección: inserta marcadores vacíos para que el usuario escriba adentro
-      const nuevoTexto =
-        value.slice(0, seleccion.start) +
-        accion.marcador + accion.marcador +
-        value.slice(seleccion.end);
-      onChange(nuevoTexto);
-    } else {
-      // Con selección: envuelve
-      const nuevoTexto =
-        value.slice(0, seleccion.start) +
-        accion.marcador + textoSeleccionado + accion.marcador +
-        value.slice(seleccion.end);
-      onChange(nuevoTexto);
-    }
-  }
-
-  return (
-    <View style={editorStyles.seccionWrapper}>
-      {/* Título de la sección */}
-      <View style={editorStyles.seccionHeader}>
-        <MaterialCommunityIcons name="file-document-edit-outline" size={13} color="#64748b" />
-        <Text style={editorStyles.seccionTitulo}>{seccion.titulo.toUpperCase()}</Text>
-      </View>
-
-      {/* Toolbar de formato */}
-      <ToolbarWYSIWYG onAccion={aplicarFormato} />
-
-      {/* Area de texto */}
-      <TextInput
-        ref={inputRef}
-        style={editorStyles.inputArea}
-        value={value}
-        onChangeText={onChange}
-        placeholder={seccion.placeholder}
-        placeholderTextColor="#334155"
-        multiline
-        textAlignVertical="top"
-        onSelectionChange={e => setSeleccion(e.nativeEvent.selection)}
-        scrollEnabled={false}
-      />
-
-      {/* Contador de caracteres */}
-      <Text style={editorStyles.contador}>{value.length} caracteres</Text>
-    </View>
-  );
-}
-
-const editorStyles = StyleSheet.create({
-  seccionWrapper: {
-    backgroundColor: '#111827',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-  },
-  seccionHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10,
-  },
-  seccionTitulo: {
-    color: '#475569', fontSize: 9, fontWeight: '800', letterSpacing: 0.8,
-  },
-  inputArea: {
-    color: '#e2e8f0',
-    fontSize: 13,
-    fontWeight: '400',
-    lineHeight: 20,
-    minHeight: 90,
-    backgroundColor: '#0d1117',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-  },
-  contador: {
-    color: '#334155', fontSize: 9, fontWeight: '600',
-    textAlign: 'right', marginTop: 4,
-  },
-});
-
-// ── Componente principal ──────────────────────────────────────────────────────
-
 export default function InformePostEmergenciaScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
 
   const alertaId = route?.params?.alertaId || null;
   const token = route?.params?.token || '';
   const rol = route?.params?.rol || 'BOMBERO';
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Cerrar Sesión",
+      "¿Estás seguro que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Confirmar", onPress: () => logout(), style: "destructive" },
+      ]
+    );
+  };
 
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  // ── Estado ──────────────────────────────────────────────────────────────────
   const [alertaData, setAlertaData] = useState(null);
   const [cargandoAlerta, setCargandoAlerta] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
+  const [observaciones, setObservaciones] = useState('');
+  const inputRef = useRef(null);
+  const [seleccion, setSeleccion] = useState({ start: 0, end: 0 });
 
-  // Contenido de cada sección del informe
-  const [contenidos, setContenidos] = useState(
-    Object.fromEntries(SECCIONES_PLANTILLA.map(s => [s.id, '']))
-  );
-
-  // Observaciones generales (campo adicional libre)
-  const [observacionesGenerales, setObservacionesGenerales] = useState('');
-
-  // ── Cargar datos de la alerta ────────────────────────────────────────────────
   useEffect(() => {
     if (!alertaId) { setCargandoAlerta(false); return; }
 
@@ -274,87 +142,73 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
       }
     }
 
-    async function cargarRegistrosPrevios() {
+    async function cargarDatosInforme() {
       try {
         const res = await fetch(
-          `${API_BASE_URL}/registros_comunicacion/alerta/${alertaId}`,
+          `${API_BASE_URL}/informes/${alertaId}/datos`,
           { headers }
         );
         if (!res.ok) return;
         const data = await res.json();
-        // Si ya hay un informe guardado, pre-llenamos el campo de observaciones generales
-        const informePrevio = Array.isArray(data)
-          ? data.find(r => r.tipo_comunicacion === 'INFORMACION')
-          : null;
-        if (informePrevio?.mensaje) {
-          setObservacionesGenerales(informePrevio.mensaje);
+        if (data?.observaciones_admin) {
+          setObservaciones(data.observaciones_admin);
         }
       } catch (err) {
-        console.warn('Sin registros previos:', err);
+        console.warn('Sin informe previo:', err);
       }
     }
 
     cargarAlerta();
-    cargarRegistrosPrevios();
+    cargarDatosInforme();
   }, [alertaId]);
 
-  // ── Actualizar una sección ───────────────────────────────────────────────────
-  function actualizarSeccion(id, texto) {
-    setContenidos(prev => ({ ...prev, [id]: texto }));
-  }
-
-  // ── Compilar el informe completo ─────────────────────────────────────────────
-  function compilarInforme() {
-    const lineas = [];
-    lineas.push('═══════════════════════════════════════');
-    lineas.push('INFORME POST-EMERGENCIA — AXON FIRE');
-    lineas.push('═══════════════════════════════════════');
-    if (alertaData) {
-      lineas.push(`Alerta ID: ${alertaId}`);
-      lineas.push(`Fecha: ${formatFecha(alertaData.fecha_hora)}`);
-      lineas.push(`Ubicación: ${alertaData.ubicacion || '—'}`);
-      lineas.push('───────────────────────────────────────');
+  function aplicarFormato(accion) {
+    const value = observaciones;
+    if (accion.id === 'lista') {
+      const antes = value.slice(0, seleccion.start);
+      const despues = value.slice(seleccion.end);
+      const lineaInicio = antes.lastIndexOf('\n') + 1;
+      const lineaTexto = antes.slice(lineaInicio);
+      const nuevoTexto = antes.slice(0, lineaInicio) + '• ' + lineaTexto + despues;
+      setObservaciones(nuevoTexto);
+      return;
+    }
+    if (accion.id === 'separador') {
+      const nuevoTexto = value.slice(0, seleccion.start) + accion.marcador + value.slice(seleccion.end);
+      setObservaciones(nuevoTexto);
+      return;
     }
 
-    SECCIONES_PLANTILLA.forEach(sec => {
-      if (contenidos[sec.id]?.trim()) {
-        lineas.push(`\n[${sec.titulo.toUpperCase()}]`);
-        lineas.push(contenidos[sec.id].trim());
-      }
-    });
-
-    if (observacionesGenerales.trim()) {
-      lineas.push('\n[OBSERVACIONES GENERALES]');
-      lineas.push(observacionesGenerales.trim());
+    const textoSeleccionado = value.slice(seleccion.start, seleccion.end);
+    if (textoSeleccionado.length === 0) {
+      const nuevoTexto =
+        value.slice(0, seleccion.start) +
+        accion.marcador + accion.marcador +
+        value.slice(seleccion.end);
+      setObservaciones(nuevoTexto);
+    } else {
+      const nuevoTexto =
+        value.slice(0, seleccion.start) +
+        accion.marcador + textoSeleccionado + accion.marcador +
+        value.slice(seleccion.end);
+      setObservaciones(nuevoTexto);
     }
-
-    lineas.push('\n═══════════════════════════════════════');
-    lineas.push(`Generado: ${new Date().toLocaleString('es-AR')}`);
-
-    return lineas.join('\n');
   }
 
   // ── Guardar informe ──────────────────────────────────────────────────────────
   async function guardarInforme() {
-    const textoCompilado = compilarInforme();
-    const tieneContenido = SECCIONES_PLANTILLA.some(s => contenidos[s.id]?.trim())
-      || observacionesGenerales.trim();
-
-    if (!tieneContenido) {
-      Alert.alert('Informe vacío', 'Completá al menos una sección antes de guardar.');
+    if (!observaciones.trim()) {
+      Alert.alert('Informe vacío', 'Escribí las observaciones antes de guardar.');
       return;
     }
 
     setGuardando(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/registros_comunicacion/crear`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE_URL}/informes/${alertaId}/guardar`, {
+        method: 'PATCH',
         headers,
         body: JSON.stringify({
-          alerta_id: alertaId,
-          mensaje: textoCompilado,
-          tipo_comunicacion: 'INFORMACION',
-          fecha_hora: new Date().toISOString(),
+          observaciones_admin: observaciones,
         }),
       });
 
@@ -374,10 +228,7 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
     }
   }
 
-  // ── Verificar acceso ─────────────────────────────────────────────────────────
   const tieneAcceso = rol === 'ADMIN' || rol === 'OFICIAL' || rol === 'BOMBERO';
-
-  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <KeyboardAvoidingView
@@ -395,9 +246,14 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
           <Text style={styles.headerTitulo}>INFORME POST-EMERGENCIA</Text>
           <Text style={styles.headerSub}>AX-16 · Solo oficiales y administradores</Text>
         </View>
-        {guardadoOk && (
-          <MaterialCommunityIcons name="check-circle" size={22} color="#22c55e" />
-        )}
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          {guardadoOk && (
+            <MaterialCommunityIcons name="check-circle" size={22} color="#22c55e" />
+          )}
+          <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
+            <MaterialCommunityIcons name="logout" size={20} color="#e11d48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -406,7 +262,6 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Sin acceso */}
         {!tieneAcceso && (
           <View style={styles.sinAcceso}>
             <MaterialCommunityIcons name="shield-lock-outline" size={44} color="#334155" />
@@ -455,41 +310,31 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
             <View style={styles.instruccion}>
               <MaterialCommunityIcons name="information-outline" size={14} color="#3b82f6" />
               <Text style={styles.instruccionTexto}>
-                Completá las secciones necesarias. Usá la barra de herramientas para
-                dar formato al texto antes de guardar el informe definitivo.
+                Redactá las observaciones del informe post-emergencia. Usá la barra de herramientas
+                para dar formato al texto antes de guardar.
               </Text>
             </View>
 
-            {/* Secciones WYSIWYG */}
-            {SECCIONES_PLANTILLA.map(sec => (
-              <EditorSeccion
-                key={sec.id}
-                seccion={sec}
-                value={contenidos[sec.id]}
-                onChange={texto => actualizarSeccion(sec.id, texto)}
-              />
-            ))}
-
-            {/* Observaciones generales (campo libre extra) */}
+            {/* Campo único de observaciones */}
             <View style={editorStyles.seccionWrapper}>
               <View style={editorStyles.seccionHeader}>
                 <MaterialCommunityIcons name="note-text-outline" size={13} color="#64748b" />
-                <Text style={editorStyles.seccionTitulo}>OBSERVACIONES GENERALES</Text>
+                <Text style={editorStyles.seccionTitulo}>OBSERVACIONES DEL INFORME</Text>
               </View>
-              <ToolbarWYSIWYG onAccion={accion => {
-                setObservacionesGenerales(prev => prev + accion.marcador);
-              }} />
+              <ToolbarWYSIWYG onAccion={aplicarFormato} />
               <TextInput
+                ref={inputRef}
                 style={editorStyles.inputArea}
-                value={observacionesGenerales}
-                onChangeText={setObservacionesGenerales}
-                placeholder="Cualquier observación adicional que no encaje en las secciones anteriores..."
+                value={observaciones}
+                onChangeText={setObservaciones}
+                placeholder="Escribí acá las observaciones del informe post-emergencia..."
                 placeholderTextColor="#334155"
                 multiline
                 textAlignVertical="top"
+                onSelectionChange={e => setSeleccion(e.nativeEvent.selection)}
                 scrollEnabled={false}
               />
-              <Text style={editorStyles.contador}>{observacionesGenerales.length} caracteres</Text>
+              <Text style={editorStyles.contador}>{observaciones.length} caracteres</Text>
             </View>
 
             {/* Botón guardar */}
@@ -522,4 +367,37 @@ export default function InformePostEmergenciaScreen({ navigation, route }) {
       </ScrollView>
     </KeyboardAvoidingView>
   );
-};
+}
+
+const editorStyles = StyleSheet.create({
+  seccionWrapper: {
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+  },
+  seccionHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10,
+  },
+  seccionTitulo: {
+    color: '#475569', fontSize: 9, fontWeight: '800', letterSpacing: 0.8,
+  },
+  inputArea: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 20,
+    minHeight: 200,
+    backgroundColor: '#0d1117',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+  },
+  contador: {
+    color: '#334155', fontSize: 9, fontWeight: '600',
+    textAlign: 'right', marginTop: 4,
+  },
+});
