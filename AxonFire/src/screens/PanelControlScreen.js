@@ -118,6 +118,23 @@ export default function PanelControlScreen({ navigation }) {
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const unreadCount = getUnreadCount();
 
+  const abrirAsistencia = (alertaId) => {
+    try {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('AttendanceBoard', { alerta_id: alertaId });
+      } else {
+        navigation.navigate('AttendanceBoard', { alerta_id: alertaId });
+      }
+    } catch (e) {
+      try {
+        navigation.navigate('Asistencia', { alerta_id: alertaId });
+      } catch (err) {
+        console.log('Error de navegación a Asistencia:', err);
+      }
+    }
+  };
+
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
@@ -531,11 +548,7 @@ export default function PanelControlScreen({ navigation }) {
                 <View style={{ marginBottom: 16 }}>
                   <TouchableOpacity
                     activeOpacity={0.9}
-                    onPress={() =>
-                      navigation.navigate("Asistencia", {
-                        alerta_id: alertaActiva.id,
-                      })
-                    }
+                    onPress={() => abrirAsistencia(alertaActiva.id)}
                     style={[styles.activeEmergencyBanner, { marginBottom: 0 }]}
                   >
                     <View style={styles.emergencyBannerLeft}>

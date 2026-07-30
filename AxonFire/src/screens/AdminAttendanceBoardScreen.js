@@ -242,9 +242,9 @@ export default function AdminAttendanceBoardScreen({ navigation, route }) {
       navigation.goBack();
     } else {
       if (user?.rol === 'ADMIN') {
-        navigation.navigate('AdminApp');
+        navigation.navigate('AdminApp', { screen: 'Panel' });
       } else {
-        navigation.navigate('MainApp');
+        navigation.navigate('MainApp', { screen: 'Panel' });
       }
     }
   };
