@@ -325,6 +325,19 @@ export default function EmergencyScreen({ route, navigation }) {
   const [respuestaSummary, setRespuestaSummary] = useState({ confirmaron: 0, rechazaron: 0, pendientes: 0 });
   const [resolvedAlertaId, setResolvedAlertaId] = useState(alertaId);
 
+  // ── BUG01 FIX: Sincronizar resolvedAlertaId cuando cambia el param de navegación ──
+  // Cuando el poller de App.js navega a Emergencia con un nuevo alerta_id,
+  // el componente (que ya está montado como tab) necesita actualizar su estado
+  // para no seguir mostrando la alerta vieja finalizada.
+  useEffect(() => {
+    if (alertaId && alertaId !== resolvedAlertaId) {
+      setResolvedAlertaId(alertaId);
+      setRespuesta(null);       // Resetear para mostrar botones de confirmar/rechazar
+      setAlertaData(null);      // Limpiar data de la alerta anterior
+      setLoadingAlerta(true);   // Mostrar loading mientras carga la nueva alerta
+    }
+  }, [alertaId]);
+
   // ── AX-14: Tiempos críticos ──────────────────────────────────────────────
   // Hora de llamado: se captura automáticamente al confirmar (o desde alertaData)
   const [horaLlamado, setHoraLlamado] = useState('');
@@ -431,7 +444,9 @@ export default function EmergencyScreen({ route, navigation }) {
 
   // ── Cargar detalles de la alerta y respuestas unificadas ───────────────────
   const fetchEmergencyData = useCallback(async () => {
-    let activeAlertaId = resolvedAlertaId || alertaId;
+    // BUG01 FIX: Priorizar alertaId (params frescos de navegación) sobre
+    // resolvedAlertaId (que puede estar stale con una alerta vieja finalizada)
+    let activeAlertaId = alertaId || resolvedAlertaId;
 
     setLoadingAlerta(true);
     try {
