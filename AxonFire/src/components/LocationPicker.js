@@ -642,8 +642,10 @@ export default function LocationPicker({
           pitchEnabled={false}
           showsCompass={false}
           showsPointsOfInterest={true}
-          showsBuildings={true}
-          showsIndoors={true}
+          liteMode={Platform.OS === 'android'}
+          showsBuildings={Platform.OS !== 'android'}
+          showsTraffic={false}
+          showsIndoors={Platform.OS !== 'android'}
           mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
           customMapStyle={Platform.OS === 'android' ? tacticalMapStyle : undefined}
         />

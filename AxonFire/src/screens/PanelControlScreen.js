@@ -24,6 +24,7 @@ import { API_BASE_URL } from "../config/api";
 import axios from "axios";
 import { useNotifications } from "../context/NotificationContext";
 import { styles } from "../styles/PanelControlScreenStyles";
+import { getPrioridadConfig, getAlertIcon, getTipoAlerta, getPriorityColor } from "../utils/alertHelpers";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,15 +73,6 @@ function getStatusBadgeStyles(estado = "") {
   }
 }
 
-function clasificarPrioridad(prioridad = "") {
-  const p = String(prioridad).toLowerCase();
-  if (p === "1" || p.includes("critica") || p.includes("crítica"))
-    return "critica";
-  if (p === "2" || p.includes("alta")) return "alta";
-  if (p === "3" || p.includes("media")) return "media";
-  return "baja";
-}
-
 function tiempoTranscurrido(fechaISO) {
   if (!fechaISO) return "";
   const min = Math.floor((Date.now() - new Date(fechaISO).getTime()) / 60000);
@@ -89,47 +81,6 @@ function tiempoTranscurrido(fechaISO) {
   const hs = Math.floor(min / 60);
   if (hs < 24) return `Hace ${hs} hs`;
   return `Hace ${Math.floor(hs / 24)} días`;
-}
-
-function getAlertIcon(tipo = "") {
-  const t = tipo.toLowerCase();
-  if (t.includes("incendio") || t.includes("fuego"))
-    return { icon: "fire", color: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" };
-  if (
-    t.includes("rescate") ||
-    t.includes("accidente") ||
-    t.includes("vehicular")
-  )
-    return {
-      icon: "car-wrench",
-      color: "#fbbf24",
-      bg: "rgba(251, 191, 36, 0.12)",
-    };
-  if (t.includes("gas") || t.includes("quimico") || t.includes("hazmat"))
-    return {
-      icon: "biohazard",
-      color: "#fca5a5",
-      bg: "rgba(252, 165, 165, 0.12)",
-    };
-  if (t.includes("medic") || t.includes("ambulancia"))
-    return {
-      icon: "ambulance",
-      color: "#38bdf8",
-      bg: "rgba(56, 189, 248, 0.12)",
-    };
-  return {
-    icon: "alert-circle",
-    color: "#94a3b8",
-    bg: "rgba(148, 163, 184, 0.12)",
-  };
-}
-
-function getPriorityColor(prioridad = "") {
-  const p = String(prioridad).toLowerCase();
-  if (p === "critica" || p.includes("1")) return "#ef4444";
-  if (p === "alta" || p.includes("2")) return "#fbbf24";
-  if (p === "media" || p.includes("3")) return "#38bdf8";
-  return "#6ee7b7";
 }
 
 function formatAlertTitle(tipo = "") {
@@ -269,9 +220,7 @@ export default function PanelControlScreen({ navigation }) {
     estado: clasificarEstado(
       a.estadoAlerta?.nombre_estado || a.estadoAlerta?.nombre || a.estado || "",
     ),
-    prioridad: clasificarPrioridad(
-      a.prioridad || a.subCategoriaAlerta?.prioridad || "",
-    ),
+    prioridad: String(a.prioridad || '').toLowerCase(),
     tipo:
       a.subCategoriaAlerta?.nombre_sub_categoria ||
       a.subCategoriaAlerta?.nombre ||

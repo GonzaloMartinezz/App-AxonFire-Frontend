@@ -865,6 +865,10 @@ export default function MapScreen({ navigation, route }) {
             showsCompass={false}
             showsScale={false}
             rotateEnabled={false}
+            liteMode={Platform.OS === 'android'}
+            showsBuildings={Platform.OS !== 'android'}
+            showsTraffic={false}
+            showsIndoors={Platform.OS !== 'android'}
             onMapReady={() => setMapaListo(true)}
             onRegionChangeComplete={region => setCurrentRegion(region)}
           >

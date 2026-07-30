@@ -54,21 +54,12 @@ const DEFAULT_LAT = -26.8083;
 const DEFAULT_LNG = -65.2176;
 
 const TIPOS_INCIDENTE = [
-  { label: 'Incendio Estructural', id: '1' },
-  { label: 'Incendio Forestal', id: '1' },
-  { label: 'Rescate Vehicular', id: '2' },
-  { label: 'Emergencia Médica', id: '3' },
-  { label: 'Fuga de Gas', id: '3' },
-  { label: 'Accidente Industrial', id: '1' },
+  { label: 'INCENDIO ESTRUCTURAL', id: '1' },
+  { label: 'RESCATE AUTOMOVIL', id: '2' },
+  { label: 'OTRO TIPO', id: '3' },
 ];
 
-const NIVELES_SEVERIDAD = [
-  'NIVEL 1 - MENOR',
-  'NIVEL 2 - MODERADO',
-  'NIVEL 3 - ALTO',
-  'NIVEL 4 - CRÍTICO',
-  'NIVEL 5 - EXTREMO',
-];
+const NIVELES_PRIORIDAD = ['BAJA', 'MEDIA', 'ALTA'];
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function NewAlertScreen({ navigation }) {
@@ -87,12 +78,12 @@ export default function NewAlertScreen({ navigation }) {
   };
 
   const [formData, setFormData] = useState({
-    type: 'Incendio Estructural',
-    severity: 'NIVEL 4 - CRÍTICO',
+    type: 'INCENDIO ESTRUCTURAL',
+    prioridad: 'ALTA',
     location: '',
     description: '',
-    latitud: '',       // ← NUEVO: requerido por el contrato
-    longitud: '',       // ← NUEVO: requerido por el contrato
+    latitud: '',
+    longitud: '',
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -156,10 +147,11 @@ export default function NewAlertScreen({ navigation }) {
       const body = {
         sub_categoria_alerta_id: subCategoriaId,
         ubicacion: formData.location,
-        latitud: lat,             // ← NUEVO
-        longitud: lng,             // ← NUEVO
-        observaciones: `[${formData.severity}] - ${formData.description || 'Sin descripción'}`,
-        destinatariosIds: [],          // se notifica a todos los activos
+        latitud: lat,
+        longitud: lng,
+        observaciones: formData.description || 'Sin descripción',
+        prioridad: formData.prioridad,
+        destinatariosIds: [],
       };
 
       const response = await fetch(`${API_BASE_URL}/alerta/crear-con-notificacion`, {
@@ -176,8 +168,8 @@ export default function NewAlertScreen({ navigation }) {
 
       Alert.alert('Despacho Confirmado', 'Las unidades de emergencia han sido notificadas.');
       setFormData({
-        type: 'Incendio Estructural',
-        severity: 'NIVEL 4 - CRÍTICO',
+        type: 'INCENDIO ESTRUCTURAL',
+        prioridad: 'ALTA',
         location: '',
         description: '',
         latitud: '',
@@ -260,17 +252,17 @@ export default function NewAlertScreen({ navigation }) {
               )}
 
               <DropdownField
-                label="NIVEL DE SEVERIDAD"
-                value={formData.severity}
+                label="NIVEL DE PRIORIDAD"
+                value={formData.prioridad}
                 onPress={() => setShowSeverityPicker(!showSeverityPicker)}
               />
               {showSeverityPicker && (
                 <View style={styles.pickerContainer}>
-                  {NIVELES_SEVERIDAD.map(nivel => (
+                  {NIVELES_PRIORIDAD.map(nivel => (
                     <TouchableOpacity
                       key={nivel}
                       style={styles.pickerOption}
-                      onPress={() => { updateForm('severity', nivel); setShowSeverityPicker(false); }}
+                      onPress={() => { updateForm('prioridad', nivel); setShowSeverityPicker(false); }}
                     >
                       <Text style={styles.pickerOptionText}>{nivel}</Text>
                     </TouchableOpacity>
