@@ -131,6 +131,19 @@ function AppContent() {
         const data = await res.json();
         const alertas = Array.isArray(data?.alertas) ? data.alertas : Array.isArray(data) ? data : [];
 
+        // BUG01 FIX: Si la alerta a la que redirigimos antes ya está finalizada,
+        // limpiar el ref para permitir redirección a nuevas alertas futuras
+        if (lastRedirectedAlertRef.current) {
+          const prevAlert = alertas.find(a => a.id === lastRedirectedAlertRef.current);
+          if (prevAlert) {
+            const prevEstado = prevAlert.estadoAlerta?.nombre_estado || '';
+            const prevLocalFinalized = await AsyncStorage.getItem(`finalized_alert_${prevAlert.id}`);
+            if (prevEstado === 'FINALIZADO' || prevLocalFinalized === 'true') {
+              lastRedirectedAlertRef.current = null;
+            }
+          }
+        }
+
         // Find active (non-finalized) alerts
         for (const alerta of alertas) {
           if (!isMounted) return;

@@ -360,6 +360,10 @@ export default function AppNavigator() {
             name="AttendanceBoard"
             component={AdminAttendanceBoardScreen}
           />
+          <Stack.Screen
+            name="Asistencia"
+            component={AdminAttendanceBoardScreen}
+          />
           <Stack.Screen name="Emergency" component={EmergencyScreen} />
           <Stack.Screen name="Reports" component={ReportsScreen} />
 

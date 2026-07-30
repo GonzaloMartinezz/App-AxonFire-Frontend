@@ -309,6 +309,26 @@ export default function EmergencyScreen({ route, navigation }) {
       ]
     );
   };
+  const irAlPanel = () => {
+    navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp', { screen: 'Panel' });
+  };
+  const irAAsistencia = (idTarget) => {
+    const aid = idTarget || resolvedAlertaId || alertaId;
+    try {
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('AttendanceBoard', { alerta_id: aid });
+      } else {
+        navigation.navigate('AttendanceBoard', { alerta_id: aid });
+      }
+    } catch (e) {
+      try {
+        navigation.navigate('Asistencia', { alerta_id: aid });
+      } catch (err) {
+        console.log('Error de navegación:', err);
+      }
+    }
+  };
   const { addNotification } = useNotifications();
   const usuarioId = user?.id ?? null;
   const token = userToken ?? user?.token ?? null;
@@ -324,6 +344,19 @@ export default function EmergencyScreen({ route, navigation }) {
   const [responders, setResponders] = useState([]);
   const [respuestaSummary, setRespuestaSummary] = useState({ confirmaron: 0, rechazaron: 0, pendientes: 0 });
   const [resolvedAlertaId, setResolvedAlertaId] = useState(alertaId);
+
+  // ── BUG01 FIX: Sincronizar resolvedAlertaId cuando cambia el param de navegación ──
+  // Cuando el poller de App.js navega a Emergencia con un nuevo alerta_id,
+  // el componente (que ya está montado como tab) necesita actualizar su estado
+  // para no seguir mostrando la alerta vieja finalizada.
+  useEffect(() => {
+    if (alertaId && alertaId !== resolvedAlertaId) {
+      setResolvedAlertaId(alertaId);
+      setRespuesta(null);       // Resetear para mostrar botones de confirmar/rechazar
+      setAlertaData(null);      // Limpiar data de la alerta anterior
+      setLoadingAlerta(true);   // Mostrar loading mientras carga la nueva alerta
+    }
+  }, [alertaId]);
 
   // ── AX-14: Tiempos críticos ──────────────────────────────────────────────
   // Hora de llamado: se captura automáticamente al confirmar (o desde alertaData)
@@ -431,7 +464,9 @@ export default function EmergencyScreen({ route, navigation }) {
 
   // ── Cargar detalles de la alerta y respuestas unificadas ───────────────────
   const fetchEmergencyData = useCallback(async () => {
-    let activeAlertaId = resolvedAlertaId || alertaId;
+    // BUG01 FIX: Priorizar alertaId (params frescos de navegación) sobre
+    // resolvedAlertaId (que puede estar stale con una alerta vieja finalizada)
+    let activeAlertaId = alertaId || resolvedAlertaId;
 
     setLoadingAlerta(true);
     try {
@@ -868,7 +903,7 @@ export default function EmergencyScreen({ route, navigation }) {
         <View style={styles.container}>
           <SafeAreaView style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ padding: 4 }}>
+              <TouchableOpacity onPress={irAlPanel} style={{ padding: 4 }}>
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
@@ -898,7 +933,7 @@ export default function EmergencyScreen({ route, navigation }) {
                 <Text style={[styles.changeButtonText, { color: '#fff', fontWeight: 'bold' }]}>CONTROLAR BOLSOS UTILIZADOS</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}>
+              <TouchableOpacity style={[styles.changeButton, { marginTop: 12 }]} onPress={irAlPanel}>
                 <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
                 <Text style={styles.changeButtonText}>Volver al panel principal</Text>
               </TouchableOpacity>
@@ -915,7 +950,7 @@ export default function EmergencyScreen({ route, navigation }) {
       <View style={styles.container}>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ padding: 4 }}>
+            <TouchableOpacity onPress={irAlPanel} style={{ padding: 4 }}>
               <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
             </TouchableOpacity>
             <TouchableOpacity onPress={handleLogout} style={{ padding: 4 }}>
@@ -955,7 +990,7 @@ export default function EmergencyScreen({ route, navigation }) {
               {/* Botón premium de acceso al Tablero de Asistencia */}
               <TouchableOpacity
                 style={styles.boardAccessButton}
-                onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
+                onPress={() => irAAsistencia(resolvedAlertaId || alertaId)}
                 activeOpacity={0.8}
               >
                 <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#fff" />
@@ -1070,7 +1105,7 @@ export default function EmergencyScreen({ route, navigation }) {
             {/* Botón de escape unificado para retornar al Panel Principal */}
             <TouchableOpacity
               style={[styles.changeButton, { marginTop: 12 }]}
-              onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')}
+              onPress={irAlPanel}
             >
               <MaterialCommunityIcons name="arrow-left" size={16} color="#90a4ae" />
               <Text style={styles.changeButtonText}>Volver al panel principal</Text>
@@ -1091,7 +1126,7 @@ export default function EmergencyScreen({ route, navigation }) {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <View style={styles.headerTopRow}>
-              <TouchableOpacity onPress={() => navigation.navigate(user?.rol === 'ADMIN' ? 'AdminApp' : 'MainApp')} style={{ marginRight: 12, padding: 4 }}>
+              <TouchableOpacity onPress={irAlPanel} style={{ marginRight: 12, padding: 4 }}>
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#90a4ae" />
               </TouchableOpacity>
               <Text style={styles.time}>{currentTime}</Text>
@@ -1283,7 +1318,7 @@ export default function EmergencyScreen({ route, navigation }) {
                 {/* Acceso siempre disponible al Tablero de Asistencia */}
                 <TouchableOpacity
                   style={styles.boardAccessButton}
-                  onPress={() => navigation.navigate('AttendanceBoard', { alerta_id: resolvedAlertaId || alertaId })}
+                  onPress={() => irAAsistencia(resolvedAlertaId || alertaId)}
                   activeOpacity={0.8}
                 >
                   <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#fff" />
