@@ -437,13 +437,15 @@ export default function GestionPoisScreen({ navigation }) {
     <View style={styles.container}>
       <StatusBar style="light" backgroundColor="#16181d" />
 
-      {/* Toast */}
-      <Toast
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        onHide={hideToast}
-      />
+      {/* Toast principal (sin modales activos) */}
+      {!formVisible && !deleteModalVisible && (
+        <Toast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onHide={hideToast}
+        />
+      )}
 
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === 'android' ? 20 : 10) }]}>
@@ -775,6 +777,7 @@ export default function GestionPoisScreen({ navigation }) {
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
+          <Toast visible={toast.visible && formVisible} message={toast.message} type={toast.type} onHide={hideToast} />
         </View>
       </Modal>
 
@@ -828,6 +831,7 @@ export default function GestionPoisScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           </View>
+          <Toast visible={toast.visible && deleteModalVisible} message={toast.message} type={toast.type} onHide={hideToast} />
         </View>
       </Modal>
     </View>

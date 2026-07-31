@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext(null);
-
-const STORAGE_KEY = 'axonfire_admin_notifications';
-const MAX_NOTIFICATIONS = 50;
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
@@ -14,145 +13,124 @@ export const useNotifications = () => {
   return context;
 };
 
-/**
- * NotificationProvider — RF-03
- * 
- * Gestiona notificaciones internas para el panel de administrador.
- * Cuando un bombero completa un control de inventario (diario o post-emergencia),
- * se agrega una notificación que el admin puede ver en su campana.
- * 
- * Tipos de notificación:
- * - CONTROL_DIARIO: Checklist diario de un móvil
- * - CONTROL_BOLSO: Checklist post-emergencia de un bolso
- * - CONTROL_CUARTEL: Inventario de base/cuartel
- * 
- * Estructura de cada notificación:
- * {
- *   id: string,
- *   tipo: 'CONTROL_DIARIO' | 'CONTROL_BOLSO' | 'CONTROL_CUARTEL',
- *   bomberoNombre: string,
- *   fechaHora: string (ISO),
- *   recursoNombre: string (nombre del camión, bolso, etc.),
- *   tieneFaltantes: boolean,
- *   cantidadFaltantes: number,
- *   leida: boolean,
- * }
- */
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const { token, user } = useAuth();
 
-  // Guardar notificaciones explícitamente y notificar a otras pestañas
-  const saveNotifications = async (newNotifications) => {
+  const loadNotifications = useCallback(async () => {
+    // Si no hay usuario o token, o no es ADMIN, no cargamos notificaciones
+    // o bien si queremos que todos las vean, lo dejamos.
+    if (!token) return;
+
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newNotifications));
-      // Despachar evento para sincronización local si es necesario (misma pestaña u otras si se usa BroadcastChannel en el futuro)
-      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof Event === 'function') {
-        window.dispatchEvent(new Event('axonfire_local_storage_sync'));
-      }
+      const res = await axios.get(`${API_BASE_URL}/notificaciones`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 3000,
+      });
+      const data = Array.isArray(res.data) ? res.data : (res.data?.notificaciones || []);
+
+      setNotifications((prev) => {
+        if (JSON.stringify(prev) !== JSON.stringify(data)) {
+          return data;
+        }
+        return prev;
+      });
     } catch (error) {
-      console.error('Error saving notifications to storage:', error);
+
+      if (error?.response?.status !== 404) {
+        console.log('Error polling notificaciones:', error?.message);
+      }
+    } finally {
+      setLoaded(true);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    const loadNotifications = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const parsedArray = Array.isArray(parsed) ? parsed : [];
-          
-          setNotifications((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(parsedArray)) {
-              return parsedArray;
-            }
-            return prev;
-          });
-        }
-      } catch (error) {
-        console.error('Error loading notifications from storage:', error);
-      } finally {
-        setLoaded((prev) => (prev ? prev : true));
-      }
-    };
-    
     // Carga inicial
     loadNotifications();
 
-    // RF-03: Polling muy corto para asegurar la actualización rápida (fallback por si falla el evento storage)
     const intervalId = setInterval(() => {
       loadNotifications();
-    }, 1500);
+    }, 3000);
 
-    // Event listener nativo de Web para localStorage (instantáneo entre pestañas)
-    const handleStorageChange = (e) => {
-      if (e.key === STORAGE_KEY || e.type === 'axonfire_local_storage_sync') {
-        loadNotifications();
-      }
-    };
-
-    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      window.addEventListener('storage', handleStorageChange);
-      window.addEventListener('axonfire_local_storage_sync', handleStorageChange);
-    }
-
-    return () => {
-      clearInterval(intervalId);
-      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
-        window.removeEventListener('storage', handleStorageChange);
-        window.removeEventListener('axonfire_local_storage_sync', handleStorageChange);
-      }
-    };
-  }, []);
+    return () => clearInterval(intervalId);
+  }, [loadNotifications]);
 
   /**
-   * Agrega una nueva notificación al inicio de la lista.
-   * @param {Object} notification — datos de la notificación (sin id ni leida)
+   * Agrega una nueva notificación de forma local temporalmente.
+   * Nota: En producción, el backend debe generarlas automáticamente
+   * al guardar un checklist, por lo que este método se usa como fallback.
    */
-  const addNotification = useCallback((notification) => {
-    const newNotification = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      leida: false,
-      fechaHora: new Date().toISOString(),
-      ...notification,
-    };
-    setNotifications((prev) => {
-      const updated = [newNotification, ...prev].slice(0, MAX_NOTIFICATIONS);
-      saveNotifications(updated);
-      return updated;
-    });
-  }, []);
+  const addNotification = useCallback(async (notification) => {
+    if (!token) return;
+    try {
+      // Intento de guardar en el backend si el endpoint existe
+      await axios.post(`${API_BASE_URL}/notificaciones`, notification, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadNotifications();
+    } catch (err) {
+      console.log('Error al enviar notificación al backend:', err?.message);
+    }
+  }, [token, loadNotifications]);
 
   /**
    * Marca una notificación como leída.
    */
-  const markAsRead = useCallback((id) => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => (n.id === id ? { ...n, leida: true } : n));
-      saveNotifications(updated);
-      return updated;
-    });
-  }, []);
+  const markAsRead = useCallback(async (id) => {
+    if (!token) return;
+
+    // Actualización optimista local
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n)));
+
+    try {
+      await axios.patch(`${API_BASE_URL}/notificaciones/${id}/leer`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadNotifications();
+    } catch (err) {
+      console.log('Error marcando notificación como leída:', err?.message);
+    }
+  }, [token, loadNotifications]);
 
   /**
    * Marca todas las notificaciones como leídas.
    */
-  const markAllAsRead = useCallback(() => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, leida: true }));
-      saveNotifications(updated);
-      return updated;
-    });
-  }, []);
+  const markAllAsRead = useCallback(async () => {
+    if (!token) return;
+
+    // Actualización optimista local
+    setNotifications((prev) => prev.map((n) => ({ ...n, leida: true })));
+
+    try {
+      await axios.post(`${API_BASE_URL}/notificaciones/leer-todas`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadNotifications();
+    } catch (err) {
+      console.log('Error marcando todas como leídas:', err?.message);
+    }
+  }, [token, loadNotifications]);
 
   /**
    * Elimina todas las notificaciones.
    */
-  const clearAll = useCallback(() => {
+  const clearAll = useCallback(async () => {
+    if (!token) return;
+
+    // Actualización optimista
     setNotifications([]);
-    saveNotifications([]);
-  }, []);
+
+    try {
+      await axios.delete(`${API_BASE_URL}/notificaciones`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      loadNotifications();
+    } catch (err) {
+      console.log('Error limpiando notificaciones:', err?.message);
+    }
+  }, [token, loadNotifications]);
 
   /**
    * Retorna la cantidad de notificaciones no leídas.
@@ -176,3 +154,4 @@ export const NotificationProvider = ({ children }) => {
     </NotificationContext.Provider>
   );
 };
+
