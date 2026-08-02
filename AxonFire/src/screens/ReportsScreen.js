@@ -79,6 +79,14 @@ export default function ReportsScreen({ navigation }) {
       const headers = {
         'Authorization': `Bearer ${token}`
       };
+
+      const checkRes = await fetch(`${API_BASE_URL}/informes/${alerta.id}/datos`, { headers });
+      if (!checkRes.ok) {
+        win.close();
+        Alert.alert('Informe no disponible', 'No se encuentra cargado el informe legal, por favor, asocie uno antes de imprimir');
+        return;
+      }
+
       const response = await axios.get(`${API_BASE_URL}/informes/${alerta.id}/pdf`, {
         headers,
         responseType: 'blob',
@@ -185,6 +193,13 @@ export default function ReportsScreen({ navigation }) {
       const headers = {
         'Authorization': `Bearer ${token}`
       };
+
+      const checkRes = await fetch(`${API_BASE_URL}/informes/${alerta.id}/datos`, { headers });
+      if (!checkRes.ok) {
+        Alert.alert('Informe no disponible', 'No se encuentra cargado el informe legal, por favor, asocie uno antes de imprimir');
+        return;
+      }
+
       const fileUri = FileSystem.documentDirectory + `informe_${alerta.id}.pdf`;
       const downloadPromise = FileSystem.downloadAsync(
         `${API_BASE_URL}/informes/${alerta.id}/pdf`,

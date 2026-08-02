@@ -507,10 +507,19 @@ export default function AlertDetailScreen({ route, navigation }) {
     if (Platform.OS !== 'web' || !alerta) return;
     const win = window.open('', '_blank');
     try {
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      const checkRes = await fetch(`${API_BASE_URL}/informes/${alertaId}/datos`, { headers });
+      if (!checkRes.ok) {
+        win.close();
+        Alert.alert('Informe no disponible', 'No se encuentra cargado el informe legal, por favor, asocie uno antes de imprimir');
+        return;
+      }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
       const response = await fetch(`${API_BASE_URL}/informes/${alertaId}/pdf`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -765,7 +774,7 @@ export default function AlertDetailScreen({ route, navigation }) {
           <Text style={styles.headerTitle}>DETALLE DE EMERGENCIA</Text>
         </View>
         <View style={styles.headerRight}>
-          {Platform.OS === 'web' && (
+          {Platform.OS === 'web' && alerta?.estadoAlerta?.nombre_estado === 'FINALIZADO' && (
             <TouchableOpacity
               style={[styles.iconBtn, { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(225,29,72,0.15)', paddingHorizontal: 10, borderRadius: 8 }]}
               onPress={imprimirInforme}
