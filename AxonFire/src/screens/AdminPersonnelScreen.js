@@ -78,6 +78,7 @@ export default function AdminPersonnelScreen({ navigation }) {
   const [selectedRango, setSelectedRango] = useState('TODOS LOS RANGOS');
   const [rangoDropdownOpen, setRangoDropdownOpen] = useState(false);
   const [rangoOptions, setRangoOptions] = useState(['TODOS LOS RANGOS']);
+  const [togglingId, setTogglingId] = useState(null);
 
   useEffect(() => {
     fetchPersonnel();
@@ -128,8 +129,47 @@ export default function AdminPersonnelScreen({ navigation }) {
     return '#6ee7b7';
   };
 
-  const getStatusInfo = (item) => {
-    return { isFree: false, status: 'ACTIVO', timeRest: 'EN SERVICIO' };
+  const toggleFirefighterStatus = async (person) => {
+    const usuarioId = person.usuarioId?.id || person.usuario_id;
+    if (!usuarioId) {
+      Alert.alert('Error', 'No se pudo identificar al usuario');
+      return;
+    }
+
+    const estaActivo = person.usuarioId?.activo !== false;
+    const accion = estaActivo ? 'desactivar' : 'activar';
+
+    Alert.alert(
+      'Confirmar acción',
+      `¿Estás seguro de ${accion} a ${person.nombre} ${person.apellido}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          style: estaActivo ? 'destructive' : 'default',
+          onPress: async () => {
+            setTogglingId(person.id);
+            try {
+              const res = await fetch(`${API_BASE_URL}/usuarios/${usuarioId}/toggle-activo`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || 'Error al actualizar');
+              Alert.alert('Éxito', data.msj);
+              fetchPersonnel();
+            } catch (err) {
+              Alert.alert('Error', err.message);
+            } finally {
+              setTogglingId(null);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const filteredPersonnel = personnel.filter(person => {
@@ -255,7 +295,8 @@ export default function AdminPersonnelScreen({ navigation }) {
         ) : (
           <>
             {filteredPersonnel.map((person) => {
-              const statusInfo = getStatusInfo(person);
+              const estaActivo = person.usuarioId?.activo !== false;
+              const isToggling = togglingId === person.id;
               return (
                 <View key={person.id} style={styles.personCard}>
                   <View style={[styles.cardLeftBorder, { backgroundColor: getRangoColor(person.rangoBombero?.nombre_rol) }]} />
@@ -275,20 +316,34 @@ export default function AdminPersonnelScreen({ navigation }) {
                     <Text style={styles.personName}>{person.nombre} {person.apellido}</Text>
                     <View style={styles.statusRow}>
                       <MaterialCommunityIcons
-                        name={statusInfo.isFree ? "close-circle" : "check-circle"}
+                        name={estaActivo ? "check-circle" : "close-circle"}
                         size={12}
-                        color={statusInfo.isFree ? "#fca5a5" : "#38bdf8"}
+                        color={estaActivo ? "#38bdf8" : "#fca5a5"}
                       />
-                      <Text style={[styles.statusText, { color: statusInfo.isFree ? "#fca5a5" : "#38bdf8" }]}>
-                        {statusInfo.status}
+                      <Text style={[styles.statusText, { color: estaActivo ? "#38bdf8" : "#fca5a5" }]}>
+                        {estaActivo ? 'ACTIVO' : 'INACTIVO'}
                       </Text>
-                      <MaterialCommunityIcons name="clock-outline" size={12} color="#f8fafc" style={{ marginLeft: 12 }} />
-                      <Text style={styles.timeText}>{statusInfo.timeRest}</Text>
+                      {isToggling ? (
+                        <ActivityIndicator size="small" color="#94a3b8" style={{ marginLeft: 12 }} />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="clock-outline" size={12} color="#f8fafc" style={{ marginLeft: 12 }} />
+                          <Text style={styles.timeText}>EN SERVICIO</Text>
+                        </>
+                      )}
                     </View>
                   </View>
 
-                  <TouchableOpacity style={styles.moreBtn}>
-                    <MaterialCommunityIcons name="dots-vertical" size={20} color="#94a3b8" />
+                  <TouchableOpacity
+                    style={styles.moreBtn}
+                    onPress={() => toggleFirefighterStatus(person)}
+                    disabled={isToggling}
+                  >
+                    <MaterialCommunityIcons
+                      name={estaActivo ? "account-off" : "account-check"}
+                      size={20}
+                      color={estaActivo ? "#fca5a5" : "#38bdf8"}
+                    />
                   </TouchableOpacity>
                 </View>
               );
